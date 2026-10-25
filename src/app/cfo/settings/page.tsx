@@ -239,6 +239,7 @@ export default function CfoSettings() {
         </label>
       }
     >
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-start">
       <Card>
         <SectionTitle>{v.company}</SectionTitle>
         <ModeSwitch />
@@ -259,7 +260,9 @@ export default function CfoSettings() {
       </Card>
 
       <DigestSettings />
+      </div>
 
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-start">
       <Card>
         <div className="flex items-center justify-between gap-2 mb-1">
           <SectionTitle>{mode === 'family' ? 'Карты, наличные и накопления' : 'Счета и кассы'}</SectionTitle>
@@ -319,6 +322,7 @@ export default function CfoSettings() {
           </div>
         ))}
       </Card>
+      </div>
       {dialogElement}
     </CfoPage>
   )

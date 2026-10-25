@@ -378,7 +378,7 @@ export default function AiAgentReview() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         {/* Счётчик «На проверке» живёт в подзаголовке: заголовок остаётся строкой, и вкладка браузера получает его название. */}
         <PageHeader
           title={t.reviewTitle}

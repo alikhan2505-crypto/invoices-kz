@@ -343,7 +343,7 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="narrow" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader title="Витрина" />
         <div className="nav-glass nav-card-accent rounded-2xl p-6 text-center max-w-md">
           <h2 className="text-base font-semibold mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>Магазин не подключён</h2>
@@ -362,7 +362,7 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="narrow" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader title="Витрина" subtitle="Публичная страница с вашими товарами — делитесь ссылкой в Instagram/WhatsApp" />
 
         <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit mb-4">
@@ -388,6 +388,10 @@ export default function KaspiShopStorefrontSettings() {
 
         {tab === 'settings' && (
           <>
+            {/* xl+: публикация и счётчик слева, «Оформление» справа; уже xl -- одной колонкой,
+                отступы между карточками дают их собственные mt-4. */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 xl:gap-4 xl:items-start">
+            <div className="min-w-0">
             {!settings?.cashierConnected ? (
               <div className="nav-glass rounded-2xl p-5 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 Для приёма оплаты на витрине нужен подключённый Kaspi Pay Кассир.{' '}
@@ -435,12 +439,14 @@ export default function KaspiShopStorefrontSettings() {
               </div>
             )}
 
-            <div className="nav-glass rounded-2xl p-5 mt-4 space-y-4">
+            </div>
+
+            <div className="nav-glass rounded-2xl p-5 mt-4 xl:mt-0 space-y-4 min-w-0">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Оформление</div>
 
               <div>
                 <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--nav-text-muted)' }}>Фон страницы</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {BACKGROUND_PRESETS.map(color => (
                     <button key={color} onClick={() => setBackgroundColor(color)} aria-label={`Фон ${color}`}
                       className="w-11 h-11 flex items-center justify-center rounded-full flex-shrink-0">
@@ -501,6 +507,7 @@ export default function KaspiShopStorefrontSettings() {
                 {appearanceSaving ? 'Сохраняем…' : appearanceSaved ? 'Сохранено ✓' : 'Сохранить оформление'}
               </button>
             </div>
+            </div>
           </>
         )}
 
@@ -515,7 +522,7 @@ export default function KaspiShopStorefrontSettings() {
 
             <div>
               <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Разделы</h2>
-              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Группируйте товары по разделам — на витрине они покажутся отдельными блоками.</p>
+              <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>Группируйте товары по разделам — на витрине они покажутся отдельными блоками.</p>
               {categories.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {categories.map(c => (
@@ -531,7 +538,7 @@ export default function KaspiShopStorefrontSettings() {
                   ))}
                 </div>
               )}
-              <div className="flex gap-2 mb-6">
+              <div className="flex gap-2 mb-6 max-w-xl">
                 <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') createCategory() }}
                   placeholder="Новый раздел, например «Футболки»"
@@ -550,7 +557,7 @@ export default function KaspiShopStorefrontSettings() {
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-critical)' }} />
                 <h2 className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Товары из Kaspi</h2>
               </div>
-              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Включите нужные товары — они появятся на витрине с красной рамкой ниже.</p>
+              <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>Включите нужные товары — они появятся на витрине с красной рамкой ниже.</p>
               {catalogLoading ? (
                 <div className="nav-glass rounded-2xl p-6 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем…</div>
               ) : kaspiProducts.length === 0 ? (
@@ -558,7 +565,7 @@ export default function KaspiShopStorefrontSettings() {
                   Нет товаров в продаже. Проверьте <a href="/kaspi-shop/removed" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Управление товарами</a>.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 min-[2200px]:grid-cols-8 gap-2.5">
                   {kaspiProducts.map(p => (
                     <div key={p.id} className="nav-glass rounded-xl overflow-hidden"
                       style={p.showOnStorefront ? { boxShadow: '0 0 0 2px var(--nav-critical)' } : undefined}>
@@ -596,10 +603,10 @@ export default function KaspiShopStorefrontSettings() {
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-teal)' }} />
                 <h2 className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Свои товары</h2>
               </div>
-              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Товары, не связанные с Kaspi — всегда показываются на витрине с синей рамкой.</p>
+              <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>Товары, не связанные с Kaspi — всегда показываются на витрине с синей рамкой.</p>
 
               {customProducts.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 min-[2200px]:grid-cols-8 gap-2.5 mb-3">
                   {customProducts.map(p => (
                     <div key={p.id} className="nav-glass rounded-xl overflow-hidden" style={{ boxShadow: '0 0 0 2px var(--nav-teal)' }}>
                       {p.imageUrl ? (
@@ -630,7 +637,7 @@ export default function KaspiShopStorefrontSettings() {
                 </div>
               )}
 
-              <div className="nav-glass rounded-2xl p-4 space-y-2">
+              <div className="nav-glass rounded-2xl p-4 space-y-2 max-w-2xl">
                 <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>+ Добавить товар</div>
                 <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Название"
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"

@@ -15,6 +15,7 @@ import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 import LapsedPlanNotice from '@/components/LapsedPlanNotice'
 import { dashboardDict } from '@/lib/i18n/dashboard'
 import { historyDict } from '@/lib/i18n/history'
@@ -737,7 +738,7 @@ export default function DashboardPage() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+        <PageContainer variant="wide">
           <PageHeader title={d.pageTitle} />
 
           {/* Пробный период и срок тарифа. Same wording as the banner on
@@ -839,7 +840,7 @@ export default function DashboardPage() {
             <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
               {d.analyticsHeading}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] 2xl:grid-cols-[3fr_1fr] gap-4 items-start">
               {/* Main revenue chart card */}
               {loading ? (
                 <div className="nav-glass nav-card-accent rounded-[24px] p-[22px_22px_12px]">
@@ -1136,7 +1137,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </footer>
-        </div>
+        </PageContainer>
         {/* Mounted only after the data has loaded: the tour freezes its step list when it starts, and the analytics anchor only exists once the skeletons are gone. */}
         {!loading && <DashboardTour />}
       </>

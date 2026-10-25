@@ -10,7 +10,7 @@ import { extractAttributes } from '@/lib/kaspiShop/salesAnalytics'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -622,11 +622,11 @@ export default function KaspiShopProductAvailability() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Управление товарами" />
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+          <p className={`text-sm ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
             Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
             обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
             выключается, чтобы репрайсер случайно не вернул его в продажу.
@@ -639,7 +639,7 @@ export default function KaspiShopProductAvailability() {
             catalogue instead. */}
         <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
           <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Фото товаров</div>
-          <p className="text-[13px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+          <p className={`text-[13px] mb-3 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-muted)' }}>
             Загружает фотографии из карточек Kaspi для товаров, у которых их ещё нет. Нужны, чтобы ИИ-агент
             мог прислать клиенту фото товара. За один раз обрабатывается 20 товаров — нажимайте, пока не
             останется ноль.
@@ -716,7 +716,7 @@ export default function KaspiShopProductAvailability() {
 
         {/* Same card grid as the Демпинг page (2026-08-21 founder request)
             -- compact cards, up to 4 per row on wide screens. */}
-        <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
+        <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5 gap-3 items-start">
           {offers.map((offer, i) => {
             const state = rowStates[offer.sku] || 'idle'
             const error = rowErrors[offer.sku]

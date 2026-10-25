@@ -245,9 +245,10 @@ export default function KaspiApiDocsPage() {
             standalone header's sticky bar. The page's own language follows
             the site-wide switcher (DOCS_COPY[lang] above) -- no independent toggle
             here anymore. */}
-        <PageContainer variant="wide" align="start">
+        <PageContainer variant="full">
           <PageHeader title={DOCS_HEADING[lang]} subtitle={d.i18nNote} />
 
+        <div className="grid grid-cols-1 gap-x-4 xl:grid-cols-2">
         <div className="pb-6">
           <Panel>
             <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
@@ -274,6 +275,7 @@ export default function KaspiApiDocsPage() {
               ))}
             </ol>
           </div>
+        </div>
         </div>
 
         <div>

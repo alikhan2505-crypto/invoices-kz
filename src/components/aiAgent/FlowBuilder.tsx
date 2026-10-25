@@ -192,7 +192,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
       <div>
         <button onClick={cancelEdit} className="text-xs mb-3" style={{ color: 'var(--nav-accent)' }}>← Назад к списку</button>
 
-        <div className="nav-glass nav-card-accent rounded-2xl p-4 mb-3">
+        <div className="nav-glass nav-card-accent rounded-2xl p-4 mb-3 xl:max-w-3xl">
           <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Название сценария</span>
           <input value={draftName} onChange={e => setDraftName(e.target.value)} maxLength={60}
             placeholder="Например: Главное меню"
@@ -207,7 +207,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
           </label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
           {draftSteps.map((step, stepIndex) => (
             <div key={step.id} className="nav-glass nav-card-accent rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
@@ -284,7 +284,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
 
         {draftSteps.length < 30 && (
           <button onClick={addStep}
-            className="w-full nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
+            className="w-full xl:max-w-sm nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
             style={{ color: 'var(--nav-accent)' }}>
             + Добавить шаг
           </button>
@@ -292,7 +292,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
 
         {error && <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2 mt-4 xl:max-w-sm">
           <button onClick={save} disabled={saving || !draftName.trim() || draftTriggerWords.length === 0 || draftSteps.some(s => !s.text.trim()) || draftSteps.some(s => s.kind === 'invoice' && (!s.invoiceItem?.name?.trim() || !(Number(s.invoiceItem?.unitPrice) > 0)))}
             className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
@@ -310,7 +310,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
 
   return (
     <div>
-      <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+      <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>
         Сценарии отвечают мгновенно и бесплатно, как шаблоны — но ведут клиента по заранее прописанным шагам с кнопками, без ИИ.
       </p>
 
@@ -326,7 +326,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
         {flows.map(flow => (
           <div key={flow.id} className="nav-glass nav-card-accent rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
@@ -353,7 +353,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
       </div>
 
       <button onClick={startNew}
-        className="w-full nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
+        className="w-full xl:max-w-sm nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
         style={{ color: 'var(--nav-accent)' }}>
         + Новый сценарий
       </button>

@@ -160,7 +160,7 @@ export default function CfoImport() {
   return (
     <CfoPage title="Импорт выписки" actions={<GhostButton type="button" onClick={() => router.push('/cfo/operations')}>К операциям</GhostButton>}>
       <Card>
-        <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
+        <p className="text-sm mb-4 max-w-[75ch]" style={{ color: 'var(--nav-text-secondary)' }}>
           Выгрузите выписку из {family ? 'приложения банка' : 'интернет-банка'} в Excel и загрузите сюда. Файл читается прямо в браузере и никуда не отправляется — в журнал попадут только строки, которые вы подтвердите.
           Повторная загрузка той же выписки не задвоит операции: совпадения по дате и сумме отмечаются как «уже есть».
         </p>

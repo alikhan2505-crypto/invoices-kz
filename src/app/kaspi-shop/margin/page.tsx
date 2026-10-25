@@ -234,7 +234,7 @@ export default function KaspiShopMargin() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="wide" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Калькулятор маржи" subtitle="Брать или не брать? Посчитайте реальную маржу товара до того, как выставите его на Kaspi." />
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
@@ -243,8 +243,12 @@ export default function KaspiShopMargin() {
           </div>
         )}
 
+        {/* От 1700px экрана: калькулятор слева, сохранённые расчёты колонкой справа (420px).
+            Уже -- как раньше, друг под другом. Порог не xl, иначе внутренние колонки
+            калькулятора сузятся до ~340px. */}
+        <div className="grid grid-cols-1 gap-4 min-[1700px]:grid-cols-[minmax(0,1fr)_420px] min-[1700px]:items-start">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Input form */}
             <div className="flex flex-col gap-3">
@@ -447,7 +451,7 @@ export default function KaspiShopMargin() {
         </motion.div>
 
         {/* Saved evaluations */}
-        <div className="nav-glass rounded-2xl overflow-hidden">
+        <div className="nav-glass rounded-2xl overflow-hidden min-w-0 min-[1700px]:sticky min-[1700px]:top-4">
           <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--nav-text-muted)' }}>
             Сохранённые расчёты {evaluations.length > 0 && `(${evaluations.length})`}
           </div>
@@ -489,6 +493,7 @@ export default function KaspiShopMargin() {
               ))}
             </AnimatePresence>
           )}
+        </div>
         </div>
       </PageContainer>
     </main>

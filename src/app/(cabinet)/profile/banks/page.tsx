@@ -239,7 +239,7 @@ export default function Banks() {
           )}
 
           {loading ? (
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4 lg:space-y-0 lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-3 lg:items-start">
               {[0, 1].map(i => (
                 <div key={i} className="nav-glass rounded-2xl p-4">
                   <Skeleton className="h-4 w-40 mb-2" />
@@ -253,7 +253,7 @@ export default function Banks() {
               <p className="text-sm mt-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.noAccountsLabel}</p>
             </div>
           ) : (
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4 lg:space-y-0 lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-3 lg:items-start">
               {accounts.map((acc, i) => (
                 <motion.div
                   key={acc.id}
@@ -315,9 +315,9 @@ export default function Banks() {
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3"
+              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-3 md:items-start xl:grid-cols-3"
             >
-              <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+              <div className="font-semibold text-sm mb-1 md:col-span-full" style={{ color: 'var(--nav-text-primary)' }}>
                 {editingId ? t.editAccountHeading : t.newAccountHeading}
               </div>
               <div>
@@ -404,14 +404,14 @@ export default function Banks() {
                   <option>RUB</option>
                 </select>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 md:col-span-full lg:justify-end">
                 <button onClick={resetForm}
-                  className="flex-1 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  className="flex-1 lg:flex-none lg:px-10 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
                   style={{ color: 'var(--nav-text-secondary)' }}>
                   {t.cancelButton}
                 </button>
                 <button onClick={saveAccount} disabled={saving}
-                  className="flex-1 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                  className="flex-1 lg:flex-none lg:px-10 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {saving ? t.savingEllipsis : editingId ? t.saveButton : t.addLabel}
                 </button>
@@ -425,7 +425,7 @@ export default function Banks() {
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.15 }}
-              className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full lg:w-fit lg:px-10 flex items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
             >
               <PlusIcon />

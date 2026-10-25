@@ -547,12 +547,12 @@ export default function SetupWizard() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <PageContainer variant="wide" align="start" className="pb-6">
+        <PageContainer variant="full" className="pb-6">
           {/* Название страницы -- h1 шапки (оно же название вкладки); заголовки шагов ниже -- h2 с фокусом при смене шага. */}
           <PageHeader title={s.pageTitle} backHref="/ai-agent" />
 
-          {/* Мастер -- один узкий поток внутри общей рамки раздела (wide), как формы настроек. */}
-          <div className="max-w-2xl">
+          {/* Мастер -- один поток шагов: на широком экране по центру рамки раздела, а не у левого края. */}
+          <div className="max-w-2xl lg:mx-auto xl:max-w-3xl">
 
           {/* Полоса прогресса: шаги 1–4 (шаг 0 -- вход, до него агента нет). */}
           {step > 0 && (

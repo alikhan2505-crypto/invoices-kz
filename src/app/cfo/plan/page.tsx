@@ -103,7 +103,7 @@ export default function CfoPlan() {
 
   return (
     <CfoPage title={v.plan} actions={<>{saving && <span role="status" className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Сохраняю…</span>}<YearPicker value={year} onChange={(y) => { setYear(y); setProblems({}) }} /></>}>
-      <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+      <p className="text-sm max-w-prose" style={{ color: 'var(--nav-text-secondary)' }}>
         {v.planHint}
         {' '}Сумма в колонке «Год» делится поровну на 12 месяцев.
       </p>

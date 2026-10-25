@@ -328,7 +328,7 @@ function KaspiShopOrdersInner() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Заказы" />
         {sessionExpired && <SessionExpiredBanner />}
 
@@ -472,7 +472,7 @@ function KaspiShopOrdersInner() {
             </div>
           </div>
         ) : (() => {
-          const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5'
+          const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 min-[2000px]:grid-cols-10 gap-2.5'
 
           function renderCard(o: Order, i: number) {
             const firstItem = o.items[0]

@@ -290,7 +290,7 @@ export default function Admin() {
         </Link>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl lg:max-w-6xl 2xl:max-w-[1600px] mx-auto p-6">
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
             { label: t.usersStatLabel, value: stats.users, color: 'text-blue-400' },
@@ -336,9 +336,9 @@ export default function Admin() {
         {tab === 'tools' && <ToolFunnelTab />}
 
         {tab === 'payments' && (
-          <div className="space-y-3">
+          <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
             {payments.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 text-gray-500 xl:col-span-2">
                 <div className="text-4xl mb-3">💳</div>
                 <div>{t.noPaymentsYetLabel}</div>
               </div>
@@ -583,7 +583,7 @@ export default function Admin() {
         )}
 
         {tab === 'stats' && (
-          <div className="space-y-4">
+          <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
             {kaspiAdminStats && (
               <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
                 <div className="font-medium text-sm mb-4">{t.kaspiAdminStatsTitle}</div>

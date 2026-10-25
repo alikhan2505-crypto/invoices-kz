@@ -9,7 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -149,7 +149,7 @@ export default function KaspiShopNkt() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Каталог НКТ" subtitle={`Национальный каталог товаров${products.length > 0 ? ` · ${products.length}` : ''}`} />
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
@@ -160,7 +160,7 @@ export default function KaspiShopNkt() {
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
+          <p className={`text-sm leading-relaxed ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
             С 2026 года регистрация NTIN (кода товара) в НКТ обязательна для продажи на Kaspi.kz. ИИ помогает подобрать вероятный код категории ОКТРУ и код ТН ВЭД — <b>это предложение, а не гарантированно верный код</b>: обязательно проверьте перед подачей. Сама подача заявки происходит на сайте{' '}
             <a href="https://nationalcatalog.kz" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>nationalcatalog.kz</a>{' '}
             — прямой автоматической подачи из этого кабинета нет (мы не нашли подтверждённого способа сделать это программно ни через Kaspi, ни через НКТ).
@@ -174,7 +174,7 @@ export default function KaspiShopNkt() {
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Отслеживаемых товаров пока нет.</div>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 items-start">
             {products.map((p, i) => {
               const chip = STATUS_CHIP[p.ntinStatus] || STATUS_CHIP.not_started
               const busy = busyId === p.id

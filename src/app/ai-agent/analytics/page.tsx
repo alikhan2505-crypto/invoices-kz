@@ -468,7 +468,7 @@ export default function AiAgentAnalytics() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader
           title="Аналитика"
           subtitle="Диалоги, ответы и расходы ваших AI-агентов"

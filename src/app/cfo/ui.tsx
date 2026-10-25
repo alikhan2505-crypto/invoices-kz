@@ -14,7 +14,8 @@ export function CfoPage({ title, actions, children }: { title: string; actions?:
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="cfo-page-content flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-5">
+        {/* Ширина: без потолка до экранов 2240px, выше 2100px по центру (те же числа, что у PageContainer full; сам PageContainer не берём, чтобы до 1024px не появился потолок max-w-lg). */}
+        <div className="cfo-page-content flex-1 min-w-0 p-4 lg:p-6 2xl:px-8 pb-6 space-y-5 min-[2240px]:max-w-[2100px] min-[2240px]:mx-auto">
           <div className="flex items-center gap-3 flex-wrap justify-between">
             <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>{title}</h1>
             {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}

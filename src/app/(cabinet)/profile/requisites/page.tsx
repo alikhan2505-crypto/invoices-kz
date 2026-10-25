@@ -25,8 +25,9 @@ const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 ho
 const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
 function Field({
-  label, value, onChange, placeholder, type = 'text', maxLength,
+  label, value, onChange, placeholder, type = 'text', maxLength, className,
 }: {
+  className?: string
   label: string
   value: string
   onChange: (v: string) => void
@@ -35,7 +36,7 @@ function Field({
   maxLength?: number
 }) {
   return (
-    <div>
+    <div className={className}>
       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{label}</label>
       <input
         className={inputClass}
@@ -249,7 +250,7 @@ export default function Requisites() {
           )}
 
           <motion.div
-            className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 ${CARD_HOVER}`}
+            className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-4 md:items-start ${CARD_HOVER}`}
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
@@ -324,7 +325,7 @@ export default function Requisites() {
             <Field label={t.companyNameFieldLabel} placeholder={t.companyNamePlaceholder}
               value={profile.company_name} onChange={v => setProfile({ ...profile, company_name: v })} />
 
-            <Field label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
+            <Field className="md:col-span-2" label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
               value={profile.address} onChange={v => setProfile({ ...profile, address: v })} />
 
             <Field label={t.emailFieldLabel} placeholder={t.emailPlaceholder}
@@ -346,7 +347,7 @@ export default function Requisites() {
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
-            className="w-full rounded-xl py-3.5 text-sm font-semibold mt-4 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+            className="w-full lg:w-fit lg:px-16 rounded-xl py-3.5 text-sm font-semibold mt-4 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
           >
             {saving ? t.savingEllipsis : t.saveChangesButton}

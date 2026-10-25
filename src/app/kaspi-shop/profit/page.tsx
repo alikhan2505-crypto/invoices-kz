@@ -11,7 +11,7 @@ import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const PERIODS = [7, 30, 90]
@@ -223,7 +223,7 @@ export default function KaspiShopProfit() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader
           title="Прибыль"
           subtitle="Юнит-экономика"
@@ -331,7 +331,7 @@ export default function KaspiShopProfit() {
           </div>
         ) : (
           <>
-            <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+            <div className={`text-[11px] px-1 mb-2 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-muted)' }}>
               Прибыль по товару — выручка минус себестоимость минус комиссия (реклама не делится по товарам). Укажите категорию Kaspi, чтобы считать комиссию по реальной ставке вместо общего процента сверху.
             </div>
             {/* Compact cards (founder 2026-08-21: no photo background, half

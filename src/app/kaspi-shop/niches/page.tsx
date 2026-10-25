@@ -335,7 +335,7 @@ export default function KaspiShopNiches() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         {/* Витрина подборок -- the page's face (2026-08-23 founder
             decision); the keyword search below stays as the secondary
             "проверить свою идею" tool. */}
@@ -351,7 +351,7 @@ export default function KaspiShopNiches() {
               5 ₸ за проверку{walletBalance !== null && ` · на балансе ${walletBalance.toLocaleString('ru-KZ')} ₸`}
             </span>
           </div>
-          <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2">
+          <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2 max-w-3xl">
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Например: термокружка"
               className={`flex-1 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
             <button type="submit" disabled={searching || !query.trim() || (walletBalance !== null && walletBalance < 5)}

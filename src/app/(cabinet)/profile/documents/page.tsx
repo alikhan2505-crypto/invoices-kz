@@ -225,7 +225,7 @@ export default function Documents() {
             style={{ background: 'var(--nav-accent-soft)' }}
           >
             <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--nav-accent)' }}><InfoIcon /></span>
-            <div>
+            <div className="max-w-prose">
               <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentsInfoBannerTitle}</div>
               <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.documentsInfoBannerBody}
@@ -234,7 +234,7 @@ export default function Documents() {
           </motion.div>
 
           <motion.div
-            className="flex gap-2 mb-4"
+            className="flex gap-2 mb-4 lg:max-w-xl"
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.08 }}
@@ -265,14 +265,13 @@ export default function Documents() {
               </p>
             </div>
           ) : (
-            <div className="nav-glass rounded-2xl overflow-hidden">
+            <div className="nav-glass rounded-2xl overflow-hidden lg:grid lg:grid-cols-2 2xl:grid-cols-3">
               {currentList.map((doc, i) => (
                 <motion.div key={doc.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.3), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-                  className="px-4 py-3.5"
-                  style={{ borderBottom: i < currentList.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}
+                  className="px-4 py-3.5 border-b border-b-[color:var(--nav-border-soft)] last:border-b-0 lg:last:border-b"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">

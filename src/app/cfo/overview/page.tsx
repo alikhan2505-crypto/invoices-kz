@@ -152,6 +152,7 @@ export default function CfoOverview() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-start">
       <LimitsCard month={month} />
 
       <Card>
@@ -167,6 +168,7 @@ export default function CfoOverview() {
           </div>
         ))}
       </Card>
+      </div>
       <AskCfo />
       <CfoTour />
     </CfoPage>

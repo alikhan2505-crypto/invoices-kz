@@ -84,13 +84,13 @@ export default function KaspiShopStorefrontOrders() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader title="Заказы витрины" subtitle="Заказы, оформленные напрямую через вашу витрину" />
 
         {orders.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет заказов с витрины</div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-2 items-start">
             {orders.map((o, i) => {
               const status = STATUS_LABEL[o.status] || STATUS_LABEL.pending_payment
               return (

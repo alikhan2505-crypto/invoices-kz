@@ -100,6 +100,7 @@ export default function Support() {
 
         <PageHeader title={t.supportHeaderLabel} backHref="/profile" />
 
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
         <motion.p {...fadeIn(1)} className="text-sm px-1" style={{ color: 'var(--nav-text-muted)' }}>
           {t.supportHoursText}
         </motion.p>
@@ -170,7 +171,7 @@ export default function Support() {
         </motion.div>
 
         {/* FAQ */}
-        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl overflow-hidden">
+        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl overflow-hidden xl:col-start-2 xl:row-start-1 xl:row-span-4">
           <div className="px-4 pt-4 pb-2 text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.faqHeaderLabel}</div>
           {t.faqItems.map((item, i, arr) => (
             <details key={i} className="group px-4" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
@@ -221,6 +222,7 @@ export default function Support() {
             </Link>
           ))}
         </motion.div>
+        </div>
 
         <motion.div {...fadeIn(6)} className="text-center py-4">
           <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.madeInKazakhstanLabel}</div>

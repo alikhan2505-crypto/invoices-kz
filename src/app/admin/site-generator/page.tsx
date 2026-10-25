@@ -282,7 +282,7 @@ export default function SiteGenerator() {
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="max-w-4xl lg:max-w-6xl 2xl:max-w-[1600px] mx-auto p-6 space-y-6">
         {error && (
           <div className="bg-red-500/10 border border-red-500/40 text-red-300 rounded-xl px-4 py-3 text-sm">{error}</div>
         )}
@@ -291,29 +291,31 @@ export default function SiteGenerator() {
           <section className="bg-gray-800 rounded-2xl p-5 space-y-4">
             <h2 className="font-semibold">Новый сайт</h2>
 
-            <Field label="Поддомен">
-              <div className="flex items-center gap-2">
-                <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())}
-                  placeholder="lotos" className={inputClass} />
-                <span className="text-xs text-gray-400 whitespace-nowrap">.{BASE_DOMAIN}</span>
-              </div>
-            </Field>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Field label="Поддомен">
+                <div className="flex items-center gap-2">
+                  <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                    placeholder="lotos" className={inputClass} />
+                  <span className="text-xs text-gray-400 whitespace-nowrap">.{BASE_DOMAIN}</span>
+                </div>
+              </Field>
 
-            <Field label="Ссылка на 2ГИС (необязательно)">
-              <div className="flex items-center gap-2">
-                <input value={twoGisUrl} onChange={(e) => setTwoGisUrl(e.target.value)}
-                  placeholder="https://2gis.kz/shymkent/firm/70000001101134746" className={inputClass} />
-                <button onClick={fillFrom2gis} disabled={fetchingTwoGis || !twoGisUrl.trim()}
-                  className="text-xs bg-gray-700 text-gray-200 px-3 py-2.5 rounded-lg whitespace-nowrap disabled:opacity-50">
-                  {fetchingTwoGis ? 'Тяну…' : 'Заполнить по ссылке'}
-                </button>
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Подтянет название/адрес/часы/рейтинг/координаты (для кнопки «Как доехать») через официальный API 2ГИС. Телефон и тексты отзывов API не отдаёт (demo-ключ без доступа к контактам) — их по-прежнему вписывать вручную.
-              </div>
-            </Field>
+              <Field label="Ссылка на 2ГИС (необязательно)">
+                <div className="flex items-center gap-2">
+                  <input value={twoGisUrl} onChange={(e) => setTwoGisUrl(e.target.value)}
+                    placeholder="https://2gis.kz/shymkent/firm/70000001101134746" className={inputClass} />
+                  <button onClick={fillFrom2gis} disabled={fetchingTwoGis || !twoGisUrl.trim()}
+                    className="text-xs bg-gray-700 text-gray-200 px-3 py-2.5 rounded-lg whitespace-nowrap disabled:opacity-50">
+                    {fetchingTwoGis ? 'Тяну…' : 'Заполнить по ссылке'}
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Подтянет название/адрес/часы/рейтинг/координаты (для кнопки «Как доехать») через официальный API 2ГИС. Телефон и тексты отзывов API не отдаёт (demo-ключ без доступа к контактам) — их по-прежнему вписывать вручную.
+                </div>
+              </Field>
+            </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               <Field label="Название салона">
                 <input value={salon.name} onChange={(e) => setSalon({ ...salon, name: e.target.value })} className={inputClass} />
               </Field>
@@ -351,15 +353,17 @@ export default function SiteGenerator() {
                 className={inputClass} />
             </Field>
 
-            <Field label="О салоне">
-              <textarea value={salon.about ?? ''} onChange={(e) => setSalon({ ...salon, about: e.target.value })}
-                rows={3} className={inputClass} />
-            </Field>
+            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+              <Field label="О салоне">
+                <textarea value={salon.about ?? ''} onChange={(e) => setSalon({ ...salon, about: e.target.value })}
+                  rows={3} className={inputClass} />
+              </Field>
 
-            <Field label="Пожелания по стилю">
-              <input value={salon.styleNotes ?? ''} onChange={(e) => setSalon({ ...salon, styleNotes: e.target.value })}
-                placeholder="пастельные тона, без розового" className={inputClass} />
-            </Field>
+              <Field label="Пожелания по стилю">
+                <input value={salon.styleNotes ?? ''} onChange={(e) => setSalon({ ...salon, styleNotes: e.target.value })}
+                  placeholder="пастельные тона, без розового" className={inputClass} />
+              </Field>
+            </div>
 
             <div>
               <div className="text-xs text-gray-400 mb-2">Услуги и цены</div>

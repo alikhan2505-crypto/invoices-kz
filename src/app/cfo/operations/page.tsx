@@ -202,7 +202,7 @@ export default function CfoOperations() {
       ) : (
         <Card className="!p-0 overflow-hidden">
           {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>{accountId || articleId || status !== 'all' ? 'Нет операций по выбранным фильтрам' : 'За этот период операций нет.'}</p>}
-          {list.map(row)}
+          <div className="xl:grid xl:grid-cols-2 xl:[&>*:nth-child(odd)]:border-r xl:[&>*:nth-child(odd)]:border-[color:var(--nav-border-soft)]">{list.map(row)}</div>
         </Card>
       ))}
 

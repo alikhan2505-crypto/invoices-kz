@@ -65,7 +65,7 @@ export default function WildberriesProductsPage() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-4xl mx-auto p-4 lg:p-6 pb-6">
+      <div className="max-w-4xl lg:max-w-6xl 2xl:max-w-7xl mx-auto p-4 lg:p-6 pb-6">
         <motion.div
           className="mb-4"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -90,6 +90,17 @@ const PERIODS = [7, 30, 90]
 // trend/shape comparison, not a literal shared axis, and the exact real
 // numbers for a day are available via the native tooltip on hover.
 function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
+  // На десктопе (>=1024px) график растягивается на всю ширину карточки, а не висит
+  // слева узкой полосой; на телефоне avail=0 и размеры прежние (days*34).
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [avail, setAvail] = useState(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setAvail(window.innerWidth >= 1024 ? el.clientWidth : 0))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   if (byDay.length === 0) return null
 
   // Left gutter for the revenue axis labels, bottom gutter for date labels
@@ -97,14 +108,15 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
   // all, just two floating min/max numbers -- unreadable for any day that
   // wasn't the single highest or lowest).
   const padLeft = 54
-  const chartWidth = Math.max(byDay.length * 34, 320)
+  const chartWidth = Math.max(byDay.length * 34, 320, avail - padLeft)
   const width = chartWidth + padLeft
   const height = 200
   const padTop = 24
   const padBottom = 34
   const plotHeight = height - padTop - padBottom
-  const barWidth = (chartWidth / byDay.length) * 0.6
-  const gap = (chartWidth / byDay.length) * 0.4
+  const slot = chartWidth / byDay.length
+  const barWidth = avail > 0 ? Math.min(slot * 0.6, 56) : slot * 0.6
+  const gap = slot - barWidth
 
   const maxRevenue = Math.max(...byDay.map(d => d.revenue), 1)
   const maxOrders = Math.max(...byDay.map(d => d.orderCount), 1)
@@ -143,7 +155,7 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
   })
 
   return (
-    <div className="overflow-x-auto">
+    <div ref={wrapRef} className="overflow-x-auto">
       <svg width={width} height={height} className="block">
         {monthBands.map((b, i) => (
           <rect key={b.month} x={x(b.startI) - gap / 2} y={padTop} width={(b.endI - b.startI + 1) * (barWidth + gap)} height={plotHeight}
@@ -264,7 +276,7 @@ export default function KaspiShopFinance() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Финансы" subtitle="Выручка" />
         {summary?.sessionExpired && <SessionExpiredBanner />}
 
@@ -359,11 +371,13 @@ export default function KaspiShopFinance() {
           </div>
         ) : (
           <>
-            <div className="nav-glass rounded-2xl p-4 mb-4">
+            {/* xl+: график слева (2/3), список по дням справа (1/3); уже xl -- друг под другом */}
+            <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+            <div className="nav-glass rounded-2xl p-4 min-w-0">
               <FinanceChart byDay={summary.byDay} />
             </div>
 
-            <div className="nav-glass rounded-2xl mb-4 max-h-64 overflow-y-auto">
+            <div className="nav-glass rounded-2xl max-h-64 overflow-y-auto xl:max-h-[22rem]">
               {[...summary.byDay].reverse().map((d, i) => (
                 <div key={d.date} className="flex items-center justify-between px-4 py-3" style={i > 0 ? { borderTop: '1px solid var(--nav-border-soft)' } : undefined}>
                   <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{d.date}</span>
@@ -372,9 +386,10 @@ export default function KaspiShopFinance() {
                 </div>
               ))}
             </div>
+            </div>
 
             <div className="text-sm font-semibold mb-2 px-1" style={{ color: 'var(--nav-text-primary)' }}>Поведение покупателей</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
               <div className="nav-glass rounded-2xl p-4">
                 <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Дни недели</div>
                 {(() => {
@@ -472,7 +487,8 @@ export default function KaspiShopFinance() {
                 характеристики в данных заказов, и подпись говорит об этом
                 честно. */}
             {(summary.abc || []).length > 0 && (
-              <div className="mt-6">
+              <div className="mt-6 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] xl:gap-6 xl:items-start">
+                <div className="min-w-0">
                 <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap px-1">
                   <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>ABC-анализ по товарам</div>
                   <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>A — первые 80% выручки, B — следующие 15%, C — остальное</div>
@@ -505,14 +521,17 @@ export default function KaspiShopFinance() {
                     </tbody>
                   </table>
                 </div>
+                </div>
 
-                <div className="flex items-baseline justify-between gap-3 mt-6 mb-3 flex-wrap px-1">
+                <div className="min-w-0">
+                <div className="flex items-baseline justify-between gap-3 mt-6 xl:mt-0 mb-3 flex-wrap px-1">
                   <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Продажи по атрибутам</div>
                   <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>цвет и размер определены по названию товара — характеристики Kaspi не передаёт</div>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 xl:grid-cols-1 gap-4">
                   <AttributeSliceCard title="По цвету" slices={summary.byColor || []} />
                   <AttributeSliceCard title="По размеру" slices={summary.bySize || []} />
+                </div>
                 </div>
               </div>
             )}

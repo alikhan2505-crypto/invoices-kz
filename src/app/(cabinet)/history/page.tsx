@@ -12,6 +12,7 @@ import { historyDict } from '@/lib/i18n/history'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -250,7 +251,7 @@ export default function History() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+        <PageContainer variant="wide">
           <PageHeader
             title={t.pageTitle}
             right={
@@ -267,7 +268,7 @@ export default function History() {
 
           {/* Search */}
           <motion.div
-            className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3"
+            className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3 lg:max-w-2xl"
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
@@ -396,7 +397,7 @@ export default function History() {
           )}
 
           {loading ? (
-            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
+            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] lg:gap-3">
               {[0, 1, 2, 3, 4].map(i => (
                 <div
                   key={i}
@@ -427,7 +428,7 @@ export default function History() {
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
+            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] lg:gap-3">
               {filtered.map((inv, i) => (
                 <motion.div key={inv.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -491,12 +492,12 @@ export default function History() {
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.34 }}
-            className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full lg:max-w-sm flex items-center justify-center px-4 py-3.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
           >
             {t.createNewInvoiceButton}
           </motion.button>
-        </div>
+        </PageContainer>
         {dialogElement}
       </>
   )

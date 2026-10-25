@@ -86,8 +86,9 @@ export default function ContractPage() {
     <PageContainer>
       <PageHeader title={contract.title} backHref="/profile/contracts" />
 
-      <div className="space-y-4">
+      <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
 
+        <div className="space-y-4">
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.createdLabel(formatDate(contract.created_at, lang))}</div>
           <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
@@ -103,6 +104,7 @@ export default function ContractPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M14 3v4h4" /></svg>
           {t.viewFileButton}
         </button>
+        </div>
 
         {profile?.is_admin || getActivePlan(profile).canEcp ? (
         <SignatureSection

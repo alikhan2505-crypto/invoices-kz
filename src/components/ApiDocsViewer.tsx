@@ -70,6 +70,12 @@ const SCALAR_CUSTOM_CSS = `
     --scalar-button-1: ${C.button};
     --scalar-button-1-hover: ${C.buttonHover};
     --scalar-button-1-color: var(--nav-accent-ink);
+    /* Scalar caps its reference area at 1540px (modern layout) by default; the
+       page container is now uncapped up to ~2240px, so let the docs use it too.
+       The right-hand column (Server, Authentication, Client Libraries) appears
+       once the reference area is wide enough, which is why the host page must
+       not cap the width (PageContainer variant="full"). */
+    --scalar-content-max-width: 2200px;
   }
 `
 

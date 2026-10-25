@@ -91,7 +91,7 @@ export default function Templates() {
           {header}
 
           {loading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
               {[0, 1].map(i => (
                 <div key={i} className="nav-glass rounded-2xl p-4">
                   <Skeleton className="h-4 w-32 mb-2" />
@@ -111,7 +111,7 @@ export default function Templates() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
               {templates.map((tpl, i) => (
                 <motion.div
                   key={tpl.id}

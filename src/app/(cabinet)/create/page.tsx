@@ -22,6 +22,7 @@ import { withReturnPath } from '@/lib/returnPath'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
 import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -1142,7 +1143,7 @@ export default function CreateInvoicePage() {
 
   return (
     <div ref={pageRef}>
-      <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
+      <PageContainer variant="full">
         <PageHeader title={t.newInvoiceTitle} subtitle={t.newInvoiceSubtitle} titleId="create-page-top" titleClassName="scroll-mt-32" />
 
         <div className="lg:flex lg:gap-6 lg:items-start">
@@ -1720,7 +1721,7 @@ export default function CreateInvoicePage() {
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ease: EASE, duration: reduceMotion ? 0 : 0.4 }}
-          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[121px]"
+          className="hidden lg:block lg:w-[400px] xl:w-[440px] 2xl:w-[520px] lg:flex-shrink-0 lg:sticky lg:top-[121px]"
         >
           <InvoiceLivePreview
             invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
@@ -1759,7 +1760,7 @@ export default function CreateInvoicePage() {
           )}
         </motion.div>
         </div>
-      </div>
+      </PageContainer>
 
       {/* Service picker modal */}
       {showServicePicker && (

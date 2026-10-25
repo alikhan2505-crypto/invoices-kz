@@ -681,7 +681,7 @@ export default function Profile() {
               {signOutEl}
               {deleteAccountEl}
             </div>
-            <div className="flex flex-col gap-4 flex-1 min-w-0">
+            <div className="flex flex-col gap-4 flex-1 min-w-0 2xl:grid 2xl:grid-cols-2 2xl:items-start">
               {companyEl}
               {documentsEl}
               {accountEl}

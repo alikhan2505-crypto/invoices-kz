@@ -169,7 +169,7 @@ export default function AiAgentOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <PageContainer variant="wide" align="start" className="pb-6 space-y-6">
+        <PageContainer variant="full" className="pb-6 space-y-6">
           <PageHeader title="Обзор" subtitle="AI-агент" />
 
           {hasAgents === false && (

@@ -57,8 +57,11 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
   return (
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
-        <PageContainer variant="narrow" align="start">
+        <PageContainer variant="narrow">
           <PageHeader title="Kaspi Bot" />
+          {/* ProGateCard (общий компонент) в режиме start сам прижат влево; на десктопе
+              центрируем его оберткой, на телефоне ничего не меняется. */}
+          <div className="lg:flex lg:justify-center">
           <ProGateCard
             align="start"
             title={lapsed ? t.lapsedTitle : t.title}
@@ -66,6 +69,7 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
             cta={lapsed ? t.lapsedCta : t.cta}
             href={crossHref('invoices', '/upgrade', 'kaspiShop', back)}
           />
+          </div>
         </PageContainer>
       </main>
     </DesktopShell>

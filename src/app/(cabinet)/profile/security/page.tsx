@@ -153,7 +153,7 @@ export default function Security() {
                       <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.passkeyNoneHint}</div>
                     )}
                     <button onClick={addPasskey} disabled={addingPasskey}
-                      className="w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                      className="w-full lg:w-fit lg:px-10 rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
                       style={{ border: '1px solid var(--nav-accent)', color: 'var(--nav-accent)' }}>
                       {addingPasskey ? t.savingEllipsis : t.passkeyAddButton}
                     </button>

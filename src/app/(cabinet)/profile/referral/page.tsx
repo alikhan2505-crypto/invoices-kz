@@ -105,6 +105,8 @@ export default function Referral() {
           backHref="/profile"
         />
 
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+        <div className="space-y-4">
         <motion.div {...fadeIn(1)} className={`nav-glass nav-card-accent rounded-2xl p-6 text-center ${CARD_HOVER}`}>
           <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
             style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
@@ -138,6 +140,8 @@ export default function Referral() {
           </div>
         </motion.div>
 
+        </div>
+        <div className="space-y-4">
         <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl p-5">
           <div className="text-sm font-medium mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.yourReferralLinkLabel}</div>
           <div className="rounded-xl px-3 py-2.5 flex items-center justify-between mb-3" style={{ background: 'var(--nav-bg)' }}>
@@ -174,6 +178,8 @@ export default function Referral() {
             ))}
           </div>
         </motion.div>
+        </div>
+        </div>
 
       </PageContainer>
     </>

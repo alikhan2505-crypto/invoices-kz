@@ -135,7 +135,7 @@ export default function KaspiShopOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6 space-y-6">
+        <PageContainer variant="full" className="flex-1 min-w-0 pb-6 space-y-6">
           <PageHeader title="Обзор" subtitle="Kaspi Bot" />
 
           {sessionExpired && (
@@ -153,7 +153,10 @@ export default function KaspiShopOverview() {
             {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : 'после комиссии и расходов')}
           </div>
 
-          <section>
+          {/* xl+: таблица заказов слева, ссылки на соседние продукты колонкой справа (380px).
+              Уже xl -- как раньше, друг под другом (отступ 24px от space-y-6 родителя). */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+          <section className="min-w-0">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заказы в работе</h2>
               <a href="/kaspi-shop/orders" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Все заказы →</a>
@@ -189,9 +192,9 @@ export default function KaspiShopOverview() {
             </div>
           </section>
 
-          <section>
+          <section className="xl:sticky xl:top-4 self-start">
             <h2 className="text-[15px] font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Связано с другими продуктами</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               {links.map((l) => (
                 <a key={l.title} href={l.href} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
                   <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{l.title}</span>
@@ -201,6 +204,7 @@ export default function KaspiShopOverview() {
               ))}
             </div>
           </section>
+          </div>
         </PageContainer>
       </main>
     </DesktopShell>

@@ -18,6 +18,7 @@ import SignatureSection from '@/components/SignatureSection'
 import { runSigexQrSigning, SigexQrState } from '@/lib/signDocument'
 import { useAppDialog } from '@/components/AppDialog'
 import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Common ОКЕИ unit codes -- confirmed against the SDK's own "796" example
 // (штука) and standard, widely-documented ОКЕИ values. Expand from the full
@@ -696,21 +697,21 @@ export default function InvoicePage() {
 
   if (loading) return (
     <>
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <PageContainer variant="wide">
       <PageHeader title={<Skeleton className="h-6 w-32" />} backHref="/history" animate={false} />
-      <div className="lg:flex lg:gap-6 lg:items-start">
-      <div className="lg:flex-1 lg:min-w-0 space-y-4">
+      <div className="lg:flex lg:gap-6 lg:items-start 2xl:justify-center">
+      <div className="lg:flex-1 lg:min-w-0 2xl:max-w-[900px] space-y-4">
         <Skeleton className="h-28 rounded-2xl" />
         <div className="grid grid-cols-4 gap-2">
           {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
         <Skeleton className="h-40 rounded-2xl" />
       </div>
-      <div className="hidden lg:block lg:w-[380px]">
+      <div className="hidden lg:block lg:w-[380px] xl:w-[460px] 2xl:w-[600px]">
         <Skeleton className="h-96 rounded-2xl" />
       </div>
       </div>
-      </div>
+      </PageContainer>
     </>
   )
 
@@ -805,10 +806,10 @@ export default function InvoicePage() {
 
   return (
     <>
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <PageContainer variant="wide">
       <PageHeader title={t.invoiceHeaderTitle(invoice.number)} backHref="/history" animate={false} />
-      <div className="lg:flex lg:gap-6 lg:items-start">
-      <div className="lg:flex-1 lg:min-w-0 space-y-4">
+      <div className="lg:flex lg:gap-6 lg:items-start 2xl:justify-center">
+      <div className="lg:flex-1 lg:min-w-0 2xl:max-w-[900px] space-y-4">
 
         <motion.div
           className={`nav-glass nav-card-accent rounded-2xl p-5 text-center ${CARD_HOVER}`}
@@ -1359,7 +1360,7 @@ export default function InvoicePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[121px]"
+        className="hidden lg:block lg:w-[380px] xl:w-[460px] 2xl:w-[600px] lg:sticky lg:top-[121px]"
       >
         <InvoiceLivePreview
           invoiceNumber={invoice.number}
@@ -1376,7 +1377,7 @@ export default function InvoicePage() {
         />
       </motion.div>
       </div>
-      </div>
+      </PageContainer>
 
       {/* Модал апгрейда */}
       {showUpgradeModal && (

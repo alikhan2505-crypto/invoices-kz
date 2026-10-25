@@ -300,7 +300,7 @@ function AiAgentDialogsInner() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="full" align="start" className="pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
+      <PageContainer variant="full" className="pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
         <PageHeader
           className="flex-shrink-0"
           title={sd.dialogsTitle}
@@ -423,7 +423,7 @@ function AiAgentDialogsInner() {
                     <div className="text-center text-sm py-8" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
                   ) : messages.map(m => (
                     <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                      <div className="max-w-[75%] rounded-2xl px-3 py-2 text-sm"
+                      <div className="max-w-[75%] xl:max-w-[min(75%,44rem)] rounded-2xl px-3 py-2 text-sm"
                         style={{
                           background: m.direction === 'outbound' ? 'var(--nav-accent)' : 'var(--nav-bg)',
                           color: m.direction === 'outbound' ? 'var(--nav-accent-ink)' : 'var(--nav-text-primary)',

@@ -133,6 +133,8 @@ export default function ConnectorsPage() {
 
         <PageHeader title={t.connectorsHeaderLabel} backHref="/profile" />
 
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+        <div className="space-y-4">
         {/* Оплата */}
         <motion.div {...fadeIn(1)}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.paymentButtonsSectionLabel}</div>
@@ -173,6 +175,8 @@ export default function ConnectorsPage() {
           </div>
         </motion.div>
 
+        </div>
+        <div className="space-y-4">
         {/* Соцсети */}
         <motion.div {...fadeIn(3)}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.socialMediaSectionLabel}</div>
@@ -241,8 +245,11 @@ export default function ConnectorsPage() {
           </motion.div>
         )}
 
+        </div>
+        </div>
+
         <motion.button {...fadeIn(5)} onClick={save} disabled={saving}
-          className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+          className="w-full lg:w-fit lg:px-16 rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
           {saving ? t.savingEllipsis : t.saveConnectorsButton}
         </motion.button>

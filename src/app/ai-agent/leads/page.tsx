@@ -232,7 +232,7 @@ export default function AiAgentLeads() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="full" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         {/* Счётчик заявок живёт в подзаголовке: заголовок остаётся строкой, и вкладка браузера получает его название. */}
         <PageHeader
           title="Заявки"

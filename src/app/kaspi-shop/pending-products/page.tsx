@@ -94,7 +94,7 @@ export default function KaspiShopPendingProducts() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Нераспознанные товары" subtitle={count > 0 ? `Всего: ${count}` : undefined} />
         {sessionExpired && <SessionExpiredBanner />}
 
@@ -127,7 +127,7 @@ export default function KaspiShopPendingProducts() {
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Нераспознанных товаров нет.</div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
             {products.map(p => (
               <div key={p.code} className="nav-glass rounded-2xl p-3 flex items-center gap-3">
                 {p.imageUrl ? (

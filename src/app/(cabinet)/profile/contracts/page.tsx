@@ -189,9 +189,9 @@ export default function Contracts() {
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3"
+              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-3 md:items-start xl:grid-cols-3"
             >
-              <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.newContractTitle}</div>
+              <div className="font-semibold text-sm mb-1 md:col-span-full" style={{ color: 'var(--nav-text-primary)' }}>{t.newContractTitle}</div>
 
               <div>
                 <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.titleFieldLabel}</label>
@@ -224,7 +224,7 @@ export default function Contracts() {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-full">
                 <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.fileFieldLabel}</label>
                 <label
                   className="flex flex-col items-center gap-2 rounded-xl py-6 text-center cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
@@ -239,14 +239,14 @@ export default function Contracts() {
                 </label>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 md:col-span-full lg:justify-end">
                 <button onClick={resetForm}
-                  className="flex-1 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  className="flex-1 lg:flex-none lg:px-10 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
                   style={{ color: 'var(--nav-text-secondary)' }}>
                   {t.cancelButton}
                 </button>
                 <button onClick={saveContract} disabled={saving}
-                  className="flex-1 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                  className="flex-1 lg:flex-none lg:px-10 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {saving ? t.savingLabel : t.saveButton}
                 </button>
@@ -270,7 +270,7 @@ export default function Contracts() {
               <p className="text-xs mt-1 px-6" style={{ color: 'var(--nav-text-muted)' }}>{t.noContractsSubHint}</p>
             </div>
           ) : (
-            <div className="nav-glass rounded-2xl overflow-hidden">
+            <div className="nav-glass rounded-2xl overflow-hidden lg:grid lg:grid-cols-2 2xl:grid-cols-3">
               {contracts.map((c, i) => {
                 const badge = statusBadge(c.id)
                 return (
@@ -279,8 +279,7 @@ export default function Contracts() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.3), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
                     onClick={() => router.push(`/contract/${c.id}`)}
-                    className="flex items-start justify-between px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
-                    style={{ borderBottom: i < contracts.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}
+                    className="flex items-start justify-between px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)] border-b border-b-[color:var(--nav-border-soft)] last:border-b-0 lg:last:border-b"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>{c.title}</div>

@@ -8,7 +8,7 @@ import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -167,7 +167,7 @@ export default function WholesaleModelsPage() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <PageContainer variant="wide" align="start" className="flex-1 min-w-0 pb-6">
+        <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
           <PageHeader
             title="Модели (оптовый каталог)"
             subtitle="Отдельный каталог для публичной витрины, не связан с товарами Kaspi"
@@ -175,12 +175,15 @@ export default function WholesaleModelsPage() {
           />
 
           <div className="nav-glass rounded-2xl p-4 mb-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-            У каждой модели своя цена и сетка размер × цвет с остатком. Если остаток 0 или не указан, покупатель видит кнопку «Оформить пошив на заказ».
+            <p className={PROSE_WIDE_CLS}>У каждой модели своя цена и сетка размер × цвет с остатком. Если остаток 0 или не указан, покупатель видит кнопку «Оформить пошив на заказ».</p>
           </div>
 
           {error && <div className="nav-glass rounded-2xl p-3 mb-4 text-sm" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
-          <div className="nav-glass rounded-2xl p-4 mb-6 space-y-2">
+          {/* xl+: список моделей слева, форма «Новая модель» липкой колонкой справа (380px).
+              В DOM форма первая, поэтому на узком экране порядок прежний. */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+          <div className="nav-glass rounded-2xl p-4 space-y-2 xl:col-start-2 xl:row-start-1 xl:sticky xl:top-4">
             <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Новая модель</div>
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Название (напр. «Лонгслив однотонный Long01»)"
               className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
@@ -199,7 +202,7 @@ export default function WholesaleModelsPage() {
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0 xl:col-start-1 xl:row-start-1">
             {models.map(m => (
               <div key={m.id} className="nav-glass rounded-2xl p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -274,6 +277,7 @@ export default function WholesaleModelsPage() {
             {models.length === 0 && (
               <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нет ни одной модели</div>
             )}
+          </div>
           </div>
         </PageContainer>
       </main>

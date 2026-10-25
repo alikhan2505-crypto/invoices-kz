@@ -82,47 +82,53 @@ export default function CfoCalendar() {
         </>
       }
     >
-      {whatIf && <ScenarioCard today={today} onClose={() => setWhatIf(false)} />}
-      {taxes && <TaxSetup onClose={() => setTaxes(false)} />}
-      <InvoicePanel today={today} />
-      {cal.firstGap && (
-        <Card className="!py-3">
-          <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
-            {v.gap} {dayLabel(cal.firstGap)}: {v.gapHint}. {v.gapAdvice}
-          </p>
-        </Card>
-      )}
+      {/* Широкий экран: список слева, сводные панели справа (вместо строк на 1500px). DOM-порядок как раньше, поэтому на телефоне и до 1280px ничего не меняется. Колонка 420px резервируется только если правая обёртка не пуста (:has), иначе список занимает всю ширину. */}
+      <div className="grid grid-cols-1 gap-5 xl:items-start xl:has-[>[data-cal-side]:not(:empty)]:grid-cols-[minmax(0,1fr)_420px]">
+        <div data-cal-side className="space-y-5 empty:hidden xl:order-2">
+          {whatIf && <ScenarioCard today={today} onClose={() => setWhatIf(false)} />}
+          {taxes && <TaxSetup onClose={() => setTaxes(false)} />}
+          <InvoicePanel today={today} />
+          {cal.firstGap && (
+            <Card className="!py-3">
+              <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
+                {v.gap} {dayLabel(cal.firstGap)}: {v.gapHint}. {v.gapAdvice}
+              </p>
+            </Card>
+          )}
+        </div>
+        <div className="space-y-5 min-w-0 xl:order-1">
+          {cal.overdue.length > 0 && (
+            <Card>
+              <SectionTitle>Просрочено — ещё не оплачено</SectionTitle>
+              {cal.overdue.map((op) => (
+                <div key={op.id}>
+                  <div className="text-xs pt-2" style={{ color: 'var(--nav-critical)' }}>{dayLabel(op.paidOn)}</div>
+                  {item(op)}
+                </div>
+              ))}
+            </Card>
+          )}
 
-      {cal.overdue.length > 0 && (
-        <Card>
-          <SectionTitle>Просрочено — ещё не оплачено</SectionTitle>
-          {cal.overdue.map((op) => (
-            <div key={op.id}>
-              <div className="text-xs pt-2" style={{ color: 'var(--nav-critical)' }}>{dayLabel(op.paidOn)}</div>
-              {item(op)}
-            </div>
-          ))}
-        </Card>
-      )}
-
-      <Card className="!p-0 overflow-hidden">
-        {days.map((d) => (
-          <div key={d.date} className="px-4 py-3" style={{ borderBottom: '1px solid var(--nav-border-soft)', background: d.date === today ? 'var(--nav-accent-soft)' : undefined }}>
-            <div className="flex items-baseline justify-between gap-2 flex-wrap">
-              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
-                {dayLabel(d.date)}{d.date === today && ' · сегодня'}
+          <Card className="!p-0 overflow-hidden">
+            {days.map((d) => (
+              <div key={d.date} className="px-4 py-3" style={{ borderBottom: '1px solid var(--nav-border-soft)', background: d.date === today ? 'var(--nav-accent-soft)' : undefined }}>
+                <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+                    {dayLabel(d.date)}{d.date === today && ' · сегодня'}
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                    {d.date >= today ? 'прогноз остатка' : 'остаток'}{' '}
+                    <span className="tabular-nums font-semibold" style={{ color: d.gap ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>{formatTenge(d.balance)}</span>
+                  </div>
+                </div>
+                {d.items.length === 0
+                  ? <p className="text-xs pt-1" style={{ color: 'var(--nav-text-muted)' }}>Платежей нет</p>
+                  : d.items.map(item)}
               </div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                {d.date >= today ? 'прогноз остатка' : 'остаток'}{' '}
-                <span className="tabular-nums font-semibold" style={{ color: d.gap ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>{formatTenge(d.balance)}</span>
-              </div>
-            </div>
-            {d.items.length === 0
-              ? <p className="text-xs pt-1" style={{ color: 'var(--nav-text-muted)' }}>Платежей нет</p>
-              : d.items.map(item)}
-          </div>
-        ))}
-      </Card>
+            ))}
+          </Card>
+        </div>
+      </div>
       {dialogElement}
     </CfoPage>
   )

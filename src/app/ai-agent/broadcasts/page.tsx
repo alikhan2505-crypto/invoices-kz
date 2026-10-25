@@ -339,7 +339,7 @@ export default function AiAgentBroadcasts() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader
           title="Рассылки"
           subtitle="Сообщение всем клиентам, которые писали вашему агенту в Telegram или WhatsApp"
@@ -379,7 +379,7 @@ export default function AiAgentBroadcasts() {
             </p>
           </motion.div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {broadcasts.map((b, i) => (
               <motion.div
                 key={b.id}

@@ -141,14 +141,15 @@ export default function AiAgentDocsPage() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader
           title="Как настроить AI-агента"
           subtitle="Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp, на сайте и через API."
         />
 
-        {/* Текст курса -- колонка около 720 px: на всю ширину wide строки были по ~145 знаков. */}
-        <div className="max-w-[45rem]">
+        {/* Текст курса: до xl одна колонка около 720 px (на всю ширину строки были по ~145 знаков),
+            с xl уроки раскладываются в две колонки карточек. */}
+        <div className="max-w-[45rem] mx-auto grid grid-cols-1 gap-x-6 xl:max-w-none xl:grid-cols-2 xl:items-start">
         <Lesson n={1} title="Что умеет AI-агент">
           <P>
             AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram (Direct и комментарии),
@@ -234,7 +235,7 @@ export default function AiAgentDocsPage() {
           </P>
         </Lesson>
 
-        <section>
+        <section className="xl:col-span-2">
           <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Поддержка</h2>
           <p className="mb-3 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
             Остались вопросы по настройке агента? Напишите нам:

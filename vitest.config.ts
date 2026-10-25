@@ -33,5 +33,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // forks, а не vmThreads: под vmThreads vi.mock('@supabase/supabase-js') в части файлов
+    // (24 файла api/lib) не срабатывает в полном прогоне, и тесты ходят в настоящий
+    // Supabase (25.10.2026: 126 ложных падений, поодиночке те же файлы зелёные).
+    // С forks полный прогон: 3167 из 3167, около 30 секунд.
+    pool: 'forks',
   },
 })

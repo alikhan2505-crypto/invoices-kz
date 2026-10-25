@@ -15,7 +15,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import { connectErrorMessage, connectUiText } from '@/lib/kaspiShop/connectMessages'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 
 type Product = {
   id: string
@@ -779,7 +779,7 @@ export default function KaspiShop() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
@@ -923,7 +923,7 @@ export default function KaspiShop() {
                 ? 'Минимальная цена не задана ни у одного товара'
                 : `Минимальная цена не задана у ${untouchedFloorCount} товаров из ${products.length}`}
             </div>
-            <p className="text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>
+            <p className={`text-[13px] ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
               При подключении магазина минимум выставляется равным текущей цене — чтобы бот ничего не уронил без
               вашего ведома. Но пока минимум равен цене, <b>снижать некуда: демпинг не сможет обойти конкурента</b>.
               Задайте минимум ниже текущей цены — по одному товару или сразу всем через массовое изменение.
@@ -1035,7 +1035,7 @@ export default function KaspiShop() {
                 with the live price, competitor, region, seller count and a
                 real Kaspi link. An expanded card spans the full row so its
                 settings form keeps comfortable width. */}
-            <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
+            <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5 gap-3 items-start">
               <AnimatePresence initial={false}>
                 {products.map((p, i) => {
                   const otherSellers = p.market_offer_count !== null ? Math.max(0, p.market_offer_count - 1) : null

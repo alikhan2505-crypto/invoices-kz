@@ -191,7 +191,7 @@ export default function KaspiShopRefundsPage() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Возвраты" />
         {sessionExpired && <SessionExpiredBanner />}
 

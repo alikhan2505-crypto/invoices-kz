@@ -709,6 +709,7 @@ export default function Notifications() {
               </button>
             </div>
           ) : (
+          <div className="space-y-6 xl:space-y-0 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] xl:gap-6 xl:items-start">
           <div className="space-y-6">
 
             {/* ---------- Telegram — главный канал ---------- */}
@@ -870,6 +871,9 @@ export default function Notifications() {
               </div>
             )}
 
+          </div>
+
+          <div className="space-y-6">
             {/* ---------- Что присылать вам ---------- */}
             <motion.section {...fadeIn(2)} aria-labelledby="owner-title">
               <h2 id="owner-title" className="text-base font-bold px-1" style={{ color: 'var(--nav-text-primary)' }}>{t.ownerSectionTitle}</h2>
@@ -909,6 +913,7 @@ export default function Notifications() {
                 </div>
               </div>
             </motion.section>
+          </div>
 
           </div>
           )}

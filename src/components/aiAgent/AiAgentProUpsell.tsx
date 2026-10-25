@@ -80,7 +80,7 @@ export default function AiAgentProUpsell({ title }: { title?: string }) {
 
   if (!title) return card
   return (
-    <PageContainer variant="wide" align="start" className="pb-6">
+    <PageContainer variant="full" className="pb-6">
       <PageHeader title={title} subtitle="AI-агент" />
       {card}
     </PageContainer>

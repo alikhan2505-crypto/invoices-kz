@@ -202,7 +202,7 @@ function sleep(ms: number) {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader
           title="Отзывы"
           subtitle="Отзывы покупателей"
@@ -346,7 +346,7 @@ function sleep(ms: number) {
           }
 
           if (groupMode === 'none') {
-            return <div className="space-y-2">{data.reviews.map((r, i) => renderReviewCard(r, i))}</div>
+            return <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3 items-start">{data.reviews.map((r, i) => renderReviewCard(r, i))}</div>
           }
 
           const groups = new Map<string, Review[]>()
@@ -370,7 +370,7 @@ function sleep(ms: number) {
                   <div className="text-xs font-semibold mb-2 px-1 truncate" style={{ color: 'var(--nav-text-secondary)' }}>
                     {groupMode === 'product' ? key : monthLabel(key)} <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}>· {groupReviews.length}</span>
                   </div>
-                  <div className="space-y-1.5">{groupReviews.map((r, i) => renderReviewRow(r, i))}</div>
+                  <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2 2xl:grid-cols-3">{groupReviews.map((r, i) => renderReviewRow(r, i))}</div>
                 </div>
               ))}
             </div>

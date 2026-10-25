@@ -100,7 +100,7 @@ export default function KaspiShopOrderDetail() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="narrow" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         {/* Назад -- по истории, чтобы вернуться на ту же вкладку статуса; если истории нет (открыли по ссылке), в список заказов. */}
         <PageHeader
           title={pageTitle}
@@ -116,8 +116,11 @@ export default function KaspiShopOrderDetail() {
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказ...</div>
         ) : (
           <>
+            {/* xl+: карточка заказа слева (420px), позиции справа (2 колонки с 2xl);
+                уже xl -- друг под другом, как раньше (отступ даёт mb-4 карточки). */}
+            <div className="xl:grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:gap-4 xl:items-start">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4 xl:mb-0">
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 {order.cityName && <div className="flex items-center gap-1.5"><PinIcon />{order.cityName}</div>}
                 {order.plannedDeliveryDate && <div className="flex items-center gap-1.5"><TruckIcon />до {new Date(order.plannedDeliveryDate).toLocaleDateString('ru-KZ')}</div>}
@@ -126,7 +129,7 @@ export default function KaspiShopOrderDetail() {
               <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums mt-4" style={{ color: 'var(--nav-text-primary)' }}>{order.totalPrice.toLocaleString('ru-KZ')} ₸</div>
             </motion.div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0 2xl:space-y-0 2xl:grid 2xl:grid-cols-2 2xl:gap-2 2xl:items-start">
               {order.items.map((item, i) => (
                 <motion.div key={item.code + i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, ease: EASE, delay: i * 0.05 }}
@@ -142,6 +145,7 @@ export default function KaspiShopOrderDetail() {
                   </div>
                 </motion.div>
               ))}
+            </div>
             </div>
           </>
         )}

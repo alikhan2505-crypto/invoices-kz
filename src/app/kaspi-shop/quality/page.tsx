@@ -10,7 +10,7 @@ import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { TWO_COL_CLS } from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -139,7 +139,7 @@ export default function KaspiShopQualityPage() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+      <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Качество" subtitle="Показатели качества" />
         {sessionExpired && <SessionExpiredBanner />}
 
@@ -176,8 +176,10 @@ export default function KaspiShopQualityPage() {
           })}
         </div>
 
+        {/* xl+: карточка показателя слева, список категорий справа; уже xl -- друг под другом */}
+        <div className={`${TWO_COL_CLS} xl:items-start`}>
         {metric && (
-          <div className="nav-glass rounded-2xl p-5 mb-4">
+          <div className="nav-glass rounded-2xl p-5">
             {metric.notEnoughData ? (
               <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 Показатель сформируется после {metric.denominator > 0 ? metric.denominator : 10}{' '}
@@ -211,7 +213,7 @@ export default function KaspiShopQualityPage() {
           </div>
         )}
 
-        <div className="nav-glass rounded-2xl overflow-hidden">
+        <div className={`nav-glass rounded-2xl overflow-hidden min-w-0 ${metric ? '' : 'xl:col-span-2'}`}>
           <div className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--nav-text-primary)', borderBottom: '1px solid var(--nav-border-soft)' }}>
             По категориям
           </div>
@@ -236,6 +238,7 @@ export default function KaspiShopQualityPage() {
               </div>
             ))
           )}
+        </div>
         </div>
       </PageContainer>
     </main>

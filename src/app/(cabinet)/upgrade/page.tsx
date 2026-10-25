@@ -893,7 +893,7 @@ export default function Upgrade() {
           <PageHeader title={t.pageTitle} onBack={goBack} as="h1" />
 
           {ownedCard && (
-            <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-6" role="status"
+            <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-6 max-w-xl mx-auto" role="status"
               style={{ boxShadow: 'var(--nav-card-glow)' }}>
               <div className="font-bold text-base mb-4" style={{ color: 'var(--nav-text-primary)' }}>
                 {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
@@ -987,7 +987,7 @@ export default function Upgrade() {
           </div>
 
           {/* Plans: stacked on a phone, one equal-height row from lg up. */}
-          <div className="grid gap-4 lg:grid-cols-3 lg:gap-5 items-stretch mb-6">
+          <div className="grid gap-4 lg:grid-cols-3 lg:gap-5 items-stretch mb-6 lg:max-w-[1400px] lg:mx-auto">
             {/* Free */}
             <PlanCard tone="free" current={plan === 'free'} index={0} reduceMotion={!!reduceMotion}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">

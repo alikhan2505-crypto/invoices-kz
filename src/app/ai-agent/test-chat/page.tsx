@@ -123,7 +123,7 @@ export default function AiAgentTestChat() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         <PageHeader
           title="Тестовый чат"
           subtitle="Пообщайтесь со своим агентом так, как это сделает клиент"
@@ -162,7 +162,7 @@ export default function AiAgentTestChat() {
           </motion.div>
         ) : agentId ? (
           <motion.div
-            className="max-w-3xl"
+            className="max-w-3xl lg:mx-auto lg:max-w-5xl"
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}

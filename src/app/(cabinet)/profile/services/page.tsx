@@ -154,8 +154,7 @@ export default function Services() {
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.3), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        className="flex items-center px-4 py-3.5 transition-colors hover:bg-[var(--nav-surface-glass)]"
-        style={{ borderBottom: i < total - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}
+        className="flex items-center px-4 py-3.5 transition-colors hover:bg-[var(--nav-surface-glass)] border-b border-b-[color:var(--nav-border-soft)] last:border-b-0 lg:last:border-b"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -189,7 +188,7 @@ export default function Services() {
 
   return (
       <>
-        <PageContainer>
+        <PageContainer variant="wide">
           <PageHeader
             title={t.servicesHeaderLabel}
             backHref="/profile"
@@ -202,7 +201,7 @@ export default function Services() {
           />
 
           <motion.div
-            className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3"
+            className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3 lg:max-w-2xl"
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
@@ -228,13 +227,13 @@ export default function Services() {
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3"
+              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-3 md:items-start xl:grid-cols-3"
             >
-              <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+              <div className="font-semibold text-sm mb-1 md:col-span-full" style={{ color: 'var(--nav-text-primary)' }}>
                 {editingId ? t.editItemHeading : t.newItemHeading}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 md:col-span-full lg:max-w-md">
                 <button type="button"
                   onClick={() => setForm({ ...form, type: 'product' })}
                   className="flex-1 px-3 py-2 text-xs rounded-lg font-semibold transition-colors"
@@ -255,7 +254,7 @@ export default function Services() {
                 </button>
               </div>
 
-              <div>
+              <div className="md:col-span-full">
                 <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.itemNameFieldLabel}</label>
                 <input
                   className={inputClass}
@@ -265,7 +264,7 @@ export default function Services() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3 md:col-span-full">
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.itemCodeFieldLabel}</label>
                   <input
@@ -296,14 +295,14 @@ export default function Services() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 md:col-span-full lg:justify-end">
                 <button onClick={resetForm}
-                  className="flex-1 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  className="flex-1 lg:flex-none lg:px-10 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
                   style={{ color: 'var(--nav-text-secondary)' }}>
                   {t.cancelButton}
                 </button>
                 <button onClick={saveService} disabled={saving}
-                  className="flex-1 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                  className="flex-1 lg:flex-none lg:px-10 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {t.formSubmitLabel(saving, !!editingId)}
                 </button>
@@ -335,19 +334,19 @@ export default function Services() {
                   <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                     {t.productsSectionLabel(productsList.length)}
                   </div>
-                  <div className="nav-glass rounded-2xl overflow-hidden">
+                  <div className="nav-glass rounded-2xl overflow-hidden lg:grid lg:grid-cols-2">
                     {productsList.map((svc, i) => <ItemRow key={svc.id} svc={svc} i={i} total={productsList.length} />)}
+                  </div>
+                </div>
+              )}
 
               {servicesList.length > 0 && (
                 <div className="mb-4">
                   <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                     {t.servicesSectionLabel(servicesList.length)}
                   </div>
-                  <div className="nav-glass rounded-2xl overflow-hidden">
+                  <div className="nav-glass rounded-2xl overflow-hidden lg:grid lg:grid-cols-2">
                     {servicesList.map((svc, i) => <ItemRow key={svc.id} svc={svc} i={i} total={servicesList.length} />)}
-                  </div>
-                </div>
-              )}
                   </div>
                 </div>
               )}
@@ -360,7 +359,7 @@ export default function Services() {
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.2 }}
-              className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full lg:w-fit lg:px-10 flex items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
             >
               <PlusIcon />

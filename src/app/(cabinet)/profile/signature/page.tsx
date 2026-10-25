@@ -511,6 +511,7 @@ export default function Signature() {
           <ProGateBanner variant="note" description={t.signatureFreePlanNote} />
         )}
 
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-3 xl:gap-4 xl:items-start">
         {/* Подпись */}
         <motion.div {...fadeIn(1)}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.signatureSectionLabel}</div>
@@ -652,6 +653,8 @@ export default function Signature() {
             )}
           </div>
         </motion.div>
+
+        </div>
 
         <motion.div {...fadeIn(4)} className="rounded-2xl p-4" style={{ background: 'var(--nav-accent-soft)' }}>
           <div className="text-xs font-medium mb-1" style={{ color: 'var(--nav-accent)' }}>{t.tipLabel}</div>

@@ -199,7 +199,7 @@ export default function AiAgentsList() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="wide" align="start" className="pb-6">
+      <PageContainer variant="full" className="pb-6">
         {/* Тур — только когда есть агенты: пустое состояние говорит само за себя. */}
         {agents.length > 0 && <AiAgentTour />}
         {/* Якорь тура (data-tour) держит обёртка: PageHeader атрибутов не принимает. */}
@@ -238,7 +238,7 @@ export default function AiAgentsList() {
             </Link>
           </motion.div>
         ) : (
-          <div data-tour="ai-agents-list" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div data-tour="ai-agents-list" className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
             {agents.map((agent, i) => {
               // Every connected channel, not just Instagram (15.10.2026): a
               // WhatsApp-only agent used to read «Канал не подключён».

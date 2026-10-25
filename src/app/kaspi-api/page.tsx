@@ -837,8 +837,13 @@ export default function KaspiApiPage() {
           strip above (rendered by SiteNav, outside this dark wrapper --
           the menu itself deliberately keeps its normal light app chrome). */}
       <div className="min-h-screen lg:min-h-full">
-      <PageContainer variant="wide" align="start" className="pb-16 space-y-6">
+      <PageContainer variant="wide" className="pb-16">
         <PageHeader title="Подключение" subtitle="Приём оплат Kaspi Pay на вашем сайте: токен, вебхуки, документация" />
+
+        {/* Широкий экран (xl+): слева карточка подключения (544px, поля не растягиваются),
+            справа выписка и ссылки на соседние продукты. Уже xl -- одна колонка в прежнем
+            порядке (карточка, выписка, ссылки), с тем же ритмом space-y-6. */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] xl:items-start">
 
         {/* Kaspi Pay Cashier — deliberately NOT plan-gated: connecting a
             Cashier is free on every plan, only usage is monetized via the
@@ -1159,6 +1164,7 @@ export default function KaspiApiPage() {
           </button>
         </div>
 
+        <div className="space-y-6 min-w-0">
         {kaspiStatementSection && (
           <div className="space-y-3">
             {kaspiStatementSection}
@@ -1179,6 +1185,8 @@ export default function KaspiApiPage() {
               <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
             </a>
           </div>
+        </div>
+        </div>
         </div>
       </PageContainer>
       </div>

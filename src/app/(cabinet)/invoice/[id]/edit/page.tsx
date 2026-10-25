@@ -12,6 +12,7 @@ import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -160,21 +161,21 @@ export default function EditInvoice() {
 
   if (loading) return (
     <>
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <PageContainer variant="wide" className="space-y-4">
       <PageHeader title={<Skeleton className="h-6 w-32" />} backHref={'/invoice/' + id} animate={false} />
         <Skeleton className="h-48 rounded-2xl" />
         <Skeleton className="h-32 rounded-2xl" />
         <Skeleton className="h-24 rounded-2xl" />
-      </div>
+      </PageContainer>
     </>
   )
 
   return (
     <>
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <PageContainer variant="wide">
       <PageHeader title={t.editInvoiceHeaderTitle} backHref={'/invoice/' + id} animate={false} />
       <div className="lg:flex lg:gap-6 lg:items-start">
-      <div className="lg:flex-1 lg:min-w-0 space-y-4">
+      <div className="lg:flex-1 lg:min-w-0 space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
 
         {/* Client */}
         <motion.div
@@ -251,7 +252,7 @@ export default function EditInvoice() {
 
         {/* Services */}
         <motion.div
-          className={`nav-glass nav-card-accent rounded-2xl p-5 ${CARD_HOVER}`}
+          className={`nav-glass nav-card-accent rounded-2xl p-5 xl:col-span-2 ${CARD_HOVER}`}
           initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
@@ -375,7 +376,7 @@ export default function EditInvoice() {
           initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
-          className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
+          className="w-full xl:col-span-2 rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
           style={{
             background: saving ? 'var(--nav-text-muted)' : 'var(--nav-success-solid)',
             color: saving ? '#fff' : 'var(--nav-success-ink)',
@@ -389,7 +390,7 @@ export default function EditInvoice() {
         initial={reduceMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ease: EASE, duration: reduceMotion ? 0 : 0.4 }}
-        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[121px]"
+        className="hidden lg:block lg:w-[380px] xl:w-[460px] 2xl:w-[520px] lg:sticky lg:top-[121px]"
       >
         <InvoiceLivePreview
           invoiceNumber={invoiceNumber}
@@ -406,7 +407,7 @@ export default function EditInvoice() {
         />
       </motion.div>
       </div>
-      </div>
+      </PageContainer>
 
       {dialogElement}
     </>
