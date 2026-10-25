@@ -59,6 +59,7 @@ export interface ZarplataDict {
   born1975: string
   born1975Hint: string
   advanced: string
+  advancedHint: string
   month: string
   /** 12 названий месяцев. */
   months: string[]
@@ -348,7 +349,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     born1975: 'Родился до 1975 года',
     born1975Hint:
       'ОПВР работодателем не платится (Соц.К. ст. 248 п. 6 пп. 6). В 2026 году ОПВР 3,5% платит работодатель за работников 1975 г. р. и моложе.',
-    advanced: 'Расширенно',
+    advanced: 'Особые случаи',
+    advancedHint: 'Месяц найма или увольнения, неодинаковая зарплата, очень высокая зарплата',
     month: 'Месяц года',
     months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
     monthHint:
@@ -531,7 +533,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     born1975: '1975 жылға дейін туған',
     born1975Hint:
       'Жұмыс беруші ЖМЗЖ төлемейді (Әлеуметтік кодекс 248-б. 6-т. 6) тармақшасы). 2026 жылы 3,5% ЖМЗЖ-ны жұмыс беруші 1975 жылы және одан кейін туған қызметкерлер үшін төлейді.',
-    advanced: 'Кеңейтілген',
+    advanced: 'Ерекше жағдайлар',
+    advancedHint: 'Жұмысқа қабылдау немесе жұмыстан босату айы, жалақы тең емес, өте жоғары жалақы',
     month: 'Жыл айы',
     months: ['Қаңтар', 'Ақпан', 'Наурыз', 'Сәуір', 'Мамыр', 'Маусым', 'Шілде', 'Тамыз', 'Қыркүйек', 'Қазан', 'Қараша', 'Желтоқсан'],
     monthHint:
@@ -716,7 +719,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     born1975: 'Born before 1975',
     born1975Hint:
       'The employer pays no OPVR for such an employee (Social Code art. 248 para. 6 sub-para. 6). In 2026 the employer pays OPVR of 3.5% for employees born in 1975 or later.',
-    advanced: 'Advanced',
+    advanced: 'Special cases',
+    advancedHint: 'Hire or dismissal month, uneven pay, very high salary',
     month: 'Month of the year',
     months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
     monthHint:

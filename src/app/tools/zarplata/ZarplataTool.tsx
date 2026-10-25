@@ -539,7 +539,10 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
                 className={`cursor-pointer list-none [&::-webkit-details-marker]:hidden flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-sm font-semibold outline-none ${focusRing}`}
                 style={{ color: 'var(--nav-text-primary)' }}
               >
-                <span>{t.advanced}</span>
+                <span className="flex flex-col gap-0.5 py-1">
+                  <span>{t.advanced}</span>
+                  <span className="text-xs font-normal" style={{ color: 'var(--nav-text-muted)' }}>{t.advancedHint}</span>
+                </span>
                 <span aria-hidden="true" className="transition-transform group-open:rotate-45" style={{ color: 'var(--nav-text-muted)' }}>+</span>
               </summary>
               <div className="grid gap-4 px-3 pb-3 pt-1">
