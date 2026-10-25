@@ -5,6 +5,7 @@ import { GUIDES, guidesIndexAlternates } from '@/lib/guides'
 import { bikGuidesIndexCard } from '@/lib/bikLinks'
 import { toolLinkPath } from '@/lib/tools-i18n'
 import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
+import KkReviewNotice from '@/components/KkReviewNotice'
 
 export const metadata: Metadata = {
   title: 'Қазақстан бизнесі үшін пайдалы — invoices.kz нұсқаулары',
@@ -50,6 +51,8 @@ export default function GuidesIndexKk() {
             Русский
           </Link>
         </div>
+
+        <KkReviewNotice className="mb-5" />
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           Пайдалы

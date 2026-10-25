@@ -4,6 +4,7 @@ import { FEATURES_HREF } from '@/lib/rootHub'
 import { toolLinkPath } from '@/lib/tools-i18n'
 import { BIK_PAGES_UPDATED, bikHubPath, type BikLang } from '@/lib/bikRegistry'
 import { CHROME, longDate, type FaqItem, type Para } from './bikContent'
+import KkReviewNotice from '@/components/KkReviewNotice'
 
 // Shared chrome for every /bik page in both languages. Mirrors GuideShell (same
 // header, prose container, FAQ block and CTA) but takes its copy from
@@ -91,6 +92,9 @@ export default function BikShell({
             {chrome.switchLabel}
           </Link>
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts); для ru и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-5" />}
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {title}

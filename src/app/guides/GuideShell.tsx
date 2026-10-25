@@ -4,6 +4,7 @@ import { FEATURES_HREF } from '@/lib/rootHub'
 import { Guide, GuideLang, guideJsonLdData, guidePath, guidesIndexPath, relatedGuidesOf } from '@/lib/guides'
 import { toolLinkPath } from '@/lib/tools-i18n'
 import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
+import KkReviewNotice from '@/components/KkReviewNotice'
 
 // Shared chrome for every guide page in both languages: header, breadcrumb,
 // language switch, prose container, cross-links and the schema.org markup.
@@ -118,6 +119,9 @@ export default function GuideShell({
             {chrome.switchLabel}
           </Link>
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts); для ru и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-5" />}
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {copy.title}
