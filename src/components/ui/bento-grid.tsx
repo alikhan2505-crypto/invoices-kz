@@ -65,7 +65,7 @@ function cx(...parts: Array<string | false | undefined>) {
 }
 
 export function BentoGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-fr">{children}</div>
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-fr xl:grid-cols-3 xl:gap-6">{children}</div>
 }
 
 export function BentoCard({ item, className }: { item: BentoItem; className?: string }) {

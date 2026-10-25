@@ -100,3 +100,16 @@
   .lp-root .lp-split .lp-hero[data-price="true"] { gap: 14px; padding-bottom: 2px; }
   .lp-root .lp-split .lp-hero[data-price="true"] .lp-price { margin-top: -6px; }
 }
+
+/* Широкие экраны (25.10.2026, жалоба основателя на пустые поля по бокам у
+   лендингов на 1920): от 1700 px текст и живое окно занимают всю ширину
+   страницы (раньше 600 + 940 px и ~280 px пустоты справа). Ниже 1700 всё как
+   принято 13.10 (в один экран от 1440x760), контейнерные запросы сцен
+   (600/640/760 px) срабатывали и при 940 px, поэтому раскладка окна та же,
+   просто шире. */
+@media (min-width: 1700px) {
+  .lp-root .lp-split { grid-template-columns: minmax(0, 680px) minmax(0, 1120px); column-gap: 72px; }
+  .lp-root .lp-split .lp-hero { max-width: 680px; }
+  .lp-root .lp-split .lp-h1 { font-size: 68px; }
+  .lp-root .lp-split .lp-lead { font-size: 20px; max-width: 46ch; }
+}

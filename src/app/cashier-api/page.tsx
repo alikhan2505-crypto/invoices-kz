@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { FOOTER_COPY } from '@/lib/i18n/productsHub'
+import { LANDING_WRAP } from '@/lib/landingLayout'
 import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 
 type CodeLang = 'curl' | 'javascript' | 'python'
@@ -236,7 +237,7 @@ function HeroCodeDemo({ responseLabel }: { responseLabel: string }) {
   const lines = active === 'curl' ? CURL_LINES : active === 'javascript' ? JAVASCRIPT_LINES : PYTHON_LINES
 
   return (
-    <div className="w-full max-w-xl overflow-hidden rounded-2xl" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
+    <div className="w-full max-w-xl overflow-hidden rounded-2xl lg:max-w-none" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
       <div className="flex" style={{ borderBottom: `1px solid ${C.border}` }}>
         {(['curl', 'javascript', 'python'] as CodeLang[]).map((l) => (
           <button
@@ -294,7 +295,7 @@ export default function CashierApiPage() {
   return (
     <div className="min-h-screen" style={{ background: C.bg0, color: C.text, fontFamily: FONT_SANS }}>
       <header className="sticky top-0 z-20" style={{ background: 'rgba(10,12,16,0.92)', borderBottom: `1px solid ${C.border}` }}>
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3 sm:px-8">
+        <div className={`${LANDING_WRAP} flex items-center justify-between py-3`}>
           <a href="/" className="flex min-h-11 items-center text-[14px] font-bold tracking-[0.08em]" style={{ color: C.text }}>
             invoices<span style={{ color: C.accent }}>.kz</span>
           </a>
@@ -330,17 +331,17 @@ export default function CashierApiPage() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-5xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20">
-          <div className="flex flex-col items-start gap-10 lg:flex-row lg:items-center">
-            <div className="max-w-xl">
+        <section className={`${LANDING_WRAP} pb-16 pt-14 sm:pt-20 xl:pb-24 xl:pt-24`}>
+          <div className="flex flex-col items-start gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-12 xl:gap-20">
+            <div className="max-w-xl lg:max-w-none">
               {/* "KASPI CASHIER API" is a product label, invariant across
                   languages -- see design spec's Hero section: "единственное
                   уместное использование эйбрау на этой странице". */}
               <div className="mb-5 text-[12px] font-bold uppercase tracking-[0.18em]" style={{ color: C.accent, fontFamily: FONT_MONO }}>
                 KASPI CASHIER API
               </div>
-              <h1 className="text-[clamp(1.9rem,4.4vw,3rem)] font-bold leading-[1.12] tracking-[-0.02em]">{t.heroTitle}</h1>
-              <p className="mt-5 text-[15px] leading-relaxed" style={{ color: C.muted }}>{t.heroSubtitle}</p>
+              <h1 className="text-[clamp(1.9rem,4.4vw,3rem)] font-bold leading-[1.12] tracking-[-0.02em] xl:text-[3.5rem] xl:leading-[1.08]">{t.heroTitle}</h1>
+              <p className="mt-5 max-w-xl text-[15px] leading-relaxed xl:mt-6 xl:max-w-[34rem] xl:text-[17px]" style={{ color: C.muted }}>{t.heroSubtitle}</p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <button
                   onClick={goLogin}
@@ -362,27 +363,27 @@ export default function CashierApiPage() {
           </div>
         </section>
 
-        <section id="how" className="mx-auto max-w-5xl px-5 py-14 sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>
+        <section id="how" className={`${LANDING_WRAP} py-14 xl:py-20`} style={{ borderTop: `1px solid ${C.border}` }}>
           <Eyebrow>{t.stepsEyebrow}</Eyebrow>
           <h2 className="mt-3 text-[clamp(1.5rem,3vw,2rem)] font-semibold tracking-[-0.01em]">{t.stepsTitle}</h2>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:mt-10 xl:gap-6">
             {t.steps.map((s, i) => (
-              <div key={s.title} className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
+              <div key={s.title} className="rounded-xl p-5 xl:p-7" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg text-[13px] font-bold" style={{ background: C.bg2, color: C.accent, fontFamily: FONT_MONO }}>
                   {i + 1}
                 </div>
-                <h3 className="mt-4 text-[14px] font-semibold">{s.title}</h3>
-                <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: C.muted }}>{s.desc}</p>
+                <h3 className="mt-4 text-[14px] font-semibold xl:text-[16px]">{s.title}</h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed xl:text-[14px]" style={{ color: C.muted }}>{s.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="mx-auto max-w-5xl px-5 py-14 sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>
+        <section className={`${LANDING_WRAP} py-14 xl:py-20`} style={{ borderTop: `1px solid ${C.border}` }}>
           <Eyebrow>{t.pricingEyebrow}</Eyebrow>
-          <div className="mt-6 flex flex-col gap-10 lg:flex-row lg:items-center">
-            <div>
-              <div className="text-[clamp(3rem,8vw,4.5rem)] font-bold leading-none" style={{ color: C.accent, fontFamily: FONT_MONO }}>
+          <div className="mt-6 flex flex-col gap-10 lg:flex-row lg:items-center lg:gap-16 xl:gap-28">
+            <div className="lg:w-[320px] lg:shrink-0 xl:w-[400px]">
+              <div className="text-[clamp(3rem,8vw,4.5rem)] font-bold leading-none xl:text-[6rem]" style={{ color: C.accent, fontFamily: FONT_MONO }}>
                 2%
               </div>
               <p className="mt-3 max-w-xs text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{t.pricingCaption}</p>
@@ -406,15 +407,15 @@ export default function CashierApiPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-5xl px-5 py-14 sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>
+        <section className={`${LANDING_WRAP} py-14 xl:py-20`} style={{ borderTop: `1px solid ${C.border}` }}>
           <Eyebrow>{t.featuresEyebrow}</Eyebrow>
           <h2 className="mt-3 text-[clamp(1.5rem,3vw,2rem)] font-semibold tracking-[-0.01em]">{t.featuresTitle}</h2>
-          <div className="mt-8">
+          <div className="mt-8 lg:grid lg:grid-cols-2 lg:gap-x-16 xl:gap-x-28">
             {t.features.map((feat, i) => (
               <div
                 key={feat.label}
-                className="flex flex-wrap items-center justify-between gap-3 py-4"
-                style={{ borderTop: i === 0 ? 'none' : `1px solid ${C.border}` }}
+                className={`flex flex-wrap items-center justify-between gap-3 py-4 ${i === 0 ? '' : 'border-t'} ${i === 1 ? 'lg:border-t-0' : ''}`}
+                style={{ borderColor: C.border }}
               >
                 <span className="text-[14px] font-medium">{feat.label}</span>
                 <span className="text-[13px]" style={{ color: C.accent, fontFamily: FONT_MONO }}>{feat.value}</span>
@@ -424,7 +425,7 @@ export default function CashierApiPage() {
           <p className="mt-5 max-w-prose text-[12.5px] leading-relaxed" style={{ color: C.muted }}>{t.featuresFootnote}</p>
         </section>
 
-        <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>
+        <section className={`${LANDING_WRAP} py-16 text-center xl:py-24`} style={{ borderTop: `1px solid ${C.border}` }}>
           <h2 className="text-[clamp(1.6rem,3.4vw,2.25rem)] font-semibold tracking-[-0.01em]">{t.finalCtaTitle}</h2>
           <button
             onClick={goLogin}
@@ -436,7 +437,7 @@ export default function CashierApiPage() {
         </section>
       </main>
 
-      <footer className="mx-auto max-w-5xl px-5 py-8 sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>
+      <footer className={`${LANDING_WRAP} py-8`} style={{ borderTop: `1px solid ${C.border}` }}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a href="/" className="flex min-h-11 items-center text-[13px] font-bold" style={{ color: C.text }}>
             invoices<span style={{ color: C.accent }}>.kz</span>

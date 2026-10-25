@@ -15,6 +15,7 @@ import { StepFormArt, StepPaidArt, StepScanArt } from './invoicesLanding/StepIll
 import { BentoMotionTile } from './invoicesLanding/BentoMotion'
 import { DigitRoll } from './invoicesLanding/DigitRoll'
 import { groupThousands } from './invoicesLanding/useLoopStep'
+import { LANDING_WRAP } from '@/lib/landingLayout'
 import './invoicesLanding/invoices-landing.css'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -704,7 +705,7 @@ export default function InvoicesLandingPage() {
           boxShadow: scrolled ? '0 12px 30px rgba(0,0,0,0.35)' : 'none',
         }}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
+        <div className={`${LANDING_WRAP} flex items-center justify-between py-3`}>
           <span className="text-[15px] font-bold tracking-[0.12em]">
             INVOICES<span style={{ color: COLOR.violet }}>.KZ</span>
           </span>
@@ -741,14 +742,14 @@ export default function InvoicesLandingPage() {
       <section ref={heroRef} className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
         <AmbientBlobs paused={!heroInView} />
 
-        <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
-          <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:gap-14 lg:text-left">
+        <div className={`relative z-10 ${LANDING_WRAP}`}>
+          <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:gap-14 lg:text-left xl:gap-20">
             <div className="flex w-full flex-col items-center lg:w-1/2 lg:items-start">
               <motion.h1
                 initial={reduce ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.06 }}
-                className="text-[clamp(2.4rem,7vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em]"
+                className="text-[clamp(2.4rem,7vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em] xl:text-[4.75rem]"
               >
                 {t.heroTitleLine1}
                 <br />
@@ -767,7 +768,7 @@ export default function InvoicesLandingPage() {
                 initial={reduce ? false : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.14 }}
-                className="mt-6 max-w-xl text-[16px] leading-relaxed"
+                className="mt-6 max-w-xl text-[16px] leading-relaxed xl:text-[18px]"
                 style={{ color: 'rgba(255,255,255,0.82)' }}
               >
                 {t.heroSubtitle}
@@ -839,7 +840,7 @@ export default function InvoicesLandingPage() {
 
       {/* --------------------------------------------------------- stats */}
       <Reveal className="relative z-10" as="div">
-        <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8" style={{ borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
+        <div className={`${LANDING_WRAP} py-10`} style={{ borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             {t.stats.map((s) => (
               <StatCounter key={s.kind} stat={s} decimalSep={lang === 'en' ? '.' : ','} />
@@ -849,22 +850,22 @@ export default function InvoicesLandingPage() {
       </Reveal>
 
       {/* ----------------------------------------------------------- how */}
-      <section id="how" className="relative z-10 mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
+      <section id="how" className={`relative z-10 ${LANDING_WRAP} py-14 sm:py-20`}>
         <Reveal className="text-center">
           <Eyebrow color={COLOR.teal}>{t.stepsEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.9rem,4vw,2.75rem)] font-semibold tracking-[-0.02em]">{t.stepsTitle}</h2>
         </Reveal>
 
-        <div className="mt-12 flex flex-col gap-4">
+        <div className="mt-12 flex flex-col gap-4 xl:grid xl:grid-cols-3 xl:gap-6">
           {t.steps.map((s, i) => (
-            <Reveal key={s.title} delay={Math.min(i * 0.05, 0.2)}>
+            <Reveal key={s.title} delay={Math.min(i * 0.05, 0.2)} className="xl:h-full">
               {/* у каждого шага -- своя маленькая зацикленная сценка справа
                   (на телефоне -- под текстом), коробка фиксированного размера */}
               <div
-                className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:translate-x-1.5 flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-center"
+                className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:translate-x-1.5 flex h-full flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-center xl:flex-col xl:items-start xl:justify-between xl:gap-7 xl:p-8"
                 style={{ background: surface, border: `1px solid ${border}` }}
               >
-                <div className="flex flex-1 items-start gap-5">
+                <div className="flex flex-1 items-start gap-5 xl:flex-none">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[16px] font-bold"
                     style={{ background: `linear-gradient(135deg, ${COLOR.violet}, ${COLOR.teal})` }}
@@ -876,7 +877,7 @@ export default function InvoicesLandingPage() {
                     <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
                   </div>
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 xl:self-center">
                   {i === 0 && <StepFormArt />}
                   {i === 1 && <StepScanArt />}
                   {i === 2 && <StepPaidArt t={t.mock} />}
@@ -893,7 +894,7 @@ export default function InvoicesLandingPage() {
           src/components/ui/bento-grid.tsx for the vendoring notes. Keeps
           the old section's #features anchor id since external links/CTAs
           may already point at it. */}
-      <section id="features" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+      <section id="features" className={`relative z-10 ${LANDING_WRAP} py-14 sm:py-20`}>
         <Reveal className="max-w-xl">
           <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.bentoTitle}</h2>
           <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.bentoSubtitle}</p>
@@ -922,7 +923,7 @@ export default function InvoicesLandingPage() {
       <PricingSection t={t} lang={lang} goLogin={goLogin} />
 
       {/* ---------------------------------------------------------- auth */}
-      <section className="relative z-10 mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
+      <section className={`relative z-10 ${LANDING_WRAP} py-12 sm:py-16`}>
         <Reveal className="text-center">
           <Eyebrow color={COLOR.teal}>{t.authEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.7rem,3.4vw,2.25rem)] font-semibold tracking-[-0.02em]">{t.authTitle}</h2>
@@ -948,7 +949,7 @@ export default function InvoicesLandingPage() {
           })}
         </div>
 
-        <div className="mx-auto mt-6 max-w-3xl border-t" style={{ borderColor: border }} />
+        <div className="mx-auto mt-6 max-w-3xl border-t xl:max-w-none" style={{ borderColor: border }} />
 
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {t.extras.map((e, i) => {
@@ -968,7 +969,7 @@ export default function InvoicesLandingPage() {
       </section>
 
       {/* ----------------------------------------------------- final cta */}
-      <section className="relative z-10 mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-16">
+      <section className={`relative z-10 ${LANDING_WRAP} py-14 sm:py-16`}>
         <Reveal>
           <div
             className="relative overflow-hidden rounded-[28px] px-6 py-14 text-center sm:px-14"
@@ -996,7 +997,7 @@ export default function InvoicesLandingPage() {
       </main>
 
       {/* ------------------------------------------------------- footer */}
-      <footer className="relative z-10 mx-auto max-w-6xl px-5 py-10 sm:px-8" style={{ borderTop: `1px solid ${border}` }}>
+      <footer className={`relative z-10 ${LANDING_WRAP} py-10`} style={{ borderTop: `1px solid ${border}` }}>
         <div className="flex flex-wrap items-center justify-between gap-5">
           <span className="text-[13px] font-bold tracking-[0.1em]">
             INVOICES<span style={{ color: COLOR.violet }}>.KZ</span>
@@ -1070,7 +1071,7 @@ function AmbientBlobs({ paused }: { paused: boolean }) {
    только без prefers-reduced-motion). */
 function OtherProducts({ t }: { t: Copy }) {
   return (
-    <section id="products" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+    <section id="products" className={`relative z-10 ${LANDING_WRAP} py-14 sm:py-20`}>
       <Reveal className="max-w-2xl">
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.othersTitle}</h2>
         <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.othersSubtitle}</p>
@@ -1199,7 +1200,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: (p
     groupThousands(PLAN_PRICES[plan].monthly * 12 - PLAN_PRICES[plan].annual)
 
   return (
-    <section id="pricing" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+    <section id="pricing" className={`relative z-10 ${LANDING_WRAP} py-14 sm:py-20`}>
       <Reveal className="text-center">
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold tracking-[-0.02em]">{t.pricing.title}</h2>
         <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
