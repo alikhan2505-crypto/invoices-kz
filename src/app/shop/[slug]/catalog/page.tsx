@@ -5,6 +5,8 @@ import { motion, useReducedMotion } from 'framer-motion'
 import WholesaleCartBar from '@/components/kaspiShop/WholesaleCartBar'
 import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
 import { formatStorefrontPrice as formatPrice } from '@/lib/i18n/storefront'
+import { ProductPhoto, CategoryTile, CategoryHeading } from '@/components/shop/StorefrontParts'
+import { STOREFRONT_WRAP, STOREFRONT_GRID, STOREFRONT_SECTION, STOREFRONT_GROUP_GRID } from '@/lib/storefrontLayout'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -66,7 +68,7 @@ export default function WholesaleCatalogPage() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
-      <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32">
+      <div className={`${STOREFRONT_WRAP} pb-32 lg:pb-32`}>
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
           <h1 className="text-lg font-bold min-w-0 truncate" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
@@ -74,7 +76,7 @@ export default function WholesaleCatalogPage() {
         </div>
 
         {categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
+          <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible pb-2 mb-6">
             <button onClick={() => setActiveCategory(null)}
               className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
               style={{ background: activeCategory === null ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: activeCategory === null ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
@@ -93,13 +95,12 @@ export default function WholesaleCatalogPage() {
         {models.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noModels}</div>
         ) : (
-          <div className="space-y-8">
+          <div className={STOREFRONT_GRID}>
             {visibleGroups.map(group => (
-              <div key={group.id || group.name || 'all'}>
-                {group.name && (
-                  <h2 className="text-lg font-bold mb-4 pb-2 border-b" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>{group.name}</h2>
-                )}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div key={group.id || group.name || 'all'} className={STOREFRONT_SECTION}>
+                {group.name && <CategoryHeading name={group.name} />}
+                <div className={STOREFRONT_GROUP_GRID}>
+                  {group.name && <CategoryTile name={group.name} count={group.models.length} />}
                   {group.models.map((m, i) => (
                     <motion.a
                       key={m.id}
@@ -109,14 +110,10 @@ export default function WholesaleCatalogPage() {
                       transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
                       className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
                     >
-                      {m.imageUrl ? (
-                        <img src={m.imageUrl} alt={m.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
-                      ) : (
-                        <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
-                      )}
-                      <div className="p-3 sm:p-4">
+                      <ProductPhoto src={m.imageUrl} name={m.name} />
+                      <div className="p-3 sm:p-4 flex flex-col flex-1">
                         <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{m.name}</div>
-                        <div className="text-base sm:text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(m.price)}</div>
+                        <div className="text-base sm:text-lg font-bold mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(m.price)}</div>
                       </div>
                     </motion.a>
                   ))}

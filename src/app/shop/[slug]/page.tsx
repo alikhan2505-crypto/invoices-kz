@@ -7,6 +7,11 @@ import QRCode from 'qrcode'
 import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
 import { formatStorefrontPrice as formatPrice, storefrontApiErrorKey, type StorefrontErrorKey } from '@/lib/i18n/storefront'
 import { WIDGET_SCRIPT_URL } from '@/lib/aiAgent/widgetSnippet'
+import { ProductPhoto, CategoryTile, CategoryHeading } from '@/components/shop/StorefrontParts'
+import {
+  STOREFRONT_WRAP, STOREFRONT_BAR_OUTER, STOREFRONT_BAR_INNER, STOREFRONT_BAR_WIDGET_PAD,
+  STOREFRONT_GRID, STOREFRONT_SECTION, STOREFRONT_GROUP_GRID,
+} from '@/lib/storefrontLayout'
 
 type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
 type Category = { id: string; name: string; sortOrder: number }
@@ -225,29 +230,31 @@ export default function StorefrontPage() {
     return (
       <div className="min-h-screen flex items-center justify-center relative" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
         <StorefrontLangSwitch className="absolute top-4 right-4" />
-        <div className="max-w-2xl mx-auto p-6 pt-16 text-center">
+        <div className={`${STOREFRONT_WRAP} pt-16 lg:pt-16 text-center`}>
           <div className="flex items-center justify-center gap-2.5 mb-6">
             <LogoMark />
             <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
           </div>
+          <div className="grid grid-cols-1 gap-4 mb-6 lg:[grid-template-columns:repeat(auto-fit,minmax(18rem,34rem))] lg:justify-center lg:items-stretch">
           {landingHistory && (
-            <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
+            <div className="nav-glass rounded-2xl p-5 text-left">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingHistory}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingHistory}</div>
             </div>
           )}
           {landingCapacity && (
-            <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
+            <div className="nav-glass rounded-2xl p-5 text-left">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingCapacity}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingCapacity}</div>
             </div>
           )}
           {landingAnnualVolume && (
-            <div className="nav-glass rounded-2xl p-5 mb-6 text-left">
+            <div className="nav-glass rounded-2xl p-5 text-left">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingAnnualVolume}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingAnnualVolume}</div>
             </div>
           )}
+          </div>
           <a href={`/shop/${params.slug}/catalog`}
             className="inline-block rounded-xl px-6 py-3 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
             {t.goToCatalog}
@@ -262,7 +269,7 @@ export default function StorefrontPage() {
       {widgetKey && (
         <Script id="invoiceskz-storefront-widget" src={WIDGET_SCRIPT_URL} data-key={widgetKey} strategy="afterInteractive" />
       )}
-      <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32 lg:pb-32">
+      <div className={`${STOREFRONT_WRAP} pb-32 lg:pb-32`}>
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
           <h1 className="text-lg font-bold min-w-0 truncate" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
@@ -270,8 +277,8 @@ export default function StorefrontPage() {
         </div>
 
         {deliveryInfo && (
-          <div className="nav-glass rounded-2xl p-4 mb-6">
-            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.delivery}</div>
+          <div className="nav-glass rounded-2xl p-4 mb-6 lg:flex lg:items-baseline lg:gap-6">
+            <div className="text-xs font-semibold mb-1 lg:mb-0 lg:w-28 lg:flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>{t.delivery}</div>
             <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{deliveryInfo}</div>
           </div>
         )}
@@ -279,13 +286,12 @@ export default function StorefrontPage() {
         {products.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noProducts}</div>
         ) : (
-          <div className="space-y-8">
+          <div className={STOREFRONT_GRID}>
             {groupProducts(products, categories, t.otherCategory).map(group => (
-              <div key={group.id || group.name || 'all'}>
-                {group.name && (
-                  <h2 className="text-lg font-bold mb-4 pb-2 border-b" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>{group.name}</h2>
-                )}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div key={group.id || group.name || 'all'} className={STOREFRONT_SECTION}>
+                {group.name && <CategoryHeading name={group.name} />}
+                <div className={STOREFRONT_GROUP_GRID}>
+                  {group.name && <CategoryTile name={group.name} count={group.products.length} />}
                   {group.products.map((p, i) => {
                     const qty = cartQty(p.id)
                     return (
@@ -297,11 +303,7 @@ export default function StorefrontPage() {
                         className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
                         style={{ scrollMarginBottom: '7rem' }}
                       >
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
-                        ) : (
-                          <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
-                        )}
+                        <ProductPhoto src={p.imageUrl} name={p.name} />
                         <div className="p-3 sm:p-4 flex flex-col flex-1">
                           {p.brand && <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
                           <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
@@ -339,23 +341,25 @@ export default function StorefrontPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
-            className="fixed bottom-4 inset-x-4 z-40 max-w-6xl mx-auto"
+            className={STOREFRONT_BAR_OUTER}
           >
+           <div className={`${STOREFRONT_BAR_INNER} ${widgetKey ? STOREFRONT_BAR_WIDGET_PAD : ''}`}>
             <button
               onClick={() => setCheckoutOpen(true)}
-              className="w-full nav-glass rounded-2xl px-5 py-3.5 flex items-center justify-between shadow-lg"
+              className="pointer-events-auto w-full nav-glass rounded-2xl px-5 py-3.5 flex items-center justify-between shadow-lg"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
             >
               <span className="text-sm font-semibold">{t.cartBar(cartCount)}</span>
               <span className="text-sm font-bold">{formatPrice(cartTotal)} · {t.checkoutCta}</span>
             </button>
+           </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {checkoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={closeModal}>
-          <div className="nav-glass rounded-2xl p-5 w-full max-w-sm" style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
+          <div className={`nav-glass rounded-2xl p-5 w-full max-h-[90vh] overflow-y-auto ${payment ? 'max-w-sm sm:max-w-md' : 'max-w-sm sm:max-w-md lg:max-w-3xl'}`} style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.yourOrder}</div>
               <button onClick={closeModal} aria-label={t.close} className="text-sm flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>✕</button>
@@ -378,8 +382,9 @@ export default function StorefrontPage() {
                 )}
               </div>
             ) : (
-              <>
-                <ul className="space-y-1.5 mb-3 max-h-40 overflow-y-auto">
+              <div className="lg:grid lg:grid-cols-2 lg:gap-8">
+                <div>
+                <ul className="space-y-1.5 mb-3 max-h-40 lg:max-h-72 overflow-y-auto">
                   {cartLines.map(l => (
                     <li key={l.id} className="flex items-center justify-between gap-2 text-sm">
                       <span className="truncate" style={{ color: 'var(--nav-text-secondary)' }}>{l.name} × {l.qty}</span>
@@ -387,10 +392,12 @@ export default function StorefrontPage() {
                     </li>
                   ))}
                 </ul>
-                <div className="flex items-center justify-between text-sm font-bold mb-4 pt-2 border-t" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>
+                <div className="flex items-center justify-between text-sm font-bold mb-4 lg:mb-0 pt-2 border-t" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>
                   <span>{t.total}</span>
                   <span>{formatPrice(cartTotal)}</span>
                 </div>
+                </div>
+                <div>
                 <div className="space-y-2 mb-4">
                   <input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder={t.namePlaceholder} autoComplete="name"
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
@@ -407,7 +414,8 @@ export default function StorefrontPage() {
                   className="w-full rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {submitting ? t.submitting : t.placeAndPay}
                 </button>
-              </>
+                </div>
+              </div>
             )}
           </div>
         </div>
