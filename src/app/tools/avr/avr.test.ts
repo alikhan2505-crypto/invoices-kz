@@ -21,11 +21,11 @@ const RU_ABBR = new RegExp(`${NB}(БИН|ИИН|НДС|ИП|ТОО|АВР|КП|�
 const CYRILLIC = /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/
 
 describe('avr metadata', () => {
-  it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
+  it('ru head names the searched wording: образец, Казахстан, скачать (24.10.2026 metadata audit)', () => {
     const m = toolMetadata('avr', 'ru', avrDict.ru.seo)
-    expect(m.title).toBe('Акт выполненных работ — образец, АВР онлайн | invoices.kz')
+    expect(m.title).toBe('Образец акта выполненных работ для Казахстана — скачать PDF')
     expect(m.description).toBe(
-      'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС, сумма прописью. 3 акта в квартал бесплатно.',
+      'Образец акта выполненных работ (АВР) для ИП и ТОО в Казахстане: заполните стороны и договор, скачайте PDF. НДС, сумма прописью. 3 акта в квартал бесплатно.',
     )
     expect(m.openGraph?.title).toBe('АВР онлайн — акт выполненных работ за минуту')
   })

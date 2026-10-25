@@ -12,9 +12,9 @@ const base: Form = {
 const err = nakladnayaDict.ru.errors
 
 describe('nakladnaya metadata', () => {
-  it('keeps the ru title exactly as it was before the split', () => {
+  it('ru title names the searched wording: образец, Казахстан, скачать (24.10.2026 metadata audit)', () => {
     const m = toolMetadata('nakladnaya', 'ru', nakladnayaDict.ru.seo)
-    expect(m.title).toBe('Накладная на отпуск запасов — образец, онлайн | invoices.kz')
+    expect(m.title).toBe('Образец накладной для Казахстана — скачать PDF | invoices.kz')
   })
 
   it('canonicalises each language to itself with hreflang to all three', () => {

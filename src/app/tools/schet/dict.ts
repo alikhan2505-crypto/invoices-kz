@@ -101,18 +101,18 @@ export interface SchetDict {
 export const schetDict: Record<ToolLang, SchetDict> = {
   ru: {
     seo: {
-      title: 'Счёт на оплату — образец, создать онлайн',
+      title: 'Образец счёта на оплату для Казахстана — скачать PDF',
       description:
-        'Образец счёта на оплату для ИП и ТОО: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
+        'Образец счёта на оплату для ИП и ТОО в Казахстане: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
       keywords:
         'счет на оплату образец казахстан, счет на оплату скачать, выставить счет онлайн бесплатно, счет на оплату ип образец, счет на оплату тоо, создать счет на оплату, счет с ндс 16 казахстан',
       ogTitle: 'Счёт на оплату онлайн — бесплатно за минуту',
       ogDescription: 'Реквизиты, БИН, банк из справочника, НДС 16% или без, сумма прописью. PDF без регистрации.',
       ogImageAlt: 'Счёт на оплату онлайн — invoices.kz',
     },
-    h1: 'Счёт на оплату — онлайн, бесплатно',
+    h1: 'Образец счёта на оплату для Казахстана — заполнить и скачать бесплатно',
     intro: n =>
-      `Заполните реквизиты — получите готовый счёт по форме, принятой в Казахстане: с БИК из справочника банков, суммой прописью и НДС, если нужен. Без регистрации, ${n} счёта в квартал.`,
+      `Заполните реквизиты — получите готовый счёт по форме, принятой в Казахстане: с БИК из справочника банков, суммой прописью и НДС, если нужен, и скачайте его в PDF. Без регистрации, ${n} счёта в квартал.`,
     docLangNote: '',
     supplierTitle: 'Поставщик — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -209,16 +209,16 @@ export const schetDict: Record<ToolLang, SchetDict> = {
 
   kk: {
     seo: {
-      title: 'Төлем шотының үлгісі — онлайн жасау, тегін',
+      title: 'Қазақстандағы төлем шотының үлгісі — PDF жүктеу',
       description:
-        'ЖК және ЖШС үшін төлем шотының үлгісі: деректемелерді толтырып, бір минутта PDF жүктеңіз. ҚҚС 16%, сомасы жазбаша — тоқсанына 3 шот тегін.',
+        'Қазақстандағы ЖК және ЖШС үшін төлем шотының үлгісі: деректемелерді толтырып, бір минутта PDF жүктеңіз. ҚҚС 16%, сомасы жазбаша — тоқсанына 3 шот тегін.',
       keywords:
         'төлем шоты үлгісі, төлемге шот үлгісі, төлем шоты онлайн, шот жазу тегін, жк төлем шоты, жшс төлем шоты, төлем шотын жасау, төлем шоты pdf жүктеу, ққс 16 шот',
       ogTitle: 'Төлем шоты онлайн — бір минутта, тегін',
       ogDescription: 'Деректемелер, БСН, банк анықтамалықтан, ҚҚС 16% немесе ҚҚС-сыз, сомасы жазбаша. Тіркелусіз PDF.',
       ogImageAlt: 'Төлем шоты онлайн — invoices.kz',
     },
-    h1: 'Төлем шоты — онлайн, тегін',
+    h1: 'Қазақстандағы төлем шотының үлгісі — толтырып, тегін жүктеңіз',
     intro: n =>
       `Деректемелерді толтырыңыз — Қазақстанда қабылданған нысандағы дайын шот аласыз: БСК банктер анықтамалығынан алынады, сомасы жазбаша көрсетіледі, қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} шот.`,
     docLangNote: 'Шот бланкісі орыс тілінде шығады — бухгалтерия мен банк қабылдайтын үйреншікті нысан.',
@@ -317,7 +317,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
 
   en: {
     seo: {
-      title: 'Kazakhstan Invoice Template — Free Online PDF',
+      title: 'Kazakhstan Invoice Template — Download Free PDF',
       description:
         'Kazakhstan invoice template for sole proprietors and LLPs: fill in your details, get a PDF in a minute. 16% VAT, total in words. 3 free per quarter.',
       keywords:
@@ -326,7 +326,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       ogDescription: 'Your details, BIN, bank from the directory, 16% VAT or none, amount in words. PDF without sign-up.',
       ogImageAlt: 'Kazakhstan invoice generator — invoices.kz',
     },
-    h1: 'Kazakhstan invoice for payment — online, free',
+    h1: 'Kazakhstan invoice template — fill in and download free',
     intro: n =>
       `Fill in your details — BIN/IIN (business or individual identification number), bank and account — to get a ready invoice on the standard Kazakhstan form: the bank code (BIC) comes from the bank directory, the amount is written out in words, VAT is added if you need it. No sign-up, ${n} invoices per quarter.`,
     docLangNote: 'The invoice is generated in Russian — the standard form that accountants and banks in Kazakhstan accept.',

@@ -20,6 +20,8 @@
 import { kaspiGuidesForRegistry } from './kaspiGuides'
 import { FORMA910_GUIDE } from './forma910'
 import { MRP_GUIDE } from './mrp'
+import { NAKLADNAYA_Z2_GUIDE } from './nakladnayaZ2'
+import { BIN_CHECK_GUIDE } from './binCheck'
 
 export type GuideLang = 'ru' | 'kk'
 
@@ -204,7 +206,7 @@ export const GUIDES: Guide[] = [
     slug: 'dokumenty-ip-kazakhstan',
     updated: '2026-10-22',
     relatedTools: ['schet', 'avr', 'nakladnaya', 'kp'],
-    relatedGuides: ['kak-vystavit-schet-ip', 'esf-kazakhstan-2026'],
+    relatedGuides: ['kak-vystavit-schet-ip', 'esf-kazakhstan-2026', 'nakladnaya-na-otpusk-zapasov-obrazec'],
     ru: {
       shortTitle: 'Счёт, АВР, накладная и КП',
       title: 'Счёт, АВР, накладная и КП: чем отличаются и когда нужны',
@@ -226,7 +228,7 @@ export const GUIDES: Guide[] = [
     slug: 'proverka-kontragenta',
     updated: '2026-10-22',
     relatedTools: ['kontragent', 'schet'],
-    relatedGuides: ['kak-vystavit-schet-ip', 'penya-za-prosrochku'],
+    relatedGuides: ['kak-vystavit-schet-ip', 'penya-za-prosrochku', 'proverka-kompanii-po-bin-chto-mozhno-uznat'],
     ru: {
       shortTitle: 'Проверка контрагента',
       title: 'Как проверить контрагента по БИН в Казахстане: пошагово',
@@ -270,6 +272,10 @@ export const GUIDES: Guide[] = [
   MRP_GUIDE,
   // Форма 910.00: данные, даты и тексты в forma910.ts, страница не за флагом.
   FORMA910_GUIDE,
+  // Накладная на отпуск запасов (форма З-2): данные и тексты в nakladnayaZ2.ts, страница не за флагом.
+  NAKLADNAYA_Z2_GUIDE,
+  // Проверка компании по БИН: данные и тексты в binCheck.ts, страница не за флагом.
+  BIN_CHECK_GUIDE,
   {
     slug: 'esf-kazakhstan-2026',
     updated: '2026-10-22',

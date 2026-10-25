@@ -75,6 +75,20 @@ describe('parseVatStatus', () => {
     expect(v.deregisteredAt).toBe('2024-06-30')
   })
 
+  it('counts someone who was deregistered and then registered again as a payer', () => {
+    // КГД reports the LAST registration and deregistration dates; the later one wins.
+    const again = { ...kaspiVat, ndsRegistrationDate: '2025-03-01', ndsDeregistrationDate: '2024-06-30' }
+    const v = parseVatStatus(again)!
+    expect(v.isVatPayer).toBe(true)
+    expect(v.registeredAt).toBe('2025-03-01')
+    expect(v.deregisteredAt).toBe('2024-06-30')
+  })
+
+  it('counts a record that was never registered as not a payer', () => {
+    const never = { iinBin: '123456789012', ndsRegistrationDate: null, ndsDeregistrationDate: null }
+    expect(parseVatStatus(never)!.isVatPayer).toBe(false)
+  })
+
   it('returns null for a body that carries no VAT information at all', () => {
     // Distinct from "not a payer": nothing was learned, and the caller must
     // be able to leave the field unset rather than assert a negative.

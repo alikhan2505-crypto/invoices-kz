@@ -55,9 +55,9 @@ describe('kp dictionary', () => {
     expect(kpDict.en.faq).toHaveLength(kpDict.ru.faq.length)
   })
 
-  it('keeps the ru title exactly as it was before the split', () => {
+  it('ru title names the searched wording: образец, Казахстан (24.10.2026 metadata audit)', () => {
     expect(toolMetadata('kp', 'ru', kpDict.ru.seo).title)
-      .toBe('Коммерческое предложение — образец, КП онлайн | invoices.kz')
+      .toBe('Образец коммерческого предложения в Казахстане — PDF')
   })
 
   it('warns about the Russian document only on kk/en', () => {

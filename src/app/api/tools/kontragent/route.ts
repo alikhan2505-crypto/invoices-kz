@@ -51,6 +51,15 @@ export async function POST(req: NextRequest) {
 
   const result = await performBinLookup(supabase, bin)
 
+  // Оба реестра не ответили (сеть, таймаут, не 2xx): это не «не найдено», и
+  // попытку из квартального лимита мы НЕ тратим. Счётчик не трогаем вообще.
+  if (!result.found && result.unavailable) {
+    return NextResponse.json(
+      { error: 'Реестры сейчас не отвечают, попробуйте позже', unavailable: true, remaining: QUARTER_PER_IP - used },
+      { status: 503 },
+    )
+  }
+
   // Попытка списывается и за «не найдено»: реестры мы уже спросили. Ошибки
   // валидации выше не считаются. Гонка двух одновременных запросов может
   // недосчитать единицу — на этом масштабе безвредно.

@@ -20,7 +20,7 @@ const LASTMOD = {
   productLandings: '2026-10-22', // kaspi./agent./salon. (lp/[key], landings.ts)
   tools: '2026-10-24', // + /tools/zarplata (ru, kk, en)
   toolsIndex: '2026-10-24', // карточка zarplata
-  guidesIndex: '2026-10-24', // на странице появились карточки гайдов про накладные Kaspi и форму 910.00
+  guidesIndex: '2026-10-25', // на странице появились карточки гайдов про накладную З-2 и проверку компании по БИН
   guides: '2026-10-22',
   privacy: '2026-10-13',
   terms: '2026-10-13',

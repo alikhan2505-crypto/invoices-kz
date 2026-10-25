@@ -21,11 +21,11 @@ const L = 'A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі'
 const RU_ABBR_ON_KK = new RegExp(`(?<![${L}])(БИН|ИИН|НДС|ИП|ТОО|АВР|КП|КГД|ЭСФ|БИК|ИИК|КНП)(?![${L}])`)
 
 describe('schet metadata', () => {
-  it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
+  it('ru head names the searched wording: образец, Казахстан, скачать (24.10.2026 metadata audit)', () => {
     const m = toolMetadata('schet', 'ru', schetDict.ru.seo)
-    expect(m.title).toBe('Счёт на оплату — образец, создать онлайн | invoices.kz')
+    expect(m.title).toBe('Образец счёта на оплату для Казахстана — скачать PDF')
     expect(m.description).toBe(
-      'Образец счёта на оплату для ИП и ТОО: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
+      'Образец счёта на оплату для ИП и ТОО в Казахстане: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
     )
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/schet')
   })

@@ -21,6 +21,9 @@ export interface KontragentDict {
   busy: string
   notFoundTitle: string
   notFoundBody: string
+  /** Оба реестра не ответили: это не «не найдено», и попытка из лимита не списывается. */
+  unavailableTitle: string
+  unavailableBody: string
   limitTitle: string
   limitBody: string
   limitButton: string
@@ -48,6 +51,9 @@ export interface KontragentDict {
   fullCardBodySignedIn: string
   fullCardLinkSignedIn: string
   sources: string
+  /** Что инструмент не проверяет + ссылка на гайд proverka-kompanii-po-bin-chto-mozhno-uznat (en — русский гайд). */
+  notCheckedNote: string
+  notCheckedLink: string
   /** Ссылка на гайд proverka-kontragenta (en — русский гайд, подпись это говорит). */
   guideLink: string
   /** Статус из реестра приходит по-русски (statusru) — переводим известные. */
@@ -104,6 +110,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'По этому БИН ничего не нашлось',
     notFoundBody:
       'Ни в реестре юридических лиц, ни в базе КГД. Проверьте цифры — или это очень свежая регистрация, реестры обновляются с задержкой до суток.',
+    unavailableTitle: 'Реестры сейчас не ответили',
+    unavailableBody:
+      'Это не значит, что компании нет: ни реестр юридических лиц, ни база КГД не дали ответа. Попытка не списана, повторите проверку чуть позже.',
     limitTitle: '3 бесплатные проверки в этом квартале закончились',
     limitBody:
       'В кабинете invoices.kz проверки без лимита — плюс полная карточка контрагента (адрес, руководитель, вид деятельности) и автозаполнение реквизитов прямо в счёте. Регистрация бесплатная, по ссылке на почту.',
@@ -145,6 +154,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Открыть в кабинете →',
     sources:
       'Источники: ГБД «Юридические лица» (data.egov.kz) и сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
+    notCheckedNote:
+      'Здесь не проверяются лицензии, реестр должников исполнительных производств, банкротство, налоговый режим и суды.',
+    notCheckedLink: 'Что ещё можно узнать о компании по БИН и где →',
     guideLink: 'Как проверить контрагента по БИН: пошагово →',
     status: raw => raw,
     faq: {
@@ -213,6 +225,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'Бұл БСН бойынша ештеңе табылмады',
     notFoundBody:
       'Заңды тұлғалар тізілімінде де, МКК базасында да жоқ. Сандарды тексеріңіз — немесе бұл жаңа ғана тіркелген компания: тізілімдер бір тәулікке дейін кешігіп жаңарады.',
+    unavailableTitle: 'Тізілімдер қазір жауап бермеді',
+    unavailableBody:
+      'Бұл компания жоқ дегенді білдірмейді: заңды тұлғалар тізілімі де, МКК базасы да жауап бермеді. Әрекет есептен шығарылған жоқ, сәл кейінірек қайталап көріңіз.',
     limitTitle: 'Осы тоқсандағы 3 тегін тексеру таусылды',
     limitBody:
       'invoices.kz кабинетінде тексеру шектеусіз — оған қоса контрагенттің толық карточкасы (мекенжайы, басшысы, қызмет түрі) бар, ал деректемелер шотқа өзі толтырылады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
@@ -254,6 +269,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Кабинетте ашу →',
     sources:
       'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
+    notCheckedNote:
+      'Мұнда лицензиялар, атқарушылық өндіріс борышкерлерінің тізілімі, банкроттық, салық режимі және сот істері тексерілмейді.',
+    notCheckedLink: 'Компания туралы БСН бойынша тағы нені және қайдан білуге болады →',
     guideLink: 'Контрагентті БСН бойынша қалай тексеруге болады: қадам-қадаммен →',
     status: translateStatus('kk'),
     faq: {
@@ -322,6 +340,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'Nothing found for this BIN',
     notFoundBody:
       'Neither the legal entity register nor the KGD database knows it. Double-check the digits — or this is a very recent registration: the registers update with up to a one-day delay.',
+    unavailableTitle: 'The registers did not respond just now',
+    unavailableBody:
+      'This does not mean the company does not exist: neither the legal entity register nor the KGD database answered. The attempt was not counted, so please try again in a little while.',
     limitTitle: 'Your 3 free checks for this quarter are used up',
     limitBody:
       'Inside an invoices.kz account checks are unlimited — plus the full company card (address, director, line of business) and the company details filled into your invoice automatically. Sign-up is free, via an email link.',
@@ -363,6 +384,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Open in my account →',
     sources:
       'Sources: the “Legal Entities” state database (data.egov.kz) and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
+    notCheckedNote:
+      'This check does not cover licences, the enforcement debtors register, bankruptcy, tax regime or court cases.',
+    notCheckedLink: 'What else you can learn about a company by BIN, and where (in Russian) →',
     guideLink: 'How to check a counterparty by BIN, step by step (in Russian) →',
     status: translateStatus('en'),
     faq: {

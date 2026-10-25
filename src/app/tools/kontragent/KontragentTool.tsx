@@ -24,6 +24,8 @@ const EASE = [0.16, 1, 0.3, 1] as const
 
 // Гайд «Как проверить контрагента по БИН»: ru и kk есть, английского нет (en → русский).
 const GUIDE_SLUG = 'proverka-kontragenta'
+// Гайд «Что можно узнать о компании по БИН» (ru и kk): что инструмент не проверяет и где смотреть остальное.
+const NOT_CHECKED_GUIDE_SLUG = 'proverka-kompanii-po-bin-chto-mozhno-uznat'
 
 // Публичный срез ответа /api/tools/kontragent — без адреса, руководителя и
 // ОКЭД: они остаются за регистрацией, роут отдаёт только hasFullCard.
@@ -48,6 +50,7 @@ type Outcome =
   | { kind: 'error'; message: string }
   | { kind: 'limit' }
   | { kind: 'busy' }
+  | { kind: 'unavailable'; remaining: number | null }
   | { kind: 'notFound'; remaining: number | null }
   | { kind: 'found'; company: PublicCompany; remaining: number | null }
 
@@ -113,6 +116,11 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
         setOutcome({ kind: 'limit' })
         return
       }
+      if (res.status === 503 && data?.unavailable === true) {
+        // Реестры не ответили: не «не найдено», и попытка не списана.
+        setOutcome({ kind: 'unavailable', remaining: typeof data?.remaining === 'number' ? data.remaining : null })
+        return
+      }
       if (!res.ok) {
         // Роут отвечает текстом ошибки по-русски; на ru показываем его как
         // есть (как раньше), на kk/en — свой перевод по коду ответа.
@@ -135,7 +143,8 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
     }
   }
 
-  const remaining = outcome.kind === 'found' || outcome.kind === 'notFound' ? outcome.remaining : null
+  const remaining =
+    outcome.kind === 'found' || outcome.kind === 'notFound' || outcome.kind === 'unavailable' ? outcome.remaining : null
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
   const signupClick = (event: string, medium: ToolEventMedium) => () => {
@@ -198,6 +207,15 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
           {outcome.kind === 'busy' && (
             <div className="nav-glass rounded-2xl p-4 mb-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
               {t.busy}
+            </div>
+          )}
+
+          {outcome.kind === 'unavailable' && (
+            <div className="nav-glass rounded-2xl p-5 mb-4">
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.unavailableTitle}</div>
+              <p className="text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                {t.unavailableBody}
+              </p>
             </div>
           )}
 
@@ -309,6 +327,17 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
 
         <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
           {t.sources}
+        </div>
+        <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+          {t.notCheckedNote}{' '}
+          <Link
+            href={toolGuidePath(NOT_CHECKED_GUIDE_SLUG, lang)}
+            hrefLang={lang === 'en' ? 'ru' : lang}
+            className="font-semibold"
+            style={{ color: 'var(--nav-accent)' }}
+          >
+            {t.notCheckedLink}
+          </Link>
         </div>
 
         {/* Пояснения к каждому пункту проверки. Обычные <details> — работают без

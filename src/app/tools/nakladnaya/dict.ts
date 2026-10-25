@@ -81,18 +81,18 @@ export interface NakladnayaDict {
 export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
   ru: {
     seo: {
-      title: 'Накладная на отпуск запасов — образец, онлайн',
+      title: 'Образец накладной для Казахстана — скачать PDF',
       description:
-        'Образец накладной на отпуск запасов на сторону (З-2) для ИП и ТОО: заполните стороны и товары, скачайте PDF за минуту. 3 накладные в квартал бесплатно.',
+        'Образец накладной на отпуск запасов (форма З-2) для ИП и ТОО в Казахстане: заполните данные и скачайте PDF за минуту. 3 накладные в квартал бесплатно.',
       keywords:
-        'накладная на отпуск запасов образец, накладная з-2 казахстан, накладная скачать бесплатно, расходная накладная ип, накладная на товар казахстан',
+        'образец накладной казахстан, накладная на отпуск запасов образец, накладная з-2 казахстан, накладная скачать бесплатно, расходная накладная ип, накладная на товар казахстан',
       ogTitle: 'Накладная онлайн — за минуту, бесплатно',
       ogDescription: 'Накладная на отпуск запасов (З-2): стороны, товары, сумма прописью. PDF без регистрации.',
       ogImageAlt: 'Накладная онлайн — invoices.kz',
     },
-    h1: 'Накладная на отпуск запасов — онлайн, бесплатно',
+    h1: 'Образец накладной для Казахстана (форма З-2) — заполнить и скачать бесплатно',
     intro: n =>
-      `Заполните стороны и товары — получите накладную по привычной форме З-2 с суммой прописью. Без регистрации, ${n} накладные в квартал.`,
+      `Заполните стороны и товары — получите накладную на отпуск запасов по казахстанской форме З-2 с суммой прописью и скачайте её в PDF. Без регистрации, ${n} накладные в квартал.`,
     docLangNote: '',
     supplierTitle: 'Поставщик — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -171,16 +171,16 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
 
   kk: {
     seo: {
-      title: 'Жүкқұжат үлгісі (З-2 нысаны) — онлайн, тегін',
+      title: 'Қазақстандағы жүкқұжат үлгісі (З-2) — PDF жүктеу',
       description:
-        'Жүкқұжаттың (З-2 нысаны) үлгісі: тараптар мен тауарларды толтырып, бір минутта PDF жүктеңіз — тоқсанына 3 жүкқұжат тегін.',
+        'Қазақстандағы жүкқұжаттың (З-2 нысаны) үлгісі: тараптар мен тауарларды толтырып, бір минутта PDF жүктеңіз — тоқсанына 3 жүкқұжат тегін.',
       keywords:
         'жүкқұжат үлгісі, жүкқұжат з-2, қорларды жағына босатуға арналған жүкқұжат, жүкқұжат онлайн, жүкқұжат жасау тегін, жк жүкқұжат, тауарға жүкқұжат, жүкқұжат pdf жүктеу',
       ogTitle: 'Жүкқұжат онлайн — бір минутта, тегін',
       ogDescription: 'Қорларды жағына босатуға арналған жүкқұжат (З-2): тараптар, тауарлар, сомасы жазбаша. Тіркелусіз PDF.',
       ogImageAlt: 'Жүкқұжат онлайн — invoices.kz',
     },
-    h1: 'Қорларды жағына босатуға арналған жүкқұжат — онлайн, тегін',
+    h1: 'Қазақстандағы жүкқұжат үлгісі (З-2 нысаны) — толтырып, тегін жүктеңіз',
     intro: n =>
       `Тараптар мен тауарларды толтырыңыз — таныс З-2 нысанындағы, сомасы жазбаша көрсетілген жүкқұжат аласыз. Тіркелусіз, тоқсанына ${n} жүкқұжат.`,
     docLangNote: 'Жүкқұжат бланкісі орыс тілінде шығады — бухгалтерия қабылдайтын үйреншікті нысан.',
@@ -261,7 +261,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
 
   en: {
     seo: {
-      title: 'Delivery Note (Form Z-2) Template — Free PDF',
+      title: 'Kazakhstan Delivery Note Template (Z-2) — Free PDF',
       description:
         'Delivery note template (form Z-2) for Kazakhstan: fill in the parties and goods, get a PDF in a minute. 3 free notes per quarter.',
       keywords:
@@ -270,7 +270,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       ogDescription: 'The standard Kazakhstan Z-2 goods delivery note: parties, goods, total in words. PDF without sign-up.',
       ogImageAlt: 'Kazakhstan delivery note generator — invoices.kz',
     },
-    h1: 'Kazakhstan delivery note (form Z-2) — online, free',
+    h1: 'Kazakhstan delivery note template (form Z-2) — fill in and download free',
     intro: n =>
       `Fill in the parties and goods to get a delivery note on the standard Kazakhstan form Z-2, with the total written out in words. No sign-up, ${n} notes per quarter.`,
     docLangNote: 'The note is generated in Russian — the standard form that accountants and counterparties in Kazakhstan accept.',

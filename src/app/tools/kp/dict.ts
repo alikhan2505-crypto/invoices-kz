@@ -83,18 +83,18 @@ export interface KpDict {
 export const kpDict: Record<ToolLang, KpDict> = {
   ru: {
     seo: {
-      title: 'Коммерческое предложение — образец, КП онлайн',
+      title: 'Образец коммерческого предложения в Казахстане — PDF',
       description:
-        'Образец коммерческого предложения (КП) для клиента: позиции с ценами, срок действия, НДС, реквизиты. Готовый PDF за минуту. 3 КП в квартал бесплатно.',
+        'Образец коммерческого предложения (КП) в Казахстане: позиции с ценами, срок действия, НДС, реквизиты. Скачайте PDF за минуту. 3 КП в квартал бесплатно.',
       keywords:
-        'коммерческое предложение образец казахстан, кп скачать бесплатно, коммерческое предложение ип, как составить кп, коммерческое предложение на услуги образец',
+        'коммерческое предложение образец казахстан, коммерческое предложение образец скачать, кп скачать бесплатно, коммерческое предложение ип, как составить кп, коммерческое предложение на услуги образец',
       ogTitle: 'Коммерческое предложение онлайн — за минуту',
       ogDescription: 'Позиции с ценами, срок действия, НДС, реквизиты. PDF без регистрации.',
       ogImageAlt: 'КП онлайн — invoices.kz',
     },
-    h1: 'Коммерческое предложение — онлайн, бесплатно',
+    h1: 'Образец коммерческого предложения в Казахстане — заполнить и скачать бесплатно',
     intro:
-      'Заполните позиции и цены — получите аккуратное КП с итоговой суммой и сроком действия. Без регистрации, 3 предложения в квартал.',
+      'Заполните позиции и цены — получите аккуратное КП с итоговой суммой и сроком действия и скачайте его в PDF. Без регистрации, 3 предложения в квартал.',
     docLangNote: '',
     fromTitle: 'От кого',
     companyLabel: 'Название ИП / ТОО *',
@@ -180,16 +180,16 @@ export const kpDict: Record<ToolLang, KpDict> = {
 
   kk: {
     seo: {
-      title: 'Коммерциялық ұсыныс үлгісі — онлайн, тегін',
+      title: 'Қазақстандағы коммерциялық ұсыныс үлгісі — PDF жүктеу',
       description:
-        'Коммерциялық ұсыныстың үлгісі: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. Бір минутта дайын PDF — тоқсанына 3 ұсыныс тегін.',
+        'Қазақстандағы коммерциялық ұсыныстың үлгісі: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. PDF жүктеңіз — тоқсанына 3 ұсыныс тегін.',
       keywords:
         'коммерциялық ұсыныс үлгісі, коммерциялық ұсыныс жазу, коммерциялық ұсыныс қазақша, коммерциялық ұсыныс тегін, ЖК коммерциялық ұсыныс, қызмет көрсетуге коммерциялық ұсыныс үлгісі, КҰ жасау онлайн',
       ogTitle: 'Коммерциялық ұсыныс онлайн — бір минутта',
       ogDescription: 'Бағасы бар позициялар, мерзімі, ҚҚС, деректемелер. Тіркелусіз PDF.',
       ogImageAlt: 'Коммерциялық ұсыныс онлайн — invoices.kz',
     },
-    h1: 'Коммерциялық ұсыныс — онлайн, тегін',
+    h1: 'Қазақстандағы коммерциялық ұсыныс үлгісі — толтырып, тегін жүктеңіз',
     intro:
       'Позициялар мен бағаларды толтырыңыз — жалпы сомасы мен қолданылу мерзімі көрсетілген ұқыпты коммерциялық ұсыныс (КҰ) аласыз. Тіркелусіз, тоқсанына 3 ұсыныс.',
     docLangNote: 'Ұсыныстың өзі орыс тілінде жасалады — Қазақстанда іскерлік құжаттарға кеңінен қабылданған үлгі.',
@@ -277,7 +277,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
 
   en: {
     seo: {
-      title: 'Commercial Proposal Template for Kazakhstan — PDF',
+      title: 'Commercial Proposal Template for Kazakhstan — Free PDF',
       description:
         'Commercial proposal (quote) template for Kazakhstan: items with prices, validity date, VAT and your details. Ready PDF in a minute. 3 free per quarter.',
       keywords:
@@ -286,7 +286,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
       ogDescription: 'Items with prices, validity date, VAT, business details. Free PDF, no sign-up.',
       ogImageAlt: 'Commercial proposal online — invoices.kz',
     },
-    h1: 'Commercial proposal — online, free',
+    h1: 'Commercial proposal template for Kazakhstan — fill in and download free',
     intro:
       'Fill in items and prices to get a clean commercial proposal (quote) with a total and a validity date. No sign-up, 3 proposals per quarter.',
     docLangNote: 'The proposal itself is generated in Russian, the standard language for business paperwork in Kazakhstan.',

@@ -77,8 +77,11 @@ export function parseTaxpayer(payload: unknown): KgdTaxpayer | null {
  * An empty body is КГД's way of saying "not registered for VAT" — verified
  * against a live sole proprietor, which returns nothing at all, while a
  * registered payer returns a record with ndsRegistrationDate. A record whose
- * deregistration date is set is someone who WAS a payer and is not one now,
- * so the flag follows the deregistration, not the mere presence of a record.
+ * deregistration date is set is someone who WAS a payer, but both dates are
+ * the LAST ones КГД holds: a company deregistered and later registered again
+ * carries a deregistration date older than its registration date. So the
+ * flag compares the two (ISO dates compare as strings) instead of treating
+ * any deregistration date as final.
  */
 export function parseVatStatus(payload: unknown): KgdVatStatus | null {
   if (payload === null || payload === undefined || payload === '') {
@@ -90,7 +93,7 @@ export function parseVatStatus(payload: unknown): KgdVatStatus | null {
   const deregisteredAt = clean(row.ndsDeregistrationDate)
   if (!registeredAt && !deregisteredAt && !clean(row.iinBin)) return null
   return {
-    isVatPayer: Boolean(registeredAt) && !deregisteredAt,
+    isVatPayer: Boolean(registeredAt) && (!deregisteredAt || registeredAt! > deregisteredAt),
     registeredAt,
     deregisteredAt,
   }

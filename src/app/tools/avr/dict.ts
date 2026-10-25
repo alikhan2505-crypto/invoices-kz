@@ -84,18 +84,18 @@ export interface AvrDict {
 export const avrDict: Record<ToolLang, AvrDict> = {
   ru: {
     seo: {
-      title: 'Акт выполненных работ — образец, АВР онлайн',
+      title: 'Образец акта выполненных работ для Казахстана — скачать PDF',
       description:
-        'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС, сумма прописью. 3 акта в квартал бесплатно.',
+        'Образец акта выполненных работ (АВР) для ИП и ТОО в Казахстане: заполните стороны и договор, скачайте PDF. НДС, сумма прописью. 3 акта в квартал бесплатно.',
       keywords:
-        'авр образец казахстан, акт выполненных работ скачать, акт оказанных услуг ип, авр онлайн бесплатно, акт выполненных работ тоо, р-1 акт казахстан',
+        'акт выполненных работ образец казахстан, авр образец казахстан, акт выполненных работ скачать, акт оказанных услуг ип, авр онлайн бесплатно, акт выполненных работ тоо, р-1 акт казахстан',
       ogTitle: 'АВР онлайн — акт выполненных работ за минуту',
       ogDescription: 'Реквизиты сторон, договор, НДС, сумма прописью. PDF без регистрации.',
       ogImageAlt: 'АВР онлайн — invoices.kz',
     },
-    h1: 'Акт выполненных работ — онлайн, бесплатно',
+    h1: 'Образец акта выполненных работ для Казахстана — заполнить и скачать бесплатно',
     intro: n =>
-      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с суммой прописью и НДС, если нужен. Без регистрации, ${n} акта в квартал.`,
+      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с суммой прописью и НДС, если нужен, и скачайте его в PDF. Без регистрации, ${n} акта в квартал.`,
     docLangNote: '',
     executorTitle: 'Исполнитель — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -181,16 +181,16 @@ export const avrDict: Record<ToolLang, AvrDict> = {
 
   kk: {
     seo: {
-      title: 'Орындалған жұмыстар актісінің үлгісі — онлайн',
+      title: 'Қазақстандағы орындалған жұмыстар актісінің үлгісі',
       description:
-        'ЖК және ЖШС үшін орындалған жұмыстар актісінің (ОЖА) үлгісі: тараптар мен шартты толтырып, бір минутта PDF жүктеңіз — тоқсанына 3 акт тегін.',
+        'Қазақстандағы ЖК және ЖШС үшін орындалған жұмыстар актісінің (ОЖА) үлгісі: тараптар мен шартты толтырып, PDF жүктеңіз — тоқсанына 3 акт тегін.',
       keywords:
         'орындалған жұмыстар актісі, орындалған жұмыстар актісі үлгісі, көрсетілген қызметтер актісі, ожа онлайн, р-1 нысаны акт, жк орындалған жұмыстар актісі, жшс акт үлгісі, орындалған жұмыстар актісі pdf жүктеу',
       ogTitle: 'Орындалған жұмыстар актісі — бір минутта, тегін',
       ogDescription: 'Тараптар, шарт, ҚҚС, сомасы жазбаша. Тіркелусіз PDF.',
       ogImageAlt: 'Орындалған жұмыстар актісі онлайн — invoices.kz',
     },
-    h1: 'Орындалған жұмыстар актісі — онлайн, тегін',
+    h1: 'Қазақстандағы орындалған жұмыстар актісінің үлгісі — толтырып, тегін жүктеңіз',
     intro: n =>
       `Тараптар мен жұмыстарды толтырыңыз — таныс қазақстандық нысандағы дайын актіні аласыз: сомасы жазбаша, қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} акт.`,
     docLangNote: 'Акт бланкісі (Р-1 нысаны) орыс тілінде шығады — бухгалтерия қабылдайтын үйреншікті нысан.',
@@ -278,7 +278,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
 
   en: {
     seo: {
-      title: 'Completed Works Certificate (AVR) Template — PDF',
+      title: 'Kazakhstan Completed Works Certificate (AVR) Template',
       description:
         'Completed works certificate (AVR, form R-1) template for Kazakhstan: fill in the parties and contract, get a PDF in a minute. 3 free per quarter.',
       keywords:
@@ -287,7 +287,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       ogDescription: 'The standard Kazakhstan AVR (form R-1): parties, contract, VAT, total in words. PDF without sign-up.',
       ogImageAlt: 'Kazakhstan AVR generator — invoices.kz',
     },
-    h1: 'Kazakhstan certificate of completed works (AVR) — online, free',
+    h1: 'Kazakhstan certificate of completed works (AVR) template — fill in and download free',
     intro: n =>
       `Fill in the parties and the work done to get a ready AVR — the act of completed works (services rendered) on the familiar Kazakhstan form, with the total in words and VAT if needed. You will need your 12-digit BIN or IIN (business / individual identification number). No sign-up, ${n} certificates per quarter.`,
     docLangNote: 'The certificate is generated in Russian (form R-1) — the standard form that accountants and counterparties in Kazakhstan accept.',

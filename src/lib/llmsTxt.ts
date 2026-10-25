@@ -49,6 +49,8 @@ const HEAD = `# invoices.kz
 - [Счёт, АВР, накладная и КП: чем отличаются](https://invoices.kz/guides/dokumenty-ip-kazakhstan)
 - [Как проверить контрагента по БИН](https://invoices.kz/guides/proverka-kontragenta)
 - [Пеня за просрочку оплаты](https://invoices.kz/guides/penya-za-prosrochku)
+- [Накладная на отпуск запасов (форма З-2): образец](https://invoices.kz/guides/nakladnaya-na-otpusk-zapasov-obrazec)
+- [Проверка компании по БИН: что можно узнать](https://invoices.kz/guides/proverka-kompanii-po-bin-chto-mozhno-uznat)
 - [Как открыть ИП в 2026 году](https://invoices.kz/guides/kak-otkryt-ip-2026)`
 
 // Раздел "Optional" до конца файла.
