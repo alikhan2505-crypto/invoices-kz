@@ -13,7 +13,16 @@ export type BinLookupState = {
   company?: BinLookupResult
 }
 
-export function useBinLookup() {
+type ExtraFields = Pick<BinLookupResult, 'unreliableCategories' | 'taxRegimes' | 'enforcement'>
+
+/**
+ * `extras: true` (only /create shows risks): after the name comes back, a second
+ * request fetches the slow checks (tax regime, unreliable-list reasons, the
+ * Ministry of Justice debtors register, up to ~9 s of retries) and merges them
+ * into the same card. The first request, and so the name autofill, never waits
+ * for them. The user's own requisites form leaves it off.
+ */
+export function useBinLookup({ extras = false }: { extras?: boolean } = {}) {
   const [state, setState] = useState<BinLookupState>({ status: 'idle' })
   // The БИН the last request was fired for. Typing the same twelve digits
   // again -- or pressing "Проверить" twice -- must not spend another of the
@@ -31,6 +40,30 @@ export function useBinLookup() {
    * press it again, and refusing them because we remember trying would be
    * the app arguing with the person looking at the error.
    */
+  const loadExtras = useCallback(async (digits: string, accessToken: string) => {
+    try {
+      const res = await fetch(`/api/bin-lookup?bin=${digits}&extras=1`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (!data?.found || !data.company) return
+      const fields: ExtraFields = {
+        unreliableCategories: data.company.unreliableCategories ?? null,
+        taxRegimes: data.company.taxRegimes ?? null,
+        enforcement: data.company.enforcement ?? null,
+      }
+      // The user may have moved on to another БИН while this was running.
+      if (lastRequested.current !== digits) return
+      setState(current =>
+        current.status === 'found' && current.company?.bin === digits
+          ? { status: 'found', company: { ...current.company, ...fields } }
+          : current)
+    } catch {
+      // Not checked stays "not checked": the card simply shows no extra lines.
+    }
+  }, [])
+
   const lookup = useCallback(async (bin: string, { force = false }: { force?: boolean } = {}) => {
     const digits = (bin || '').replace(/\D/g, '')
     if (digits.length !== 12) return null
@@ -51,12 +84,13 @@ export function useBinLookup() {
         return null
       }
       setState({ status: 'found', company: data.company as BinLookupResult })
+      if (extras) void loadExtras(digits, session?.access_token || '')
       return data.company as BinLookupResult
     } catch {
       setState({ status: 'notfound' })
       return null
     }
-  }, [])
+  }, [extras, loadExtras])
 
   return { binLookup: state, lookupBin: lookup, resetBinLookup: reset }
 }

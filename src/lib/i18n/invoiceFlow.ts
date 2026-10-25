@@ -18,6 +18,15 @@ export interface InvoiceFlowContent {
   binLookupVatYes: (since: string | null) => string
   binLookupVatNo: string
   binLookupUnreliable: string
+  /** Причины из списка неблагонадёжных КГД (бездействующий, банкрот, недействительная регистрация). */
+  binLookupUnreliableReason: (reasons: string) => string
+  /** Реестр должников Минюста (открытые данные): только факт и число записей. */
+  binLookupEnforcement: (records: string, active: string) => string
+  binLookupEnforcementSource: string
+  /** Налоговый режим из КГД, например «Упрощённая декларация с 01.01.2026». */
+  binLookupRegime: (regime: string) => string
+  binLookupRegimeSince: (date: string) => string
+  binLookupRegimeUntil: (date: string) => string
   binLookupLiquidating: string
   binLookupTaxDebt: (amount: string) => string
   binLookupNoTaxDebt: string
@@ -259,6 +268,12 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatYes: (since: string | null) => since ? `Плательщик НДС с ${since}` : 'Плательщик НДС',
     binLookupVatNo: 'Не плательщик НДС',
     binLookupUnreliable: '⚠️ Числится в списке неблагонадёжных налогоплательщиков КГД',
+    binLookupUnreliableReason: (reasons: string) => `Причина в списке КГД: ${reasons}`,
+    binLookupEnforcement: (records: string, active: string) => `В реестре должников Минюста (открытые данные) есть записи об исполнительных производствах: ${records}, из них без даты окончания: ${active}`,
+    binLookupEnforcementSource: 'Источник: данные Минюста РК, data.egov.kz',
+    binLookupRegime: (regime: string) => `Налоговый режим: ${regime}`,
+    binLookupRegimeSince: (date: string) => `с ${date}`,
+    binLookupRegimeUntil: (date: string) => `по ${date}`,
     binLookupLiquidating: '⚠️ Находится на стадии ликвидации по данным КГД',
     binLookupTaxDebt: (amount: string) => `⚠️ Налоговая задолженность по данным КГД: ${amount} ₸`,
     binLookupNoTaxDebt: 'Налоговой задолженности нет',
@@ -505,6 +520,12 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatYes: (since: string | null) => since ? `ҚҚС төлеуші ${since} бастап` : 'ҚҚС төлеуші',
     binLookupVatNo: 'ҚҚС төлеуші емес',
     binLookupUnreliable: '⚠️ МКК-нің сенімсіз салық төлеушілер тізімінде тұр',
+    binLookupUnreliableReason: (reasons: string) => `МКК тізіміндегі себебі: ${reasons}`,
+    binLookupEnforcement: (records: string, active: string) => `Әділет министрлігінің борышкерлер тізілімінде (ашық деректер) атқарушылық өндіріс жазбалары бар: ${records}, оның ішінде аяқталу күні жоқ: ${active}`,
+    binLookupEnforcementSource: 'Дереккөз: ҚР Әділет министрлігінің деректері, data.egov.kz',
+    binLookupRegime: (regime: string) => `Салық режимі: ${regime}`,
+    binLookupRegimeSince: (date: string) => `${date} бастап`,
+    binLookupRegimeUntil: (date: string) => `${date} дейін`,
     binLookupLiquidating: '⚠️ МКК деректері бойынша тарату сатысында',
     binLookupTaxDebt: (amount: string) => `⚠️ МКК деректері бойынша салық берешегі: ${amount} ₸`,
     binLookupNoTaxDebt: 'Салық берешегі жоқ',
@@ -750,6 +771,12 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatYes: (since: string | null) => since ? `Registered for VAT since ${since}` : 'Registered for VAT',
     binLookupVatNo: 'Not registered for VAT',
     binLookupUnreliable: '⚠️ Listed as an unreliable taxpayer by the State Revenue Committee',
+    binLookupUnreliableReason: (reasons: string) => `Reason on the KGD list: ${reasons}`,
+    binLookupEnforcement: (records: string, active: string) => `The Ministry of Justice debtors register (open data) has enforcement records: ${records}, of them without an end date: ${active}`,
+    binLookupEnforcementSource: 'Source: Ministry of Justice data, data.egov.kz',
+    binLookupRegime: (regime: string) => `Tax regime: ${regime}`,
+    binLookupRegimeSince: (date: string) => `since ${date}`,
+    binLookupRegimeUntil: (date: string) => `until ${date}`,
     binLookupLiquidating: '⚠️ In liquidation according to the State Revenue Committee',
     binLookupTaxDebt: (amount: string) => `⚠️ Tax arrears per the State Revenue Committee: ${amount} ₸`,
     binLookupNoTaxDebt: 'No tax arrears',

@@ -18,6 +18,10 @@ export const KGD_TAXPAYER_URL = `${BASE}/taxpayer-data`
 export const KGD_VAT_URL = `${BASE}/search-payer-data`
 export const KGD_LIQUIDATION_URL = `${BASE}/find-liquidated-taxpayer`
 export const KGD_DEBT_URL = `${BASE}/tax-debt-info`
+// Налоговые режимы (СНР). Параметр называется именно `uin` (проверено на живом
+// API 25.10.2026): iin, bin и taxpayerCode дают 500 «Проверьте правильность
+// ввода ИИН». Тот же KGD_PORTAL_TOKEN, лимитов в документации нет.
+export const KGD_SNR_URL = `${BASE}/snr-search/search`
 // Note the host path: the unreliable-taxpayer search lives under
 // `isnaportal`, not `isnaportalsync` like everything else. Easy to miss and
 // it answers 404 if you assume otherwise.
@@ -111,23 +115,138 @@ export const KGD_TAXPAYER_TYPES = ['IP', 'UL'] as const
 /**
  * Whether the search of unreliable taxpayers returned this counterparty.
  *
- * The service answers with a bare array — populated means listed, empty
- * means not. Anything that is not an array means we learned nothing, and
- * that is returned as null so the caller can keep "unknown" distinct from
- * "clean": a seller must never be shown a reassuring silence produced by a
- * failed request.
+ * The service answers with a bare array: populated means listed, empty means
+ * not. Anything that is not an array means we learned nothing, and that is
+ * returned as null so the caller can keep "unknown" distinct from "clean": a
+ * seller must never be shown a reassuring silence produced by a failed
+ * request.
  *
- * STILL NOT VERIFIED AGAINST A POSITIVE CASE, unlike parseLiquidation below.
- * Every taxpayer available for testing has come back clean and no
- * known-unreliable БИН has been found — КГД's own list is reachable only
- * through a captcha-protected page, and the open-data set that looks like it
- * holds one is a stub pointing back at their site. The empty-array path is
- * confirmed against live calls; the populated path rests on the documented
- * schema alone. Worth re-checking the first time a warning actually fires.
+ * Both branches are now verified against live calls (25.10.2026): the empty
+ * array for clean taxpayers (Kaspi Bank and others) and the populated one for
+ * real listed companies of every category, searched by БИН. See
+ * parseUnreliableDetail for what a populated answer carries.
  */
 export function parseUnreliable(payload: unknown): boolean | null {
   if (!Array.isArray(payload)) return null
   return payload.length > 0
+}
+
+/**
+ * Why a taxpayer is on КГД's unreliable list. The list is not one thing: a
+ * company that simply stopped filing reports (INACTIVE_LIST) is a different
+ * warning from one a court declared bankrupt (BANKRUPT_LIST) or whose
+ * registration was declared invalid, and the screen must say which.
+ * `other` is a category we have not seen: shown generically, never hidden.
+ */
+export type UnreliableCategory =
+  | 'inactive'
+  | 'bankrupt'
+  | 'registrationInvalid'
+  | 'reregistrationInvalid'
+  | 'other'
+
+const UNRELIABLE_CATEGORY_MAP: Record<string, UnreliableCategory> = {
+  INACTIVE_LIST: 'inactive',
+  BANKRUPT_LIST: 'bankrupt',
+  REGISTRATION_INVALID_LIST: 'registrationInvalid',
+  REREGISTRATION_INVALID_LIST: 'reregistrationInvalid',
+}
+
+export interface UnreliableDetail {
+  listed: boolean
+  /** Deduplicated, in the order КГД returned them. Empty when not listed. */
+  categories: UnreliableCategory[]
+}
+
+/**
+ * The unreliable-taxpayer answer with its categories.
+ *
+ * Shape (verified live 25.10.2026, searching by taxPayerCode): a bare array,
+ * one element per listing, each carrying `taxpayerDataList[]` whose
+ * `unreliableTaxpayerDataCategory` is one of the four values above. Court act
+ * numbers, director names and order dates are deliberately NOT read: the
+ * category is the fact a seller needs, the rest is personal data or noise.
+ *
+ * Returns null for anything that is not an array of objects (nothing was
+ * learned). A populated array whose elements carry no recognisable category
+ * is still `listed: true` with an empty category list: being on the list is
+ * the finding, the reason is extra.
+ */
+export function parseUnreliableDetail(payload: unknown): UnreliableDetail | null {
+  if (!Array.isArray(payload)) return null
+  if (payload.length === 0) return { listed: false, categories: [] }
+  if (!payload.every(el => el && typeof el === 'object')) return null
+
+  const categories: UnreliableCategory[] = []
+  for (const el of payload as Record<string, unknown>[]) {
+    const list = el.taxpayerDataList
+    if (!Array.isArray(list)) continue
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const raw = clean((item as Record<string, unknown>).unreliableTaxpayerDataCategory)
+      if (!raw) continue
+      const cat = UNRELIABLE_CATEGORY_MAP[raw] ?? 'other'
+      if (!categories.includes(cat)) categories.push(cat)
+    }
+  }
+  return { listed: true, categories }
+}
+
+/**
+ * One tax regime КГД reports for a taxpayer (snr-search).
+ *
+ * `type` is an open string (SNR_GENERAL_ORDER, SNR_SIMPLIFIED_DECLARATION are
+ * the ones seen; others exist) and the names come from КГД, so a regime we
+ * have never met is still shown by its own name. Dates are only published
+ * from 01.01.2026 (НК РК, ст. 716), so a null date on an older regime is the
+ * norm and not an error.
+ */
+export interface TaxRegime {
+  type: string
+  nameRu: string | null
+  nameKk: string | null
+  nameEn: string | null
+  beginDate: string | null
+  endDate: string | null
+}
+
+const isoDate = (v: unknown): string | null => {
+  const s = clean(v)
+  const m = s ? s.match(/^\d{4}-\d{2}-\d{2}/) : null
+  return m ? m[0] : null
+}
+
+/**
+ * The regimes in a snr-search response, or null when nothing was learned.
+ *
+ * `status` must be SUCCESS and `stmList` a non-empty array. An ERROR answer
+ * (`tax.payer.not.found` for an unknown БИН, HTTP 200) is NOT "this taxpayer
+ * has no regime": it comes back as null, same as an empty list. The taxpayer
+ * name in `tpName` is personal data for a sole proprietor and is never read.
+ */
+export function parseTaxRegime(payload: unknown): TaxRegime[] | null {
+  if (!payload || typeof payload !== 'object') return null
+  const root = payload as Record<string, unknown>
+  if (root.status !== 'SUCCESS') return null
+  if (!Array.isArray(root.stmList)) return null
+
+  const regimes: TaxRegime[] = []
+  for (const item of root.stmList) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const type = clean(row.type)
+    const nameRu = clean(row.typeNameRu)
+    if (!type && !nameRu) continue
+    regimes.push({
+      type: type ?? 'UNKNOWN',
+      nameRu,
+      nameKk: clean(row.typeNameKk),
+      nameEn: clean(row.typeNameEn),
+      beginDate: isoDate(row.beginDate),
+      endDate: isoDate(row.endDate),
+    })
+  }
+  return regimes.length > 0 ? regimes : null
 }
 
 /**

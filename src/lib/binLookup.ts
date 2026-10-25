@@ -1,4 +1,5 @@
-import { parseVatStatus, KGD_VAT_URL } from './kgdTaxpayer'
+import { parseVatStatus, KGD_VAT_URL, type TaxRegime, type UnreliableCategory } from './kgdTaxpayer'
+import type { EnforcementResult } from './aisoip'
 
 // Looking a counterparty up by БИН, so it does not have to be typed.
 //
@@ -44,6 +45,20 @@ export interface BinLookupResult {
   /** Tax arrears in tenge. null = not checked; 0 = checked, owes nothing. */
   totalArrear: number | null
   taxArrear: number | null
+  /**
+   * Added 25.10.2026. These three are NOT stored in bin_lookup_cache (no schema
+   * change): they are fetched fresh on every lookup, so they are optional and
+   * undefined/null both mean "not checked" -- never "clean".
+   *
+   * Why the unreliable list was met: when isUnreliable is true, which
+   * categories (inactive, bankrupt, invalid registration). null = list was
+   * not re-read or failed; [] = listed, reason not recognised.
+   */
+  unreliableCategories?: UnreliableCategory[] | null
+  /** Tax regimes from КГД (snr-search). null = could not check. */
+  taxRegimes?: TaxRegime[] | null
+  /** Enforcement proceedings, Минюст via data.egov.kz. null = could not check. */
+  enforcement?: EnforcementResult | null
 }
 
 /** One row of the gbd_ul dataset, as the API returns it. */

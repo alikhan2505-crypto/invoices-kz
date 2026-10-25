@@ -36,7 +36,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'БИН должен состоять из 12 цифр' }, { status: 400 })
   }
 
-  const result = await performBinLookup(supabase, bin)
+  // Риски, налоговый режим и реестр должников Минюста (до ~9 с на повторах)
+  // отдаём только тому, кто их показывает: /create просит их отдельным вторым
+  // запросом (?extras=1) уже после подстановки названия. Реквизиты профиля и
+  // первый запрос /create идут без них и не ждут Минюст.
+  const extras = req.nextUrl.searchParams.get('extras') === '1'
+  const result = await performBinLookup(supabase, bin, { extras })
   if (!result.found) return NextResponse.json({ found: false })
   return NextResponse.json({ found: true, company: result.company })
 }

@@ -31,9 +31,19 @@ export interface KontragentDict {
   limitBodySignedIn: string
   binPrefix: string
   registered: (date: string) => string
+  /** Дата после статуса, когда слово «зарегистрирован» уже есть в статусе. */
+  registeredSince: (date: string) => string
   kgdNote: string
   unknown: string
-  unreliable: { label: string; ok: string; bad: string }
+  unreliable: {
+    label: string
+    ok: string
+    bad: string
+    /** «Причина в списке КГД: ...»; перечень причин собирает binRiskText. */
+    reasons: (list: string) => string
+  }
+  /** Банкротство по решению суда: берётся из того же списка КГД, реабилитацию не проверяем. */
+  bankruptcy: { label: string; ok: string; bad: string; unknown: string }
   liquidation: { label: string; ok: string; bad: string }
   arrear: {
     label: string
@@ -43,6 +53,34 @@ export interface KontragentDict {
     unknown: string
   }
   vat: { label: string; payer: (since: string | null) => string; notPayer: string; unknown: string }
+  /** Налоговый режим (КГД, сервис СНР). Нейтральная строка: «хорошо» и «плохо» тут нет. */
+  regime: {
+    label: string
+    unknown: string
+    since: (date: string) => string
+    until: (date: string) => string
+    /** КГД публикует даты режимов только с 01.01.2026: пустая дата не ошибка. */
+    datesNote: string
+  }
+  /** Исполнительные производства: открытые данные Минюста на data.egov.kz. */
+  enforcement: {
+    label: string
+    ok: string
+    /** records = все записи реестра, active = из них без даты окончания. */
+    bad: (records: string, active: string, amount: string | null, since: string | null) => string
+    unknown: string
+    /** Оговорка рядом с любым ответом: открытые данные, не справка, дата обновления набора. */
+    asOfNote: string
+    /** Для ИП: БИН это ИИН человека, запись может быть личной, а не про бизнес. */
+    ipNote: string
+    /** «Источник: » перед ссылкой на набор данных (условие data.egov.kz). */
+    sourcePrefix: string
+    sourceLink: string
+    /** Ссылка на ручную проверку, когда сервис не ответил (БИН подставить нельзя: reCAPTCHA). */
+    manualLink: string
+  }
+  /** Лицензии: автоматически не проверяем, даём ссылку на поиск с подставленным БИН. */
+  permits: { label: string; text: string; link: string }
   fullCardTitle: string
   fullCardBody: string
   fullCardLink: string
@@ -93,7 +131,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Проверка контрагента по БИН',
     intro:
-      'Неблагонадёжность, ликвидация, налоговая задолженность и НДС — по официальным данным КГД РК и реестра юридических лиц. Бесплатно: 3 проверки в квартал.',
+      'Неблагонадёжность, банкротство, ликвидация, налоговая задолженность, НДС, налоговый режим и исполнительные производства — по официальным данным КГД РК, Минюста и реестра юридических лиц. Бесплатно: 3 проверки в квартал.',
     binLabel: 'БИН / ИИН контрагента',
     binPlaceholder: '12 цифр',
     check: 'Проверить',
@@ -121,12 +159,20 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       'В кабинете invoices.kz проверка по БИН — без лимита, прямо в счёте: введите БИН клиента, и реквизиты подставятся сами, а налоговый долг и риски будут видны сразу. Продолжите в кабинете invoices.kz.',
     binPrefix: 'БИН',
     registered: d => `зарегистрирован ${d}`,
+    registeredSince: d => `с ${d}`,
     kgdNote: 'Данные КГД: для ИП государство публикует только имя и дату регистрации — пустые поля здесь не ошибка.',
     unknown: 'Не удалось проверить — это не значит, что всё в порядке',
     unreliable: {
       label: 'Неблагонадёжность',
       ok: 'Не числится в списке неблагонадёжных налогоплательщиков КГД',
       bad: 'Числится в списке неблагонадёжных — работать с предоплатой рискованно',
+      reasons: list => `Причина в списке КГД: ${list}`,
+    },
+    bankruptcy: {
+      label: 'Банкротство',
+      ok: 'Решения суда о банкротстве в списке КГД нет. Реабилитационную процедуру здесь не проверяем',
+      bad: 'Признан банкротом по решению суда (список КГД)',
+      unknown: 'Не удалось проверить. Это не значит, что банкротства нет',
     },
     liquidation: {
       label: 'Ликвидация',
@@ -146,6 +192,30 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       notPayer: 'Не является плательщиком НДС',
       unknown: 'Не удалось проверить статус НДС',
     },
+    regime: {
+      label: 'Налоговый режим',
+      unknown: 'Не удалось проверить налоговый режим',
+      since: d => `с ${d}`,
+      until: d => `по ${d}`,
+      datesNote: 'КГД публикует даты режимов только с 01.01.2026, пустая дата здесь не ошибка',
+    },
+    enforcement: {
+      label: 'Исполнительные производства',
+      ok: 'В реестре должников Минюста по открытым данным производств нет',
+      bad: (records, active, amount, since) =>
+        `В реестре есть записи об исполнительных производствах: ${records}, из них без даты окончания: ${active}${amount ? `, сумма взыскания ${amount}` : ''}${since ? `, самое раннее с ${since}` : ''}`,
+      unknown: 'Не удалось проверить. Это не значит, что производств нет',
+      asOfNote: 'Открытые данные Минюста на дату обновления набора, это не справка',
+      ipNote: 'Для ИП запись может относиться к самому человеку, а не к бизнесу',
+      sourcePrefix: 'Источник: ',
+      sourceLink: 'открытые данные Минюста РК, data.egov.kz',
+      manualLink: 'Проверить вручную на aisoip.adilet.gov.kz (нужна капча)',
+    },
+    permits: {
+      label: 'Лицензии и разрешения',
+      text: 'Автоматически не проверяем: у реестра нет открытого API, а поиск закрыт капчей. Откройте поиск с уже подставленным БИН.',
+      link: 'Проверить на elicense.kz →',
+    },
     fullCardTitle: '🔒 Адрес, руководитель и вид деятельности — в полной карточке',
     fullCardBody: 'После бесплатной регистрации реквизиты контрагента подставляются в счёт автоматически.',
     fullCardLink: 'Открыть полную карточку →',
@@ -153,9 +223,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardBodySignedIn: 'В кабинете введите БИН клиента при создании счёта — реквизиты подставятся автоматически.',
     fullCardLinkSignedIn: 'Открыть в кабинете →',
     sources:
-      'Источники: ГБД «Юридические лица» (data.egov.kz) и сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
+      'Источники: ГБД «Юридические лица» и реестр должников Минюста (data.egov.kz), сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
     notCheckedNote:
-      'Здесь не проверяются лицензии, реестр должников исполнительных производств, банкротство, налоговый режим и суды.',
+      'Здесь не проверяются реабилитационная процедура, сделки без фактического выполнения работ, лицензии (даём ссылку на поиск) и суды.',
     notCheckedLink: 'Что ещё можно узнать о компании по БИН и где →',
     guideLink: 'Как проверить контрагента по БИН: пошагово →',
     status: raw => raw,
@@ -168,7 +238,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: 'Что значит «неблагонадёжный налогоплательщик»?',
-          a: 'КГД ведёт списки компаний и ИП, признанных бездействующими, лжепредприятиями, банкротами, отсутствующими по юридическому адресу или с регистрацией, признанной недействительной. Сделка с таким контрагентом — риск: налоговая может не принять НДС к зачёту, а расходы по сделке — к вычету.',
+          a: 'КГД ведёт списки налогоплательщиков, признанных бездействующими, банкротами по решению суда или с регистрацией либо перерегистрацией, признанной недействительной. Проверка показывает, по какой из причин контрагент в списке. Сделка с таким контрагентом — риск: налоговая может не принять НДС к зачёту, а расходы по сделке — к вычету.',
         },
         {
           q: 'Контрагент на стадии ликвидации — можно ли с ним работать?',
@@ -185,6 +255,14 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         {
           q: 'Насколько можно доверять результату?',
           a: 'Данные берутся в момент проверки напрямую из ГБД «Юридические лица» (data.egov.kz) и сервисов портала КГД РК. Реестры обновляются с задержкой до суток, поэтому результат справочный: официальную справку получают на eGov или в кабинете налогоплательщика.',
+        },
+        {
+          q: 'Что значат исполнительные производства в результате?',
+          a: 'Это записи реестра должников Минюста (АИС ОИП) в открытых данных data.egov.kz: по ним судебные исполнители взыскивают долг по исполнительным документам. Показываем число записей и сумму взыскания, без имён. «Производств нет» означает, что в открытых данных их нет на дату обновления реестра, это не официальная справка. Если сервис не ответил, строка пишет «не удалось проверить».',
+        },
+        {
+          q: 'Как проверить лицензию контрагента?',
+          a: 'У реестра лицензий нет открытого API, а поиск на elicense.kz закрыт капчей, поэтому инструмент лицензии не проверяет. Ссылка «Проверить на elicense.kz» открывает поиск с уже подставленным БИН, останется ввести капчу. Отсутствие лицензии не всегда тревожный знак: для части видов деятельности нужно только уведомление.',
         },
         {
           q: 'Сколько проверок бесплатно?',
@@ -208,7 +286,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Контрагентті БСН бойынша тексеру',
     intro:
-      'Сенімсіз салық төлеуші мәртебесі, тарату, салық берешегі және ҚҚС — ҚР МКК мен заңды тұлғалар тізілімінің ресми деректері бойынша. Тегін: тоқсанына 3 тексеру.',
+      'Сенімсіз салық төлеуші мәртебесі, банкроттық, тарату, салық берешегі, ҚҚС, салық режимі және атқарушылық іс жүргізу — ҚР МКК, Әділет министрлігі мен заңды тұлғалар тізілімінің ресми деректері бойынша. Тегін: тоқсанына 3 тексеру.',
     binLabel: 'Контрагенттің БСН / ЖСН',
     binPlaceholder: '12 цифр',
     check: 'Тексеру',
@@ -236,12 +314,20 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       'invoices.kz кабинетінде БСН бойынша тексеру шектеусіз, тікелей шоттың ішінде: клиенттің БСН-ін енгізсеңіз, деректемелері өзі толтырылады, ал салық қарызы мен тәуекелдер бірден көрінеді. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     binPrefix: 'БСН',
     registered: d => `тіркелген күні ${d}`,
+    registeredSince: d => `${d} бастап`,
     kgdNote: 'МКК деректері: ЖК бойынша мемлекет тек аты-жөні мен тіркелген күнін жариялайды — мұндағы бос өрістер қате емес.',
     unknown: 'Тексеру мүмкін болмады — бұл бәрі дұрыс дегенді білдірмейді',
     unreliable: {
       label: 'Сенімсіз салық төлеуші',
       ok: 'МКК-нің сенімсіз салық төлеушілер тізімінде жоқ',
       bad: 'Сенімсіздер тізімінде тұр — алдын ала төлеммен жұмыс істеу қауіпті',
+      reasons: list => `МКК тізіміндегі себебі: ${list}`,
+    },
+    bankruptcy: {
+      label: 'Банкроттық',
+      ok: 'МКК тізімінде банкроттық туралы сот шешімі жоқ. Оңалту рәсімін мұнда тексермейміз',
+      bad: 'Сот шешімі бойынша банкрот деп танылған (МКК тізімі)',
+      unknown: 'Тексеру мүмкін болмады. Бұл банкроттық жоқ дегенді білдірмейді',
     },
     liquidation: {
       label: 'Тарату',
@@ -261,6 +347,30 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       notPayer: 'ҚҚС төлеуші емес',
       unknown: 'ҚҚС мәртебесін тексеру мүмкін болмады',
     },
+    regime: {
+      label: 'Салық режимі',
+      unknown: 'Салық режимін тексеру мүмкін болмады',
+      since: d => `${d} бастап`,
+      until: d => `${d} дейін`,
+      datesNote: 'МКК режим күндерін тек 2026 жылғы 1 қаңтардан бастап жариялайды, бос күн мұнда қате емес',
+    },
+    enforcement: {
+      label: 'Атқарушылық іс жүргізу',
+      ok: 'Әділет министрлігінің борышкерлер тізілімінде ашық деректер бойынша өндіріс жоқ',
+      bad: (records, active, amount, since) =>
+        `Тізілімде атқарушылық өндіріс жазбалары бар: ${records}, оның ішінде аяқталу күні жоқ: ${active}${amount ? `, өндіріп алу сомасы ${amount}` : ''}${since ? `, ең ертесі ${since} бастап` : ''}`,
+      unknown: 'Тексеру мүмкін болмады. Бұл өндіріс жоқ дегенді білдірмейді',
+      asOfNote: 'Әділет министрлігінің ашық деректері жиынтықтың жаңарту күніне, бұл анықтама емес',
+      ipNote: 'ЖК үшін жазба бизнеске емес, адамның өзіне қатысты болуы мүмкін',
+      sourcePrefix: 'Дереккөз: ',
+      sourceLink: 'ҚР Әділет министрлігінің ашық деректері, data.egov.kz',
+      manualLink: 'aisoip.adilet.gov.kz сайтында қолмен тексеру (капча керек)',
+    },
+    permits: {
+      label: 'Лицензиялар және рұқсаттар',
+      text: 'Автоматты түрде тексермейміз: тізілімнің ашық API-і жоқ, ал іздеу капчамен жабылған. БСН-і қойылған іздеуді ашыңыз.',
+      link: 'elicense.kz сайтында тексеру →',
+    },
     fullCardTitle: '🔒 Мекенжайы, басшысы және қызмет түрі — толық карточкада',
     fullCardBody: 'Тегін тіркелгеннен кейін контрагенттің деректемелері шотқа автоматты түрде қойылады.',
     fullCardLink: 'Толық карточканы ашу →',
@@ -268,9 +378,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardBodySignedIn: 'Кабинетте шот жасағанда клиенттің БСН-ін енгізіңіз — деректемелері автоматты түрде қойылады.',
     fullCardLinkSignedIn: 'Кабинетте ашу →',
     sources:
-      'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
+      'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы мен Әділет министрлігінің борышкерлер тізілімі (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
     notCheckedNote:
-      'Мұнда лицензиялар, атқарушылық өндіріс борышкерлерінің тізілімі, банкроттық, салық режимі және сот істері тексерілмейді.',
+      'Мұнда оңалту рәсімі, жұмыстар нақты орындалмай жасалған мәмілелер, лицензиялар (іздеуге сілтеме береміз) және сот істері тексерілмейді.',
     notCheckedLink: 'Компания туралы БСН бойынша тағы нені және қайдан білуге болады →',
     guideLink: 'Контрагентті БСН бойынша қалай тексеруге болады: қадам-қадаммен →',
     status: translateStatus('kk'),
@@ -283,7 +393,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: '«Сенімсіз салық төлеуші» деген не?',
-          a: 'МКК әрекетсіз, жалған кәсіпорын немесе банкрот деп танылған, заңды мекенжайы бойынша табылмаған не тіркелуі жарамсыз деп танылған компаниялар мен ЖК тізімдерін жүргізеді. Мұндай контрагентпен мәміле — тәуекел: салық органы ҚҚС-ты есепке алмауы, ал мәміле бойынша шығыстарды шегерімге қабылдамауы мүмкін.',
+          a: 'МКК әрекетсіз, сот шешімі бойынша банкрот деп танылған не тіркелуі немесе қайта тіркелуі жарамсыз деп танылған салық төлеушілер тізімдерін жүргізеді. Тексеру контрагент тізімде қандай себеппен тұрғанын көрсетеді. Мұндай контрагентпен мәміле — тәуекел: салық органы ҚҚС-ты есепке алмауы, ал мәміле бойынша шығыстарды шегерімге қабылдамауы мүмкін.',
         },
         {
           q: 'Контрагент тарату сатысында — онымен жұмыс істеуге бола ма?',
@@ -300,6 +410,14 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         {
           q: 'Нәтижеге қаншалықты сенуге болады?',
           a: 'Деректер тексеру сәтінде «Заңды тұлғалар» мемлекеттік деректер базасынан (data.egov.kz) және ҚР МКК порталының сервистерінен тікелей алынады. Тізілімдер бір тәулікке дейін кешігіп жаңарады, сондықтан нәтиже анықтамалық сипатта: ресми анықтаманы eGov-тан немесе салық төлеушінің кабинетінен алады.',
+        },
+        {
+          q: 'Нәтижедегі атқарушылық іс жүргізу нені білдіреді?',
+          a: 'Бұл data.egov.kz ашық деректеріндегі Әділет министрлігінің борышкерлер тізілімінің (АІЖО ААЖ) жазбалары: олар бойынша сот орындаушылары атқару құжаттары негізінде берешекті өндіріп алады. Жазба санын және өндіріп алу сомасын көрсетеміз, есімдерсіз. «Өндіріс жоқ» деген тізілім жаңартылған күні ашық деректерде олардың жоқтығын білдіреді, бұл ресми анықтама емес. Сервис жауап бермесе, жол «тексеру мүмкін болмады» деп жазады.',
+        },
+        {
+          q: 'Контрагенттің лицензиясын қалай тексеруге болады?',
+          a: 'Лицензиялар тізілімінің ашық API-і жоқ, ал elicense.kz сайтындағы іздеу капчамен жабылған, сондықтан құрал лицензияларды тексермейді. «elicense.kz сайтында тексеру» сілтемесі БСН-і қойылған іздеуді ашады, тек капчаны енгізу қалады. Лицензияның болмауы әрдайым алаңдатарлық белгі емес: қызметтің бір бөлігі үшін тек хабарлама қажет.',
         },
         {
           q: 'Қанша тексеру тегін?',
@@ -323,7 +441,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Check a Kazakhstan company by BIN',
     intro:
-      'Enter a 12-digit BIN (company ID) or IIN (sole proprietor ID) to see unreliable-taxpayer status, liquidation, tax debt and VAT registration — from official data of the State Revenue Committee (KGD) and the legal entity register. Free: 3 checks per quarter.',
+      'Enter a 12-digit BIN (company ID) or IIN (sole proprietor ID) to see unreliable-taxpayer status, bankruptcy, liquidation, tax debt, VAT registration, tax regime and enforcement proceedings, from official data of the State Revenue Committee (KGD), the Ministry of Justice and the legal entity register. Free: 3 checks per quarter.',
     binLabel: 'Company BIN / IIN',
     binPlaceholder: '12 digits',
     check: 'Check',
@@ -351,12 +469,20 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       'In your invoices.kz account BIN checks are unlimited, right inside the invoice: enter the client’s BIN and their details fill in automatically, with tax debt and risks shown at once. Continue in your invoices.kz account.',
     binPrefix: 'BIN',
     registered: d => `registered ${d}`,
+    registeredSince: d => `since ${d}`,
     kgdNote: 'KGD data: for sole proprietors the state publishes only the name and registration date — empty fields here are not an error.',
     unknown: 'Could not be checked — this does not mean everything is fine',
     unreliable: {
       label: 'Unreliable taxpayer',
       ok: 'Not on the KGD list of unreliable taxpayers',
       bad: 'On the unreliable-taxpayer list — paying in advance is risky',
+      reasons: list => `Reason on the KGD list: ${list}`,
+    },
+    bankruptcy: {
+      label: 'Bankruptcy',
+      ok: 'No court bankruptcy decision on the KGD list. Rehabilitation proceedings are not checked here',
+      bad: 'Declared bankrupt by a court (KGD list)',
+      unknown: 'Could not be checked. This does not mean there is no bankruptcy',
     },
     liquidation: {
       label: 'Liquidation',
@@ -376,6 +502,30 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       notPayer: 'Not a VAT payer',
       unknown: 'Could not check VAT status',
     },
+    regime: {
+      label: 'Tax regime',
+      unknown: 'Could not check the tax regime',
+      since: d => `since ${d}`,
+      until: d => `until ${d}`,
+      datesNote: 'KGD publishes regime dates only from 1 January 2026, so an empty date here is not an error',
+    },
+    enforcement: {
+      label: 'Enforcement proceedings',
+      ok: 'No proceedings in the Ministry of Justice debtors register, per open data',
+      bad: (records, active, amount, since) =>
+        `The register has enforcement records: ${records}, of them without an end date: ${active}${amount ? `, amount to recover ${amount}` : ''}${since ? `, earliest since ${since}` : ''}`,
+      unknown: 'Could not be checked. This does not mean there are no proceedings',
+      asOfNote: 'Ministry of Justice open data as of the dataset update date, not an official certificate',
+      ipNote: 'For a sole proprietor a record may concern the person, not the business',
+      sourcePrefix: 'Source: ',
+      sourceLink: 'Ministry of Justice open data, data.egov.kz',
+      manualLink: 'Check manually at aisoip.adilet.gov.kz (captcha required)',
+    },
+    permits: {
+      label: 'Licences and permits',
+      text: 'Not checked automatically: the register has no open API and its search is behind a captcha. Open the search with the BIN already filled in.',
+      link: 'Check on elicense.kz →',
+    },
     fullCardTitle: '🔒 Address, director and line of business are in the full card',
     fullCardBody: 'After a free sign-up, a counterparty’s company details are filled into your invoice automatically.',
     fullCardLink: 'Open the full card →',
@@ -383,9 +533,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardBodySignedIn: 'In your account, enter the client’s BIN when creating an invoice and their details fill in automatically.',
     fullCardLinkSignedIn: 'Open in my account →',
     sources:
-      'Sources: the “Legal Entities” state database (data.egov.kz) and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
+      'Sources: the “Legal Entities” state database and the Ministry of Justice debtors register (data.egov.kz), and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
     notCheckedNote:
-      'This check does not cover licences, the enforcement debtors register, bankruptcy, tax regime or court cases.',
+      'This check does not cover rehabilitation proceedings, deals without actual delivery of work, licences (we link to the search) or court cases.',
     notCheckedLink: 'What else you can learn about a company by BIN, and where (in Russian) →',
     guideLink: 'How to check a counterparty by BIN, step by step (in Russian) →',
     status: translateStatus('en'),
@@ -398,7 +548,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: 'What is an “unreliable taxpayer”?',
-          a: 'Kazakhstan’s State Revenue Committee (KGD) keeps lists of companies and sole proprietors declared inactive, sham companies or bankrupt, not found at their registered address, or whose registration was declared invalid. Doing business with them is risky: the tax authority may refuse your VAT credit and disallow the related expenses as deductions.',
+          a: 'Kazakhstan’s State Revenue Committee (KGD) keeps lists of taxpayers declared inactive, declared bankrupt by a court, or whose registration or re-registration was declared invalid. The check shows which of these reasons applies. Doing business with them is risky: the tax authority may refuse your VAT credit and disallow the related expenses as deductions.',
         },
         {
           q: 'The company is in liquidation — can I still work with it?',
@@ -415,6 +565,14 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         {
           q: 'How reliable is the result?',
           a: 'The data is taken directly, at the moment you check, from the “Legal Entities” state database (data.egov.kz) and KGD portal services. Registers update with up to a one-day delay, so the result is for reference only: an official certificate comes from eGov or the taxpayer’s online account.',
+        },
+        {
+          q: 'What do enforcement proceedings in the result mean?',
+          a: 'These are records of the Ministry of Justice debtors register (AIS OIP) in the open data on data.egov.kz: bailiffs use them to recover debts under enforcement documents. We show the number of records and the amount to recover, without names. “No proceedings” means none appear in the open data as of the register’s update date, which is not an official certificate. If the service did not respond, the line says it could not be checked.',
+        },
+        {
+          q: 'How do I check a counterparty’s licence?',
+          a: 'The licence register has no open API and its search on elicense.kz is behind a captcha, so this tool does not check licences. The “Check on elicense.kz” link opens the search with the BIN already filled in; you only enter the captcha. A missing licence is not always a warning sign: for some activities only a notification is required.',
         },
         {
           q: 'How many checks are free?',

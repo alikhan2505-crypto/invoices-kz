@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'БИН должен состоять из 12 цифр' }, { status: 400 })
   }
 
-  const result = await performBinLookup(supabase, bin)
+  // extras: категории неблагонадёжных, налоговый режим и реестр должников Минюста
+  // (25.10.2026). Все три независимы: сбой даёт null в своём поле, не 503.
+  const result = await performBinLookup(supabase, bin, { extras: true })
 
   // Оба реестра не ответили (сеть, таймаут, не 2xx): это не «не найдено», и
   // попытку из квартального лимита мы НЕ тратим. Счётчик не трогаем вообще.
@@ -86,6 +88,21 @@ export async function POST(req: NextRequest) {
       isLiquidating: c.isLiquidating,
       totalArrear: c.totalArrear,
       taxArrear: c.taxArrear,
+      // Новые проверки: undefined в JSON превращается в «нет поля», а клиент
+      // читает это как null («не проверяли»), поэтому приводим к null явно.
+      unreliableCategories: c.unreliableCategories ?? null,
+      taxRegimes: c.taxRegimes ?? null,
+      // Только агрегаты, перечисленные поимённо: ни имён должников и судебных
+      // исполнителей, ни категорий взыскания (у ИП БИН это ИИН человека).
+      enforcement: c.enforcement
+        ? {
+            found: c.enforcement.found,
+            count: c.enforcement.count,
+            activeCount: c.enforcement.activeCount,
+            totalAmount: c.enforcement.totalAmount,
+            earliestStart: c.enforcement.earliestStart,
+          }
+        : null,
       hasFullCard: Boolean(c.address || c.director || c.activity),
     },
   })

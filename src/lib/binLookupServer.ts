@@ -13,10 +13,12 @@ import {
   type BinLookupResult,
 } from '@/lib/binLookup'
 import {
-  parseTaxpayer, parseUnreliable, parseLiquidation, parseTaxDebt,
-  KGD_TAXPAYER_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL, KGD_DEBT_URL,
+  parseTaxpayer, parseLiquidation, parseTaxDebt,
+  KGD_TAXPAYER_URL, KGD_LIQUIDATION_URL, KGD_DEBT_URL,
   KGD_TAXPAYER_TYPES,
+  type UnreliableCategory,
 } from '@/lib/kgdTaxpayer'
+import { fetchUnreliableDetail, fetchTaxRegime, fetchEnforcement } from '@/lib/binExtraChecks'
 
 // A registry row is re-fetched after this. Companies get renamed, liquidated
 // and registered for VAT, and a stale name printed on an invoice is worse
@@ -95,29 +97,19 @@ async function lookUpInKgd(bin: string): Promise<SourceAnswer> {
  */
 async function checkRisk(bin: string): Promise<{
   unreliable: boolean | null
+  unreliableCategories: UnreliableCategory[] | null
   liquidating: boolean | null
   totalArrear: number | null
   taxArrear: number | null
 }> {
   const token = process.env.KGD_PORTAL_TOKEN
-  if (!token) return { unreliable: null, liquidating: null, totalArrear: null, taxArrear: null }
+  if (!token) return { unreliable: null, unreliableCategories: null, liquidating: null, totalArrear: null, taxArrear: null }
   const headers = { 'X-Portal-Token': token }
 
-  const unreliable = (async () => {
-    try {
-      const res = await fetch(KGD_UNRELIABLE_URL, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taxPayerCode: bin, language: 'ru' }),
-        signal: AbortSignal.timeout(12_000),
-      })
-      if (!res.ok) return null
-      return parseUnreliable(await res.json())
-    } catch (e) {
-      console.error('bin-lookup: КГД unreliable check failed:', e instanceof Error ? e.message : e)
-      return null
-    }
-  })()
+  // Неблагонадёжные: тот же один запрос, но с категориями (бездействующий,
+  // банкрот, недействительная регистрация). Флаг `listed` остаётся прежним
+  // булевым значением для кэша и для /create.
+  const unreliable = fetchUnreliableDetail(bin)
 
   const liquidating = (async () => {
     try {
@@ -153,7 +145,8 @@ async function checkRisk(bin: string): Promise<{
 
   const [u, l, d] = await Promise.all([unreliable, liquidating, debt])
   return {
-    unreliable: u,
+    unreliable: u ? u.listed : null,
+    unreliableCategories: u ? u.categories : null,
     liquidating: l,
     totalArrear: d ? d.totalArrear : null,
     taxArrear: d ? d.taxArrear : null,
@@ -173,7 +166,33 @@ export type BinLookupOutcome = { found: false; unavailable?: boolean } | { found
  * (НДС/риски, закэшированные до появления этих полей), identity-поля заново
  * не запрашиваются.
  */
-export async function performBinLookup(supabase: SupabaseClient, bin: string): Promise<BinLookupOutcome> {
+/**
+ * Проверки 25.10.2026, которых нет в таблице кэша: налоговый режим и реестр
+ * должников Минюста. Спрашиваются каждый раз заново, параллельно и независимо:
+ * сбой одного даёт null в своём поле и не трогает остальные.
+ */
+async function checkExtras(bin: string) {
+  const [taxRegimes, enforcement] = await Promise.all([fetchTaxRegime(bin), fetchEnforcement(bin)])
+  return { taxRegimes, enforcement }
+}
+
+export interface PerformBinLookupOptions {
+  /**
+   * Также спросить налоговый режим, реестр должников и категории
+   * неблагонадёжных. Нужно только показу рисков: публичному
+   * /api/tools/kontragent и /api/bin-lookup?extras=1 (вторым, ленивым запросом
+   * с /create). Остальным (подстановка названия, реквизиты профиля, бонус за
+   * реквизиты, поиск по названию) лишние запросы к egov и КГД ни к чему, а
+   * повторы Минюста растягивают ответ до ~9 с.
+   */
+  extras?: boolean
+}
+
+export async function performBinLookup(
+  supabase: SupabaseClient,
+  bin: string,
+  options: PerformBinLookupOptions = {},
+): Promise<BinLookupOutcome> {
   const { data: cached } = await supabase
     .from('bin_lookup_cache')
     .select('*')
@@ -224,6 +243,7 @@ export async function performBinLookup(supabase: SupabaseClient, bin: string): P
       }
       if (risk) {
         company.isUnreliable = risk.unreliable
+        company.unreliableCategories = risk.unreliableCategories
         company.isLiquidating = risk.liquidating
         company.totalArrear = risk.totalArrear
         company.taxArrear = risk.taxArrear
@@ -236,6 +256,23 @@ export async function performBinLookup(supabase: SupabaseClient, bin: string): P
         const { error } = await supabase.from('bin_lookup_cache').update(patch).eq('bin', bin)
         if (error) console.error('bin-lookup: backfill failed:', error.message)
       }
+    }
+
+    if (options.extras) {
+      // Категории неблагонадёжных в кэше не хранятся. «Нет в списке» значит
+      // категорий нет; «в списке» значит перечитываем список (редкий случай);
+      // неизвестно (null) остаётся неизвестным. Если risk уже прочитан выше
+      // (дозаполнение дыры), категории у него есть.
+      const needCategories = company.isUnreliable === true && company.unreliableCategories === undefined
+      const [extra, detail] = await Promise.all([
+        checkExtras(bin),
+        needCategories ? fetchUnreliableDetail(bin) : Promise.resolve(undefined),
+      ])
+      company.taxRegimes = extra.taxRegimes
+      company.enforcement = extra.enforcement
+      if (company.isUnreliable === false) company.unreliableCategories = []
+      else if (needCategories) company.unreliableCategories = detail ? detail.categories : null
+      else if (company.unreliableCategories === undefined) company.unreliableCategories = null
     }
 
     return { found: true, company }
@@ -253,7 +290,13 @@ export async function performBinLookup(supabase: SupabaseClient, bin: string): P
   }
 
   // Run together: three independent КГД calls, and the user is waiting.
-  const [vat, risk] = await Promise.all([lookupVatStatus(bin), checkRisk(bin)])
+  const [vat, risk, extra] = await Promise.all([
+    lookupVatStatus(bin),
+    checkRisk(bin),
+    // Режим и реестр должников не зависят от результата рисков; категории
+    // неблагонадёжных уже пришли вместе с рисками, второй раз не спрашиваем.
+    options.extras ? checkExtras(bin) : Promise.resolve(null),
+  ])
   if (vat) {
     company.isVatPayer = vat.isVatPayer
     company.vatRegisteredAt = vat.registeredAt
@@ -262,6 +305,11 @@ export async function performBinLookup(supabase: SupabaseClient, bin: string): P
   company.isLiquidating = risk.liquidating
   company.totalArrear = risk.totalArrear
   company.taxArrear = risk.taxArrear
+  if (extra) {
+    company.unreliableCategories = risk.unreliable === false ? [] : risk.unreliableCategories
+    company.taxRegimes = extra.taxRegimes
+    company.enforcement = extra.enforcement
+  }
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({
     bin: company.bin,

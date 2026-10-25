@@ -1,10 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { motion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
+import type { TaxRegime, UnreliableCategory } from '@/lib/kgdTaxpayer'
+import { AISOIP_DATASET_URL, AISOIP_MANUAL_URL, isIndividualId, type EnforcementResult } from '@/lib/aisoip'
+import { elicenseSearchUrl, taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import { useLanguage } from '@/components/LanguageProvider'
 import { formatIsoDate, formatTenge, toolGuidePath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
@@ -41,6 +44,10 @@ interface PublicCompany {
   isLiquidating: boolean | null
   totalArrear: number | null
   taxArrear: number | null
+  /** Новые проверки (25.10.2026). Нет поля или null = не проверяли. */
+  unreliableCategories?: UnreliableCategory[] | null
+  taxRegimes?: TaxRegime[] | null
+  enforcement?: EnforcementResult | null
   hasFullCard: boolean
 }
 
@@ -58,20 +65,24 @@ type Outcome =
 // сохраняется до экрана: молчание из-за упавшего запроса никогда не должно
 // читаться как «контрагент в порядке» — то же правило, что во внутренней
 // проверке на /create.
-function Verdict({ ok, label, okText, badText, unknownText }: {
+function Verdict({ ok, tone, label, okText, badText, unknownText, children }: {
   ok: boolean | null
+  /** 'info': проверка ответила, но «хорошо» или «плохо» тут не бывает (налоговый режим). */
+  tone?: 'info'
   label: string
   okText: string
   badText: string
   unknownText: string
+  children?: ReactNode
 }) {
-  const color = ok === null ? 'var(--nav-text-muted)' : ok ? 'var(--nav-success)' : 'var(--nav-critical)'
-  const icon = ok === null ? '?' : ok ? '✓' : '!'
+  const info = tone === 'info' && ok !== null
+  const color = ok === null ? 'var(--nav-text-muted)' : info ? 'var(--nav-accent)' : ok ? 'var(--nav-success)' : 'var(--nav-critical)'
+  const icon = ok === null ? '?' : info ? 'i' : ok ? '✓' : '!'
   return (
     <div className="flex items-start gap-2.5 py-2">
       <span
         className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5"
-        style={{ background: color, color: '#fff' }}
+        style={{ background: color, color: info ? 'var(--nav-accent-ink)' : '#fff' }}
         aria-hidden="true"
       >
         {icon}
@@ -81,8 +92,22 @@ function Verdict({ ok, label, okText, badText, unknownText }: {
         <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
           {ok === null ? unknownText : ok ? okText : badText}
         </div>
+        {children}
       </div>
     </div>
+  )
+}
+
+/** Мелкая строка под вердиктом: причины, источник, ссылка на ручную проверку. */
+function Detail({ children }: { children: ReactNode }) {
+  return <div className="text-[12px] mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{children}</div>
+}
+
+function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
+      {children}
+    </a>
   )
 }
 
@@ -254,6 +279,22 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
             const vatSince = formatIsoDate(c.vatRegisteredAt)
             const hasDebt = c.totalArrear !== null && c.totalArrear > 0
             const taxPart = hasDebt && c.taxArrear !== null && c.taxArrear !== c.totalArrear ? formatTenge(c.taxArrear) : null
+            // Причины попадания в список и банкротство. unreliableCategories
+            // null/нет = не знаем причину; пустой список при «в списке» =
+            // причина не распознана, и про банкротство честно сказать нельзя.
+            const cats = c.unreliableCategories ?? null
+            const reasonText = c.isUnreliable === true && cats ? unreliableCategoriesText(cats, lang) : ''
+            const bankruptOk: boolean | null =
+              c.isUnreliable === null || cats === null ? null
+              : cats.includes('bankrupt') ? false
+              : c.isUnreliable === true && cats.length === 0 ? null
+              : true
+            const regimes = c.taxRegimes ?? null
+            const regimeText = regimes
+              ? taxRegimesText(regimes, lang, formatIsoDate, { since: t.regime.since, until: t.regime.until })
+              : ''
+            const enf = c.enforcement ?? null
+            const enfAmount = enf && enf.totalAmount > 0 ? formatTenge(enf.totalAmount) : null
             return (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}
                 className="nav-glass rounded-2xl p-5 mb-4">
@@ -262,7 +303,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                   <div className="text-[13px] mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>
                     {t.binPrefix} {c.bin}
                     {c.status ? ` · ${t.status(c.status)}` : ''}
-                    {registeredAt ? ` · ${t.registered(registeredAt)}` : ''}
+                    {registeredAt ? ` · ${c.status && /^зарегистрирован/i.test(c.status) ? t.registeredSince(registeredAt) : t.registered(registeredAt)}` : ''}
                   </div>
                   {c.source === 'kgd' && (
                     <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
@@ -278,6 +319,15 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                     okText={t.unreliable.ok}
                     badText={t.unreliable.bad}
                     unknownText={t.unknown}
+                  >
+                    {reasonText && <Detail>{t.unreliable.reasons(reasonText)}</Detail>}
+                  </Verdict>
+                  <Verdict
+                    ok={bankruptOk}
+                    label={t.bankruptcy.label}
+                    okText={t.bankruptcy.ok}
+                    badText={t.bankruptcy.bad}
+                    unknownText={t.bankruptcy.unknown}
                   />
                   <Verdict
                     ok={c.isLiquidating === null ? null : !c.isLiquidating}
@@ -300,6 +350,52 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                     badText=""
                     unknownText={t.vat.unknown}
                   />
+                  <Verdict
+                    ok={regimes ? true : null}
+                    tone="info"
+                    label={t.regime.label}
+                    okText={regimeText}
+                    badText=""
+                    unknownText={t.regime.unknown}
+                  >
+                    {regimes && regimes.some(r => !r.beginDate) && <Detail>{t.regime.datesNote}</Detail>}
+                  </Verdict>
+                  <Verdict
+                    ok={enf ? !enf.found : null}
+                    label={t.enforcement.label}
+                    okText={t.enforcement.ok}
+                    badText={enf ? t.enforcement.bad(String(enf.count), String(enf.activeCount), enfAmount, formatIsoDate(enf.earliestStart)) : ''}
+                    unknownText={t.enforcement.unknown}
+                  >
+                    {enf && <Detail>{t.enforcement.asOfNote}</Detail>}
+                    {enf && enf.found && isIndividualId(c.bin) && <Detail>{t.enforcement.ipNote}</Detail>}
+                    <Detail>
+                      {enf ? (
+                        <>
+                          {t.enforcement.sourcePrefix}
+                          <ExternalLink href={AISOIP_DATASET_URL}>{t.enforcement.sourceLink}</ExternalLink>
+                        </>
+                      ) : (
+                        <ExternalLink href={AISOIP_MANUAL_URL}>{t.enforcement.manualLink}</ExternalLink>
+                      )}
+                    </Detail>
+                  </Verdict>
+                  <div className="flex items-start gap-2.5 py-2">
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5"
+                      style={{ border: '1.5px solid var(--nav-text-muted)', color: 'var(--nav-text-muted)' }}
+                      aria-hidden="true"
+                    >
+                      ↗
+                    </span>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>{t.permits.label}</div>
+                      <Detail>{t.permits.text}</Detail>
+                      <Detail>
+                        <ExternalLink href={elicenseSearchUrl(c.bin, lang)}>{t.permits.link}</ExternalLink>
+                      </Detail>
+                    </div>
+                  </div>
                 </div>
 
                 {c.hasFullCard && (

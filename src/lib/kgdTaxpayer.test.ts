@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, parseTaxDebt, KGD_TAXPAYER_TYPES } from './kgdTaxpayer'
+import {
+  parseTaxpayer, parseVatStatus, parseUnreliable, parseUnreliableDetail, parseTaxRegime, parseLiquidation, parseTaxDebt,
+  KGD_TAXPAYER_TYPES, KGD_SNR_URL,
+} from './kgdTaxpayer'
 
 // Both fixtures are verbatim from live calls on 2026-09-10.
 const ipResponse = {
@@ -169,5 +172,48 @@ describe('parseTaxDebt', () => {
     expect(parseTaxDebt({ message: 'error.personal-account-token' })).toBeNull()
     expect(parseTaxDebt(null)).toBeNull()
     expect(parseTaxDebt('')).toBeNull()
+  })
+})
+
+describe('parseUnreliableDetail', () => {
+  const entry = (...cats: string[]) => ({ iin: null, rnn: '000000000000', name: 'ТОО «Пример»', taxpayerDataList: cats.map(c => ({ unreliableTaxpayerDataCategory: c })) })
+
+  it('empty array: not listed', () => {
+    expect(parseUnreliableDetail([])).toEqual({ listed: false, categories: [] })
+  })
+  it('collects categories without repeats, in order', () => {
+    expect(parseUnreliableDetail([entry('INACTIVE_LIST', 'BANKRUPT_LIST'), entry('INACTIVE_LIST')])).toEqual({
+      listed: true, categories: ['inactive', 'bankrupt'],
+    })
+  })
+  it('not an array, or an array of non-objects: null (nothing learned)', () => {
+    expect(parseUnreliableDetail(null)).toBeNull()
+    expect(parseUnreliableDetail({})).toBeNull()
+    expect(parseUnreliableDetail('')).toBeNull()
+    expect(parseUnreliableDetail(['x'])).toBeNull()
+  })
+  it('stays consistent with the boolean parser', () => {
+    for (const p of [[], [entry('INACTIVE_LIST')], {}, null]) {
+      expect(parseUnreliableDetail(p)?.listed ?? null).toBe(parseUnreliable(p))
+    }
+  })
+})
+
+describe('parseTaxRegime', () => {
+  it('uses the snr-search endpoint', () => {
+    expect(KGD_SNR_URL).toBe('https://portal.kgd.gov.kz/services/isnaportalsync/public/snr-search/search')
+  })
+  it('requires status SUCCESS', () => {
+    expect(parseTaxRegime({ status: 'ERROR', error: 'tax.payer.not.found', stmList: null })).toBeNull()
+    expect(parseTaxRegime({ stmList: [{ type: 'SNR_GENERAL_ORDER' }] })).toBeNull()
+  })
+  it('skips junk entries and returns null when none is usable', () => {
+    expect(parseTaxRegime({ status: 'SUCCESS', stmList: [null, 5, {}] })).toBeNull()
+    expect(parseTaxRegime({ status: 'SUCCESS', stmList: [null, { type: 'SNR_GENERAL_ORDER' }] })).toHaveLength(1)
+  })
+  it('does not take a date that is not a date', () => {
+    const r = parseTaxRegime({ status: 'SUCCESS', stmList: [{ type: 'X', beginDate: 'вчера', endDate: '2026-12-31T00:00:00' }] })!
+    expect(r[0].beginDate).toBeNull()
+    expect(r[0].endDate).toBe('2026-12-31')
   })
 })

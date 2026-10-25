@@ -17,6 +17,7 @@ import { kontragentDict } from '@/app/tools/kontragent/dict'
 import {
   KGD_DEBT_URL,
   KGD_LIQUIDATION_URL,
+  KGD_SNR_URL,
   KGD_TAXPAYER_URL,
   KGD_UNRELIABLE_URL,
   KGD_VAT_URL,
@@ -58,11 +59,12 @@ describe('реестры: данные', () => {
     }
   })
 
-  it('покрытие: две проверяются, четыре частично, пять нет (реестр юрлиц частично: три поля из пяти скрыты)', () => {
+  it('покрытие (25.10.2026): три проверяются, шесть частично, две нет', () => {
     const ids = (c: 'yes' | 'partial' | 'no') => registersByCoverage(c).map(r => r.id)
-    expect(ids('yes')).toEqual(['liquidation', 'unreliable'])
-    expect(ids('partial')).toEqual(['legal-entities', 'taxpayer', 'tax-debt', 'vat'])
-    expect(ids('no')).toEqual(['permits', 'debtors', 'bankruptcy', 'false-deals', 'tax-regime'])
+    expect(ids('yes')).toEqual(['liquidation', 'unreliable', 'tax-regime'])
+    // debtors: только открытые данные Минюста; bankruptcy: только суд-банкротство из списка КГД, реабилитации нет.
+    expect(ids('partial')).toEqual(['legal-entities', 'taxpayer', 'tax-debt', 'vat', 'debtors', 'bankruptcy'])
+    expect(ids('no')).toEqual(['permits', 'false-deals'])
   })
 
   it('адреса КГД ведут на страницы сервисов портала, kk-адрес на kk-версию', () => {
@@ -72,13 +74,31 @@ describe('реестры: данные', () => {
     }
   })
 
-  it('лицензии, реестр должников и банкротство в таблице есть и помечены «Нет»', () => {
-    for (const id of ['permits', 'debtors', 'bankruptcy'] as RegisterId[]) {
+  it('лицензии и сделки без выполнения работ в таблице есть и помечены «Нет»', () => {
+    for (const id of ['permits', 'false-deals'] as RegisterId[]) {
       const r = BIN_REGISTERS.find(x => x.id === id)!
       expect(r.coverage).toBe('no')
       expect(r.toolNote.ru).toContain('Не проверяет')
       expect(r.toolNote.kk).toContain('Тексермейді')
     }
+  })
+
+  it('реестр должников и банкротство помечены «Частично» и честно называют границу', () => {
+    const debtors = BIN_REGISTERS.find(x => x.id === 'debtors')!
+    expect(debtors.coverage).toBe('partial')
+    expect(debtors.toolNote.ru).toContain('без имён')
+    expect(debtors.toolNote.ru).toContain('открытых данных')
+    const bankruptcy = BIN_REGISTERS.find(x => x.id === 'bankruptcy')!
+    expect(bankruptcy.coverage).toBe('partial')
+    expect(bankruptcy.toolNote.ru).toContain('Реабилитационную процедуру не проверяет')
+    expect(bankruptcy.toolNote.kk).toContain('Оңалту рәсімін тексермейді')
+  })
+
+  it('налоговый режим помечен «Да», но с оговоркой про даты с 1 января 2026 и про «не удалось проверить»', () => {
+    const r = BIN_REGISTERS.find(x => x.id === 'tax-regime')!
+    expect(r.coverage).toBe('yes')
+    expect(r.toolNote.ru).toContain('1 января 2026')
+    expect(r.toolNote.ru).toContain('не удалось проверить')
   })
 })
 
@@ -91,15 +111,66 @@ describe('утверждения о покрытии соответствуют 
     expect(KGD_TAXPAYER_URL).toContain('taxpayer-data')
   })
 
-  it('на экране есть вердикты для неблагонадёжных, ликвидации, долга и НДС и больше ни для чего', () => {
+  it('новые проверки ходят в сервис режимов и в SOAP-сервис Минюста', () => {
+    expect(KGD_SNR_URL).toContain('snr-search')
+    const extra = readFileSync(join(root, 'src/lib/binExtraChecks.ts'), 'utf8')
+    expect(extra).toContain('?uin=')
+    const aisoip = readFileSync(join(root, 'src/lib/aisoip.ts'), 'utf8')
+    expect(aisoip).toContain('ODWebServiceImpl')
+    expect(aisoip).toContain('<indexName>aisoip</indexName>')
+  })
+
+  it('на экране есть вердикты для неблагонадёжных, банкротства, ликвидации, долга, НДС, режима и производств; лицензии только ссылкой; судов и штрафов нет', () => {
     const t = kontragentDict.ru
-    expect(t.unreliable.label).toBeTruthy()
-    expect(t.liquidation.label).toBeTruthy()
-    expect(t.arrear.label).toBeTruthy()
-    expect(t.vat.label).toBeTruthy()
+    for (const part of [t.unreliable, t.bankruptcy, t.liquidation, t.arrear, t.vat, t.regime, t.enforcement, t.permits]) {
+      expect(part.label).toBeTruthy()
+    }
+    // У лицензий нет «ok»/«bad»: состояния «проверено, чисто» быть не может, только ссылка.
+    expect(Object.keys(t.permits).sort()).toEqual(['label', 'link', 'text'])
     const text = JSON.stringify(Object.keys(t)).toLowerCase()
-    for (const word of ['licen', 'permit', 'fine', 'court', 'debtor', 'bankrupt', 'regime']) {
+    for (const word of ['fine', 'court', 'rehab', 'falsedeal']) {
       expect(text, word).not.toContain(word)
+    }
+  })
+
+  it('у всех проверок с результатом есть третье состояние «не удалось проверить» на всех языках', () => {
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      const t = kontragentDict[lang]
+      expect(t.unknown.length, lang).toBeGreaterThan(10)
+      expect(t.bankruptcy.unknown.length, lang).toBeGreaterThan(10)
+      expect(t.regime.unknown.length, lang).toBeGreaterThan(10)
+      expect(t.enforcement.unknown.length, lang).toBeGreaterThan(10)
+      expect(t.arrear.unknown.length, lang).toBeGreaterThan(10)
+      expect(t.vat.unknown.length, lang).toBeGreaterThan(10)
+    }
+  })
+
+  it('исполнительные производства: ссылка на источник data.egov.kz (условие портала) и ни одного имени', () => {
+    const t = kontragentDict.ru.enforcement
+    expect(t.sourceLink).toContain('data.egov.kz')
+    expect(t.sourcePrefix).toBeTruthy()
+    const bad = t.bad('2', '1', '1 000 ₸', '01.01.2026')
+    expect(bad).toContain('2')
+    expect(bad).toContain('без даты окончания: 1')
+    expect(bad).toContain('1 000 ₸')
+    expect(bad).toContain('01.01.2026')
+    // сумму и дату можно не знать
+    expect(t.bad('1', '1', null, null)).not.toMatch(/null|undefined/)
+  })
+
+  it('исполнительные производства и режим: строки не содержат тире, в строках словаря нет эмодзи (кроме уже существовавшей замочка)', () => {
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      const t = kontragentDict[lang]
+      const fresh = [
+        t.bankruptcy.label, t.bankruptcy.ok, t.bankruptcy.bad, t.bankruptcy.unknown,
+        t.regime.label, t.regime.unknown, t.regime.datesNote, t.regime.since('X'), t.regime.until('X'),
+        t.enforcement.label, t.enforcement.ok, t.enforcement.bad('1', '1', '2 ₸', 'X'), t.enforcement.unknown,
+        t.enforcement.asOfNote, t.enforcement.ipNote,
+        t.enforcement.sourcePrefix, t.enforcement.sourceLink, t.enforcement.manualLink,
+        t.permits.label, t.permits.text, t.permits.link, t.unreliable.reasons('X'),
+      ].join(' ')
+      expect(fresh, lang).not.toMatch(/[–—]/)
+      expect(/\p{Extended_Pictographic}/u.test(fresh), lang).toBe(false)
     }
   })
 
@@ -258,21 +329,21 @@ describe('запись гайда: качество по реестру', () => 
     expect(guide.ru.faq!.length).toBe(guide.kk.faq!.length)
   })
 
-  it('честность: в ответе про инструмент названо, что он НЕ проверяет (ru и kk)', () => {
+  it('честность: в ответе про инструмент названо, что он делает и что НЕ проверяет (ru и kk)', () => {
     const ru = guide.ru.faq![3].a
-    for (const w of ['лицензии', 'реестр должников', 'банкротство', 'налоговый режим', 'суды']) {
+    for (const w of ['налоговый режим', 'исполнительные производства', 'причиной', 'лицензии', 'реабилитационную процедуру', 'суды']) {
       expect(ru, w).toContain(w)
     }
     expect(ru).toContain('не проверяет')
     const kk = guide.kk.faq![3].a
-    for (const w of ['лицензияларды', 'борышкерлер тізілімін', 'банкроттықты', 'салық режимін', 'соттарды']) {
+    for (const w of ['салық режимін', 'атқарушылық өндірісті', 'себебімен', 'лицензияларды', 'оңалту рәсімін', 'соттарды']) {
       expect(kk, w).toContain(w)
     }
     expect(kk).toContain('тексермейді')
   })
 
-  it('честность: в резюме сказано, что лицензии, реестр должников и суды инструмент не проверяет', () => {
-    expect(guide.ru.summary).toContain('лицензии, реестр должников Минюста и суды не проверяет')
+  it('честность: в резюме сказано, что лицензии, реабилитацию и суды инструмент не проверяет', () => {
+    expect(guide.ru.summary).toContain('лицензии, реабилитацию и суды не проверяет')
     expect(guide.kk.summary).toContain('соттарды тексермейді')
   })
 
@@ -282,11 +353,25 @@ describe('запись гайда: качество по реестру', () => 
     expect(guide.kk.summary).not.toContain('алғашқы бес тармақты')
   })
 
-  it('честность: «не удалось проверить» обещано только для проверок КГД, при сбое регистрации сказано про «ничего не нашлось»', () => {
-    expect(guide.ru.faq![3].a).toContain('четырёх последних проверок')
+  it('честность: «не удалось проверить» обещано только для проверок КГД и Минюста, при сбое регистрации сказано про «ничего не нашлось»', () => {
+    expect(guide.ru.faq![3].a).toContain('сервис КГД или Минюста')
     expect(guide.ru.faq![3].a).toContain('ничего не нашлось')
-    expect(guide.kk.faq![3].a).toContain('соңғы төрт тексерудің')
+    expect(guide.kk.faq![3].a).toContain('МКК немесе Әділет министрлігі қызметі')
     expect(guide.kk.faq![3].a).toContain('ештеңе табылмады')
+  })
+
+  it('страницы гайда описывают новые проверки (категории, режим, открытые данные Минюста) и не говорят «не проверяет» про них', () => {
+    const ru = readFileSync(join(root, `src/app/guides/${BIN_CHECK_SLUG}/page.tsx`), 'utf8').replace(/\s+/g, ' ')
+    expect(ru).toContain('Инструмент его использует')
+    expect(ru).toContain('reestr_dolzh_po_isp_pr')
+    expect(ru).toContain('по открытым данным Минюста')
+    expect(ru).not.toContain('Инструмент этот реестр не проверяет')
+    expect(ru).not.toContain('Инструмент его не использует')
+    const kk = readFileSync(join(root, `src/app/guides/kk/${BIN_CHECK_SLUG}/page.tsx`), 'utf8').replace(/\s+/g, ' ')
+    expect(kk).toContain('Құрал оны пайдаланады')
+    expect(kk).toContain('reestr_dolzh_po_isp_pr')
+    expect(kk).not.toContain('Құрал бұл тізілімді тексермейді')
+    expect(kk).not.toContain('Құрал оны пайдаланбайды')
   })
 
   it('НДС: в ответе есть оговорка про повторную постановку на учёт (инструмент читает последние даты КГД)', () => {

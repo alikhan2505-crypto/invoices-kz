@@ -21,6 +21,8 @@ import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraf
 import { withReturnPath } from '@/lib/returnPath'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
+import { AISOIP_DATASET_URL } from '@/lib/aisoip'
+import { taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 
@@ -303,7 +305,7 @@ export default function CreateInvoicePage() {
  
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
-  const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
+  const { binLookup, lookupBin, resetBinLookup } = useBinLookup({ extras: true })
 
   // The name the state register last put into «Название», for the БИН it
   // belongs to. Drives the green check beside the field: it shows only while
@@ -1428,6 +1430,35 @@ export default function CreateInvoicePage() {
                               )}
                               {c.isUnreliable === true && (
                                 <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>{t.binLookupUnreliable}</div>
+                              )}
+                              {/* Почему в списке: бездействующий, банкрот,
+                                  недействительная регистрация. Нет данных
+                                  (null) молчит, как и остальные риски. */}
+                              {c.isUnreliable === true && c.unreliableCategories && c.unreliableCategories.length > 0 && (
+                                <div style={{ color: 'var(--nav-critical, #ef4444)' }}>
+                                  {t.binLookupUnreliableReason(unreliableCategoriesText(c.unreliableCategories, lang))}
+                                </div>
+                              )}
+                              {c.enforcement?.found === true && (
+                                <div>
+                                  <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>
+                                    {t.binLookupEnforcement(String(c.enforcement.count), String(c.enforcement.activeCount))}
+                                  </div>
+                                  {/* Условие data.egov.kz: рядом с данными видимая ссылка на источник. */}
+                                  <a href={AISOIP_DATASET_URL} target="_blank" rel="noopener noreferrer"
+                                     className="underline underline-offset-2" style={{ color: 'var(--nav-text-muted)' }}>
+                                    {t.binLookupEnforcementSource}
+                                  </a>
+                                </div>
+                              )}
+                              {c.taxRegimes && c.taxRegimes.length > 0 && (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>
+                                  {t.binLookupRegime(taxRegimesText(
+                                    c.taxRegimes, lang,
+                                    iso => (iso ? formatDateSafe(iso, lang) : null),
+                                    { since: t.binLookupRegimeSince, until: t.binLookupRegimeUntil },
+                                  ))}
+                                </div>
                               )}
                               {c.isLiquidating === true && (
                                 <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>{t.binLookupLiquidating}</div>
