@@ -262,7 +262,7 @@ export default function Documents() {
             ))}
           </motion.div>
 
-          {tab === 'kp' && currentList.length > 0 && (
+          {tab === 'kp' && (
             <KpLangPicker value={kpLang} onChange={setKpLang} className="mb-4" />
           )}
 

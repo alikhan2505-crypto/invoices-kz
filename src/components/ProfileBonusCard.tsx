@@ -29,6 +29,17 @@ import {
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+// Высота карточки с прошлого захода: пока сервер отвечает (до 5-9 с), на её месте
+// держим пустую плашку такой же высоты, иначе карточка появляется позже остальных
+// блоков и сдвигает колонку вниз. Нет подсказки (карточки не было) - ничего не держим.
+const HEIGHT_HINT_KEY = 'ikz-bonus-card-h'
+function readHeightHint(): number {
+  try {
+    const v = Number(localStorage.getItem(HEIGHT_HINT_KEY))
+    return v > 0 && v < 600 ? v : 0
+  } catch { return 0 }
+}
+
 const BLOCK_HREF: Record<ProfileBonusBlock, string> = {
   requisites: withReturnPath('/profile/requisites', '/create'),
   bank: withReturnPath('/profile/banks', '/create'),
@@ -91,6 +102,19 @@ export default function ProfileBonusCard() {
   const [completedNow, setCompletedNow] = useState(false)
   const rowsRef = useRef<Record<ProfileBonusBlock, RowState> | null>(null)
   const announcedRef = useRef(false)
+  const cardRef = useRef<HTMLElement | null>(null)
+  const [heightHint, setHeightHint] = useState(0)
+
+  useEffect(() => { setHeightHint(readHeightHint()) }, [])
+  // Запомнить высоту показанной карточки; если карточки нет, подсказку сбросить.
+  useEffect(() => {
+    if (!status || !rows) return
+    try {
+      const h = cardRef.current?.offsetHeight ?? 0
+      if (h > 0) localStorage.setItem(HEIGHT_HINT_KEY, String(h))
+      else localStorage.removeItem(HEIGHT_HINT_KEY)
+    } catch {}
+  })
 
   function applyRow(block: ProfileBonusBlock, next: RowState) {
     if (!rowsRef.current) return
@@ -113,7 +137,13 @@ export default function ProfileBonusCard() {
     let cancelled = false
     async function run() {
       const s = await fetchProfileBonusStatus()
-      if (cancelled || !s || !s.available) return
+      if (cancelled) return
+      if (!s || !s.available) {
+        // Карточки не будет: убрать держащую место плашку и забыть подсказку.
+        try { localStorage.removeItem(HEIGHT_HINT_KEY) } catch {}
+        setHeightHint(0)
+        return
+      }
       setStatus(s)
       const initial = Object.fromEntries(
         PROFILE_BONUS_BLOCKS.map(b => [b, { state: s.blocks[b].state, reason: s.blocks[b].reason }]),
@@ -145,7 +175,9 @@ export default function ProfileBonusCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (!status || !rows) return null
+  if (!status || !rows) {
+    return heightHint > 0 ? <div aria-hidden="true" style={{ minHeight: heightHint }} /> : null
+  }
   const allDone = PROFILE_BONUS_BLOCKS.every(b => isDone(rows[b]))
   if (allDone && (!completedNow || announcedRef.current)) return null
 
@@ -157,7 +189,7 @@ export default function ProfileBonusCard() {
 
   if (allDone) {
     return (
-      <motion.div {...motionProps} role="status" className="nav-glass rounded-2xl px-4 py-3 flex items-center gap-2 text-sm"
+      <motion.div {...motionProps} ref={cardRef as React.Ref<HTMLDivElement>} role="status" className="nav-glass rounded-2xl px-4 py-3 flex items-center gap-2 text-sm"
         style={{ color: 'var(--nav-text-secondary)' }}>
         <span style={{ color: 'var(--nav-success)' }}><CheckIcon /></span>
         {t.allClaimedLabel}
@@ -169,7 +201,7 @@ export default function ProfileBonusCard() {
   const ctaStyle = { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
 
   return (
-    <motion.section {...motionProps} aria-labelledby="profile-bonus-title" className="nav-glass nav-card-accent rounded-2xl overflow-hidden">
+    <motion.section {...motionProps} ref={cardRef as React.Ref<HTMLElement>} aria-labelledby="profile-bonus-title" className="nav-glass nav-card-accent rounded-2xl overflow-hidden">
       <div className="px-4 pt-4 pb-2">
         <h2 id="profile-bonus-title" className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.cardTitle}</h2>
         <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--nav-text-muted)' }}>{t.cardWalletHint}</p>
