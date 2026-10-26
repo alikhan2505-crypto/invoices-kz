@@ -79,6 +79,19 @@ export interface KontragentDict {
     /** Ссылка на ручную проверку, когда сервис не ответил (БИН подставить нельзя: reCAPTCHA). */
     manualLink: string
   }
+  /**
+   * Реабилитационная процедура (список должников КГД, суточная выгрузка). Строка
+   * показывается, только когда проверка включена (в ответе есть поле rehabilitation).
+   */
+  rehabilitation: {
+    label: string
+    ok: string
+    /** since = дата вступления решения в силу, уже отформатированная, или null. */
+    bad: (since: string | null) => string
+    terminated: string
+    unknown: string
+    note: string
+  }
   /** Лицензии: автоматически не проверяем, даём ссылку на поиск с подставленным БИН. */
   permits: { label: string; text: string; link: string }
   fullCardTitle: string
@@ -210,6 +223,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourcePrefix: 'Источник: ',
       sourceLink: 'открытые данные Минюста РК, data.egov.kz',
       manualLink: 'Проверить вручную на aisoip.adilet.gov.kz (нужна капча)',
+    },
+    rehabilitation: {
+      label: 'Реабилитационная процедура',
+      ok: 'В списке КГД с реабилитационной процедурой не числится',
+      bad: since =>
+        `Числится в списке КГД: вступило в силу решение суда о реабилитационной процедуре${since ? `, с ${since}` : ''}`,
+      terminated: 'Реабилитационная процедура прекращена определением суда (список КГД)',
+      unknown: 'Не удалось проверить. Это не значит, что процедуры нет',
+      note: 'Список должников КГД, обновляется раз в сутки, это не справка',
     },
     permits: {
       label: 'Лицензии и разрешения',
@@ -366,6 +388,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourceLink: 'ҚР Әділет министрлігінің ашық деректері, data.egov.kz',
       manualLink: 'aisoip.adilet.gov.kz сайтында қолмен тексеру (капча керек)',
     },
+    rehabilitation: {
+      label: 'Оңалту рәсімі',
+      ok: 'МКК тізімінде оңалту рәсімі бойынша тұрмайды',
+      bad: since =>
+        `МКК тізімінде тұр: оңалту рәсімі туралы сот шешімі заңды күшіне енген${since ? `, ${since} бастап` : ''}`,
+      terminated: 'Оңалту рәсімі сот ұйғарымымен тоқтатылған (МКК тізімі)',
+      unknown: 'Тексеру мүмкін болмады. Бұл рәсім жоқ дегенді білдірмейді',
+      note: 'МКК борышкерлер тізімі, тәулігіне бір рет жаңартылады, бұл анықтама емес',
+    },
     permits: {
       label: 'Лицензиялар және рұқсаттар',
       text: 'Автоматты түрде тексермейміз: тізілімнің ашық API-і жоқ, ал іздеу капчамен жабылған. БСН-і қойылған іздеуді ашыңыз.',
@@ -520,6 +551,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourcePrefix: 'Source: ',
       sourceLink: 'Ministry of Justice open data, data.egov.kz',
       manualLink: 'Check manually at aisoip.adilet.gov.kz (captcha required)',
+    },
+    rehabilitation: {
+      label: 'Rehabilitation procedure',
+      ok: 'Not in the KGD list of rehabilitation procedures',
+      bad: since =>
+        `Listed by KGD: a court decision on a rehabilitation procedure has come into force${since ? `, since ${since}` : ''}`,
+      terminated: 'The rehabilitation procedure was terminated by a court ruling (KGD list)',
+      unknown: 'Could not be checked. This does not mean there is no procedure',
+      note: 'KGD debtors list, updated once a day, not an official certificate',
     },
     permits: {
       label: 'Licences and permits',

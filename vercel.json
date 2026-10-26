@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/car-report",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/kgd-rehabilitation",
+      "schedule": "0 2 * * *"
     }
   ]
 }

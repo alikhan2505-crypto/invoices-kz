@@ -128,9 +128,18 @@ describe('утверждения о покрытии соответствуют 
     // У лицензий нет «ok»/«bad»: состояния «проверено, чисто» быть не может, только ссылка.
     expect(Object.keys(t.permits).sort()).toEqual(['label', 'link', 'text'])
     const text = JSON.stringify(Object.keys(t)).toLowerCase()
-    for (const word of ['fine', 'court', 'rehab', 'falsedeal']) {
+    for (const word of ['fine', 'court', 'falsedeal']) {
       expect(text, word).not.toContain(word)
     }
+  })
+
+  it('реабилитация (26.10.2026) спит: ключ в словаре есть, но строка рисуется только при наличии поля rehabilitation в ответе', () => {
+    // Пока основатель не применил supabase/migrations/kgd_rehabilitation_debtors.sql, API не отдаёт поле
+    // и тексты «реабилитацию не проверяет» в гайде верны. При включении их надо поменять (см. отчёт задачи).
+    const tool = readFileSync(join(root, 'src/app/tools/kontragent/KontragentTool.tsx'), 'utf8')
+    expect(tool).toContain('c.rehabilitation !== undefined')
+    const lib = readFileSync(join(root, 'src/lib/kgdRehabilitation.ts'), 'utf8')
+    expect(lib).toContain('isMissingRehabTable(fresh.error)')
   })
 
   it('у всех проверок с результатом есть третье состояние «не удалось проверить» на всех языках', () => {

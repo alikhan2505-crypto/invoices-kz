@@ -1,5 +1,6 @@
 import { parseVatStatus, KGD_VAT_URL, type TaxRegime, type UnreliableCategory } from './kgdTaxpayer'
 import type { EnforcementResult } from './aisoip'
+import type { RehabilitationResult } from './kgdRehabilitation'
 
 // Looking a counterparty up by БИН, so it does not have to be typed.
 //
@@ -59,6 +60,12 @@ export interface BinLookupResult {
   taxRegimes?: TaxRegime[] | null
   /** Enforcement proceedings, Минюст via data.egov.kz. null = could not check. */
   enforcement?: EnforcementResult | null
+  /**
+   * Реабилитационная процедура по суточной выгрузке списка КГД (26.10.2026).
+   * undefined = проверка не включена (таблицы нет): строку не показываем.
+   * null = не проверили (выгрузка пуста или старше трёх суток, сбой): НЕ «чисто».
+   */
+  rehabilitation?: RehabilitationResult | null
 }
 
 /** One row of the gbd_ul dataset, as the API returns it. */

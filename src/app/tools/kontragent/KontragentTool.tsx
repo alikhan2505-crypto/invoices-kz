@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import type { TaxRegime, UnreliableCategory } from '@/lib/kgdTaxpayer'
+import type { RehabilitationResult } from '@/lib/kgdRehabilitation'
 import { AISOIP_DATASET_URL, AISOIP_MANUAL_URL, isIndividualId, type EnforcementResult } from '@/lib/aisoip'
 import { elicenseSearchUrl, taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -48,6 +49,8 @@ interface PublicCompany {
   unreliableCategories?: UnreliableCategory[] | null
   taxRegimes?: TaxRegime[] | null
   enforcement?: EnforcementResult | null
+  /** Нет поля = проверка не включена (строку не рисуем). null = не удалось проверить. */
+  rehabilitation?: RehabilitationResult | null
   hasFullCard: boolean
 }
 
@@ -294,6 +297,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
               ? taxRegimesText(regimes, lang, formatIsoDate, { since: t.regime.since, until: t.regime.until })
               : ''
             const enf = c.enforcement ?? null
+            const rehab = c.rehabilitation ?? null
             const enfAmount = enf && enf.totalAmount > 0 ? formatTenge(enf.totalAmount) : null
             return (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}
@@ -360,6 +364,18 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                   >
                     {regimes && regimes.some(r => !r.beginDate) && <Detail>{t.regime.datesNote}</Detail>}
                   </Verdict>
+                  {c.rehabilitation !== undefined && (
+                    <Verdict
+                      ok={rehab ? rehab.state !== 'listed' : null}
+                      tone={rehab?.state === 'terminated' ? 'info' : undefined}
+                      label={t.rehabilitation.label}
+                      okText={rehab?.state === 'terminated' ? t.rehabilitation.terminated : t.rehabilitation.ok}
+                      badText={t.rehabilitation.bad(rehab ? formatIsoDate(rehab.since ?? null) : null)}
+                      unknownText={t.rehabilitation.unknown}
+                    >
+                      {rehab && <Detail>{t.rehabilitation.note}</Detail>}
+                    </Verdict>
+                  )}
                   <Verdict
                     ok={enf ? !enf.found : null}
                     label={t.enforcement.label}

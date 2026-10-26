@@ -13,7 +13,7 @@ export type BinLookupState = {
   company?: BinLookupResult
 }
 
-type ExtraFields = Pick<BinLookupResult, 'unreliableCategories' | 'taxRegimes' | 'enforcement'>
+type ExtraFields = Pick<BinLookupResult, 'unreliableCategories' | 'taxRegimes' | 'enforcement' | 'rehabilitation'>
 
 /**
  * `extras: true` (only /create shows risks): after the name comes back, a second
@@ -52,6 +52,9 @@ export function useBinLookup({ extras = false }: { extras?: boolean } = {}) {
         unreliableCategories: data.company.unreliableCategories ?? null,
         taxRegimes: data.company.taxRegimes ?? null,
         enforcement: data.company.enforcement ?? null,
+        // Нет поля = проверка не включена (строку не показываем), null = не проверили.
+        // Поэтому здесь НЕТ «?? null»: undefined должен остаться undefined.
+        rehabilitation: data.company.rehabilitation,
       }
       // The user may have moved on to another БИН while this was running.
       if (lastRequested.current !== digits) return

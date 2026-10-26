@@ -1451,6 +1451,15 @@ export default function CreateInvoicePage() {
                                   </a>
                                 </div>
                               )}
+                              {/* Реабилитация (список КГД): красная строка только при
+                                  «числится». «Нет в списке», «прекращена» и «не проверили»
+                                  молчат: на этой карточке не добавляем шум, а null
+                                  не должен читаться как «чисто». */}
+                              {c.rehabilitation?.state === 'listed' && (
+                                <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>
+                                  {t.binLookupRehabilitation(c.rehabilitation.since ? formatDateSafe(c.rehabilitation.since, lang) : null)}
+                                </div>
+                              )}
                               {c.taxRegimes && c.taxRegimes.length > 0 && (
                                 <div style={{ color: 'var(--nav-text-secondary)' }}>
                                   {t.binLookupRegime(taxRegimesText(

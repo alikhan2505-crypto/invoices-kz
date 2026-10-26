@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { performBinLookup } from '@/lib/binLookupServer'
+import { publicRehabilitation } from '@/lib/kgdRehabilitation'
 import { almatyQuarter, clientIp, readCounter, registryLoadToday, REGISTRY_DAILY_GLOBAL, sha256Hex, writeCounter } from '@/lib/toolQuota'
 
 const supabase = createClient(
@@ -103,6 +104,10 @@ export async function POST(req: NextRequest) {
             earliestStart: c.enforcement.earliestStart,
           }
         : null,
+      // Реабилитация (26.10.2026): только state/since/region после проверки формы.
+      // undefined (таблицы нет, фича спит) в JSON пропадает: клиент не рисует строку.
+      // null = «не удалось проверить» и остаётся null, не «чисто».
+      rehabilitation: publicRehabilitation(c.rehabilitation),
       hasFullCard: Boolean(c.address || c.director || c.activity),
     },
   })

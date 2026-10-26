@@ -19,6 +19,7 @@ import {
   type UnreliableCategory,
 } from '@/lib/kgdTaxpayer'
 import { fetchUnreliableDetail, fetchTaxRegime, fetchEnforcement } from '@/lib/binExtraChecks'
+import { fetchRehabilitation } from '@/lib/kgdRehabilitation'
 
 // A registry row is re-fetched after this. Companies get renamed, liquidated
 // and registered for VAT, and a stale name printed on an invoice is worse
@@ -171,9 +172,13 @@ export type BinLookupOutcome = { found: false; unavailable?: boolean } | { found
  * должников Минюста. Спрашиваются каждый раз заново, параллельно и независимо:
  * сбой одного даёт null в своём поле и не трогает остальные.
  */
-async function checkExtras(bin: string) {
-  const [taxRegimes, enforcement] = await Promise.all([fetchTaxRegime(bin), fetchEnforcement(bin)])
-  return { taxRegimes, enforcement }
+async function checkExtras(supabase: SupabaseClient, bin: string) {
+  // Реабилитация (26.10.2026): чтение одной строки суточной выгрузки КГД из нашей
+  // базы, без сети. undefined = таблицы нет, фича спит; null = не проверили.
+  const [taxRegimes, enforcement, rehabilitation] = await Promise.all([
+    fetchTaxRegime(bin), fetchEnforcement(bin), fetchRehabilitation(supabase, bin),
+  ])
+  return { taxRegimes, enforcement, rehabilitation }
 }
 
 export interface PerformBinLookupOptions {
@@ -265,11 +270,12 @@ export async function performBinLookup(
       // (дозаполнение дыры), категории у него есть.
       const needCategories = company.isUnreliable === true && company.unreliableCategories === undefined
       const [extra, detail] = await Promise.all([
-        checkExtras(bin),
+        checkExtras(supabase, bin),
         needCategories ? fetchUnreliableDetail(bin) : Promise.resolve(undefined),
       ])
       company.taxRegimes = extra.taxRegimes
       company.enforcement = extra.enforcement
+      company.rehabilitation = extra.rehabilitation
       if (company.isUnreliable === false) company.unreliableCategories = []
       else if (needCategories) company.unreliableCategories = detail ? detail.categories : null
       else if (company.unreliableCategories === undefined) company.unreliableCategories = null
@@ -295,7 +301,7 @@ export async function performBinLookup(
     checkRisk(bin),
     // Режим и реестр должников не зависят от результата рисков; категории
     // неблагонадёжных уже пришли вместе с рисками, второй раз не спрашиваем.
-    options.extras ? checkExtras(bin) : Promise.resolve(null),
+    options.extras ? checkExtras(supabase, bin) : Promise.resolve(null),
   ])
   if (vat) {
     company.isVatPayer = vat.isVatPayer
@@ -309,6 +315,7 @@ export async function performBinLookup(
     company.unreliableCategories = risk.unreliable === false ? [] : risk.unreliableCategories
     company.taxRegimes = extra.taxRegimes
     company.enforcement = extra.enforcement
+    company.rehabilitation = extra.rehabilitation
   }
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({

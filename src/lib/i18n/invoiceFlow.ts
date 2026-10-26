@@ -23,6 +23,8 @@ export interface InvoiceFlowContent {
   /** Реестр должников Минюста (открытые данные): только факт и число записей. */
   binLookupEnforcement: (records: string, active: string) => string
   binLookupEnforcementSource: string
+  /** Реабилитационная процедура (список КГД): показывается только когда числится в списке. since = дата или null. */
+  binLookupRehabilitation: (since: string | null) => string
   /** Налоговый режим из КГД, например «Упрощённая декларация с 01.01.2026». */
   binLookupRegime: (regime: string) => string
   binLookupRegimeSince: (date: string) => string
@@ -271,6 +273,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupUnreliableReason: (reasons: string) => `Причина в списке КГД: ${reasons}`,
     binLookupEnforcement: (records: string, active: string) => `В реестре должников Минюста (открытые данные) есть записи об исполнительных производствах: ${records}, из них без даты окончания: ${active}`,
     binLookupEnforcementSource: 'Источник: данные Минюста РК, data.egov.kz',
+    binLookupRehabilitation: (since: string | null) => `Числится в списке КГД с реабилитационной процедурой${since ? ` (с ${since})` : ''}`,
     binLookupRegime: (regime: string) => `Налоговый режим: ${regime}`,
     binLookupRegimeSince: (date: string) => `с ${date}`,
     binLookupRegimeUntil: (date: string) => `по ${date}`,
@@ -523,6 +526,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupUnreliableReason: (reasons: string) => `МКК тізіміндегі себебі: ${reasons}`,
     binLookupEnforcement: (records: string, active: string) => `Әділет министрлігінің борышкерлер тізілімінде (ашық деректер) атқарушылық өндіріс жазбалары бар: ${records}, оның ішінде аяқталу күні жоқ: ${active}`,
     binLookupEnforcementSource: 'Дереккөз: ҚР Әділет министрлігінің деректері, data.egov.kz',
+    binLookupRehabilitation: (since: string | null) => `МКК тізімінде оңалту рәсімімен тұр${since ? ` (${since} бастап)` : ''}`,
     binLookupRegime: (regime: string) => `Салық режимі: ${regime}`,
     binLookupRegimeSince: (date: string) => `${date} бастап`,
     binLookupRegimeUntil: (date: string) => `${date} дейін`,
@@ -774,6 +778,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupUnreliableReason: (reasons: string) => `Reason on the KGD list: ${reasons}`,
     binLookupEnforcement: (records: string, active: string) => `The Ministry of Justice debtors register (open data) has enforcement records: ${records}, of them without an end date: ${active}`,
     binLookupEnforcementSource: 'Source: Ministry of Justice data, data.egov.kz',
+    binLookupRehabilitation: (since: string | null) => `Listed by KGD as under a rehabilitation procedure${since ? ` (since ${since})` : ''}`,
     binLookupRegime: (regime: string) => `Tax regime: ${regime}`,
     binLookupRegimeSince: (date: string) => `since ${date}`,
     binLookupRegimeUntil: (date: string) => `until ${date}`,

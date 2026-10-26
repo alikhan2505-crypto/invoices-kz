@@ -69,6 +69,28 @@ describe('POST /api/tools/kontragent', () => {
     expect(h.writeCounter.mock.calls[0][2]).toBe(2)
   })
 
+  it('rehabilitation: only state/since/region reach the public response', async () => {
+    h.lookup.mockResolvedValue({
+      found: true,
+      company: { ...company, rehabilitation: { state: 'listed', since: '2024-06-07', region: 'город Астана', name: 'ТОО Секрет', identifier: '123456789012' } },
+    })
+    const body = await (await POST(req('123456789012'))).json()
+    expect(body.company.rehabilitation).toEqual({ state: 'listed', since: '2024-06-07', region: 'город Астана' })
+    expect(JSON.stringify(body)).not.toContain('Секрет')
+  })
+
+  it('rehabilitation: null (not checked) stays null in the response, never becomes a clean answer', async () => {
+    h.lookup.mockResolvedValue({ found: true, company: { ...company, rehabilitation: null } })
+    const body = await (await POST(req('123456789012'))).json()
+    expect(body.company).toHaveProperty('rehabilitation', null)
+  })
+
+  it('rehabilitation: undefined (feature asleep) leaves the field out entirely', async () => {
+    h.lookup.mockResolvedValue({ found: true, company })
+    const body = await (await POST(req('123456789012'))).json()
+    expect(body.company).not.toHaveProperty('rehabilitation')
+  })
+
   it('not found: answers found:false and still charges the attempt', async () => {
     h.lookup.mockResolvedValue({ found: false })
     const res = await POST(req('123456789012'))

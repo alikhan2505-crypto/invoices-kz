@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { performBinLookup } from '@/lib/binLookupServer'
+import { publicRehabilitation } from '@/lib/kgdRehabilitation'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,5 +44,10 @@ export async function GET(req: NextRequest) {
   const extras = req.nextUrl.searchParams.get('extras') === '1'
   const result = await performBinLookup(supabase, bin, { extras })
   if (!result.found) return NextResponse.json({ found: false })
-  return NextResponse.json({ found: true, company: result.company })
+  // Реабилитация отдаётся только в виде проверенного среза (state/since/region);
+  // undefined (фича спит) не попадает в JSON вовсе.
+  return NextResponse.json({
+    found: true,
+    company: { ...result.company, rehabilitation: publicRehabilitation(result.company.rehabilitation) },
+  })
 }
