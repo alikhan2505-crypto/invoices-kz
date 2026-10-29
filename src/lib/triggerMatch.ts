@@ -44,11 +44,20 @@ function atWordStart(lowerText: string, word: string): boolean {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(word.toLowerCase())}`, 'u').test(lowerText)
 }
 
+// Служебные маркеры строк-настроек («@comment_ack», «@attachment» и т.п., см.
+// src/lib/aiAgent/instagramSpecialTemplates.ts) начинаются с «@». Текстовый
+// матчер на них не срабатывает НИКОГДА: клиент не должен вызвать настройку,
+// написав её название. (В боевой базе триггеров с «@» на 29.10.2026 нет.)
+export function isSpecialTrigger(trigger: unknown): boolean {
+  return typeof trigger === 'string' && trigger.trim().startsWith('@')
+}
+
 // lowerText -- уже приведённый к нижнему регистру текст сообщения клиента.
 export function triggerMatches(lowerText: string, trigger: string): boolean {
   if (typeof trigger !== 'string') return false
   const trimmed = trigger.trim()
   if (trimmed === '') return false
+  if (trimmed.startsWith('@')) return false
   if (trimmed.startsWith('=')) {
     const word = trimmed.slice(1).trim().toLowerCase()
     if (word === '') return false

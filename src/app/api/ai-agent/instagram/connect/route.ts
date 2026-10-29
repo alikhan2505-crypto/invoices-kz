@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createOAuthState } from '@/lib/aiAgent/oauthState'
 import { getActivePlan } from '@/lib/plan'
+import { ownerHasCommentsScope } from '@/lib/aiAgent/instagramScopes'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,9 +80,12 @@ export async function GET(req: NextRequest) {
   // Customers never get it: they do not publish to our feed, and asking for a
   // permission they have no use for would only widen their consent screen.
   const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
-  const scopes = profile?.is_admin
-    ? 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish'
-    : 'instagram_business_basic,instagram_business_manage_messages'
+  // Права собираются из двух независимых условий (при нынешнем false поведение
+  // то же, что и раньше: админ получает все четыре, клиент -- два).
+  const scopeList = ['instagram_business_basic', 'instagram_business_manage_messages']
+  if (ownerHasCommentsScope(!!profile?.is_admin)) scopeList.push('instagram_business_manage_comments')
+  if (profile?.is_admin) scopeList.push('instagram_business_content_publish')
+  const scopes = scopeList.join(',')
   // force_reauth makes the app user authorise from scratch even when Instagram
   // already has them logged in. Without it, an account that connected before
   // gets the short "you already connected invoices.kz-IG, continue?" screen,

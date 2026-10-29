@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
-import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, InstagramApiError } from '@/lib/instagram'
+import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, sendPrivateReply, InstagramApiError } from '@/lib/instagram'
 import { pickProductPhoto } from './productPhoto'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildCollectFieldsToExtract } from './promptContext'
@@ -24,6 +24,12 @@ import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
 import { agentCanReply, agentReplyState, storesInboundOnly } from './planGate'
 import { handleInboundWithoutReply } from './lapsedInbound'
+import {
+  planCommentReply, runCommentCodeword, findCommentDefaultText, findSpecialTemplate, attachmentRuleFromRows,
+  commentDefaultAllowed, COMMENT_DEFAULT_PER_AUTHOR_MS,
+  SPECIAL_TRIGGERS, type TemplateRow, type AttachmentRule,
+} from './instagramSpecialTemplates'
+import { ownerHasCommentsScope } from './instagramScopes'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,6 +93,84 @@ export async function loadTenantConnection(externalAccountId: string): Promise<T
   }
 }
 
+// Подключение Instagram по id агента -- для админ-маршрута «готовых вопросов»
+// (там известен агент, а не id аккаунта из вебхука).
+export async function loadTenantConnectionByAgentId(agentId: string): Promise<TenantConnection | null> {
+  const { data } = await supabase
+    .from('ai_agent_channel_connections')
+    .select('id, agent_id, external_account_id, access_token_enc')
+    .eq('channel', 'instagram')
+    .eq('agent_id', agentId)
+    .eq('status', 'active')
+    .maybeSingle()
+  if (!data) return null
+  return {
+    connectionId: data.id,
+    agentId: data.agent_id,
+    externalAccountId: data.external_account_id,
+    accessToken: decryptAtRest(data.access_token_enc, getKey()).toString('utf8'),
+  }
+}
+
+// Настройка агента «меню на вложение без текста» (особая строка @attachment,
+// см. instagramSpecialTemplates.ts). Вызывается маршрутом вебхука только для
+// сообщения с вложением и без текста. Ошибка чтения = «не настроено»: тогда
+// маршрут ведёт себя ровно как раньше.
+export async function loadAttachmentRule(agentId: string): Promise<AttachmentRule> {
+  const { data, error } = await supabase
+    .from('ai_agent_reply_templates')
+    .select('id, trigger_words, reply_text, channel')
+    .eq('agent_id', agentId)
+    .or('channel.is.null,channel.eq.dm')
+    .order('created_at', { ascending: true })
+  if (error || !data) return { enabled: false, images: false, text: null }
+  return attachmentRuleFromRows(data as TemplateRow[])
+}
+
+// Нажатие «готового вопроса» Instagram может прийти и как postback, и как
+// обычное сообщение (в документации Meta в списке событий messages упомянут
+// выбор Icebreaker). Строки журнала от postback имеют external_id «pb:...».
+// Окно 20 секунд; без нажатий «готовых вопросов» таких строк нет и защита
+// ничего не меняет.
+const ICE_ECHO_WINDOW_MS = 20_000
+async function isIceBreakerEcho(conversationId: string, params: { fromPostback?: boolean; loggedText?: string; incomingText: string }): Promise<boolean> {
+  const since = new Date(Date.now() - ICE_ECHO_WINDOW_MS).toISOString()
+  if (params.fromPostback) {
+    const texts = Array.from(new Set([params.loggedText, params.incomingText].filter((t): t is string => !!t)))
+    const { data } = await supabase.from('ai_agent_messages').select('id')
+      .eq('conversation_id', conversationId).eq('direction', 'inbound')
+      .in('text', texts).not('external_id', 'like', 'pb:%').gte('created_at', since).limit(1)
+    return !!(data && data.length > 0)
+  }
+  const { data } = await supabase.from('ai_agent_messages').select('id')
+    .eq('conversation_id', conversationId).eq('direction', 'inbound')
+    .eq('text', params.incomingText).like('external_id', 'pb:%').gte('created_at', since).limit(1)
+  return !!(data && data.length > 0)
+}
+
+// Можно ли сейчас публично ответить меню @comment_default: не ответ в ветке,
+// есть буквы/цифры, нет недавнего такого же ответа этому автору и не выбран
+// часовой лимит аккаунта. Ошибка чтения журнала = «нельзя» (лучше промолчать,
+// чем повторять одинаковый публичный текст).
+async function commentDefaultAllowedNow(agentId: string, defaultText: string, params: { isReply?: boolean; incomingText: string; fromUsername: string }): Promise<boolean> {
+  if (params.isReply) return false
+  const since = new Date(Date.now() - COMMENT_DEFAULT_PER_AUTHOR_MS).toISOString()
+  const { data, error } = await supabase
+    .from('ai_agent_messages')
+    .select('created_at, ai_agent_conversations!inner(agent_id, customer_handle)')
+    .eq('direction', 'outbound')
+    .eq('text', defaultText)
+    .eq('ai_agent_conversations.agent_id', agentId)
+    .gte('created_at', since)
+    .limit(100)
+  if (error) return false
+  const recent = (data || []).map((r: any) => ({
+    handle: (Array.isArray(r.ai_agent_conversations) ? r.ai_agent_conversations[0] : r.ai_agent_conversations)?.customer_handle ?? null,
+    createdAt: r.created_at as string,
+  }))
+  return commentDefaultAllowed({ isReply: false, text: params.incomingText, handle: params.fromUsername, recent })
+}
+
 interface TenantIncomingParams {
   source: 'comment' | 'dm'
   externalId: string
@@ -98,6 +182,21 @@ interface TenantIncomingParams {
   // set for source: 'comment' (a comment can't carry an attachment from the
   // commenter).
   media?: { kind: 'image'; base64: string; mediaType: string }
+  // Что писать в журнал входящих, если оно отличается от текста для конвейера
+  // (нажатие «готового вопроса»: в журнале подпись кнопки, в конвейер идёт
+  // payload-слово).
+  loggedText?: string
+  // DM только с вложением, без текста (пересланный рилс/пост/сторис, share,
+  // видео, файл; фото -- только если в строке @attachment есть
+  // @attachment_image). Отвечает меню из строки @attachment агента.
+  attachmentOnly?: boolean
+  // source: 'comment' -- комментарий является ответом в ветке под чужим
+  // комментарием (value.parent_id). Публичное меню @comment_default на такие
+  // не отправляется.
+  isReply?: boolean
+  // Нажатие «готового вопроса» (вебхук messaging_postbacks): защита от двойного
+  // ответа, если Meta пришлёт ещё и обычное сообщение.
+  fromPostback?: boolean
 }
 
 export async function handleTenantIncoming(conn: TenantConnection, params: TenantIncomingParams): Promise<void> {
@@ -126,7 +225,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (storesInboundOnly(replyState)) {
     await handleInboundWithoutReply(supabase, replyState, agent, {
       agentId: conn.agentId, channel: 'instagram', externalThreadId: params.replyTarget,
-      customerHandle: params.fromUsername, text: params.incomingText, externalId: params.externalId,
+      customerHandle: params.fromUsername, text: params.loggedText ?? params.incomingText, externalId: params.externalId,
       source: params.source,
     })
     return
@@ -155,6 +254,8 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     .single()
   if (!conversation) return
 
+  if (params.source === 'dm' && await isIceBreakerEcho(conversation.id, params)) return
+
   // Instagram has no /start-equivalent command -- a DM start-flow fires on
   // the customer's very first-ever message instead. Comments never trigger
   // this (no interactive-button mechanism exists for a comment reply).
@@ -179,7 +280,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   const { error: insertError } = await supabase.from('ai_agent_messages').insert({
     conversation_id: conversation.id,
     direction: 'inbound',
-    text: params.incomingText,
+    text: params.loggedText ?? params.incomingText,
     external_id: params.externalId,
   })
   if (insertError) {
@@ -249,15 +350,87 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // Template match first -- skipped entirely for a photo message, same
   // reasoning as the WhatsApp/Telegram tenant paths. Same channel-scoping
   // rule as instagram_reply_templates otherwise.
+  //
+  // Для комментария шаблоны ВСЕХ каналов читаются одним запросом: те же
+  // `channel is null / comment` идут в обычное сопоставление (результат тот
+  // же, что давал фильтр .or(...)), а DM-шаблоны нужны только режиму «кодовое
+  // слово в комментарии» (строка @comment_ack, см. instagramSpecialTemplates.ts).
+  // Без особых строк у агента поведение прежнее.
   let match: { id: string; reply_text: string } | null = null
+  let templates: TemplateRow[] = []
+  let allTemplates: TemplateRow[] = []
   if (!params.media) {
-    const { data: templates } = await supabase
-      .from('ai_agent_reply_templates')
-      .select('id, trigger_words, reply_text')
-      .eq('agent_id', conn.agentId)
-      .or(`channel.is.null,channel.eq.${params.source}`)
-      .order('created_at', { ascending: true })
-    match = findTemplateMatch(params.incomingText, templates || [])
+    if (params.source === 'comment') {
+      const { data: rows } = await supabase
+        .from('ai_agent_reply_templates')
+        .select('id, trigger_words, reply_text, channel')
+        .eq('agent_id', conn.agentId)
+        .order('created_at', { ascending: true })
+      allTemplates = (rows || []) as TemplateRow[]
+      templates = allTemplates.filter(t => t.channel == null || t.channel === 'comment')
+    } else {
+      const { data: rows } = await supabase
+        .from('ai_agent_reply_templates')
+        .select('id, trigger_words, reply_text, channel')
+        .eq('agent_id', conn.agentId)
+        .or(`channel.is.null,channel.eq.${params.source}`)
+        .order('created_at', { ascending: true })
+      templates = (rows || []) as TemplateRow[]
+    }
+
+    // Вложение без текста: меню слов вместо «не умею» (строка @attachment).
+    if (params.attachmentOnly) {
+      const menu = findSpecialTemplate(templates, SPECIAL_TRIGGERS.attachment)
+      const menuText = menu?.reply_text?.trim() || UNSUPPORTED_MEDIA_REPLY_TEXT
+      try {
+        await sendDirectMessage(params.replyTarget, menuText, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+        await supabase.from('ai_agent_messages').insert({
+          conversation_id: conversation.id, direction: 'outbound', text: menuText, is_ai_generated: false, status: 'sent',
+        })
+      } catch (err: any) {
+        console.error('ai-agent webhook: attachment menu send failed for', params.externalId, ':', err.message)
+        await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+      }
+      return
+    }
+
+    // Кодовое слово в комментарии: ссылка в директ (Private Reply) + короткий
+    // публичный ответ. Только если у агента есть строка @comment_ack.
+    if (params.source === 'comment') {
+      let plan = planCommentReply(allTemplates, params.incomingText)
+      // Private Reply требует права manage_comments, а оно выдаётся только
+      // подключениям владельцев-админов (instagramScopes.ts). У остальных режим
+      // не включается: комментарий идёт обычным путём, как до @comment_ack.
+      if (plan.kind === 'codeword') {
+        const { data: ownerProfile } = await supabase.from('profiles').select('is_admin').eq('id', agent.user_id).maybeSingle()
+        if (!ownerHasCommentsScope(!!ownerProfile?.is_admin)) plan = { kind: 'none' }
+      }
+      if (plan.kind === 'codeword') {
+        const fallbackDefault = findCommentDefaultText(allTemplates)
+        const fallbackOk = fallbackDefault ? await commentDefaultAllowedNow(conn.agentId, fallbackDefault, params) : false
+        await runCommentCodeword(plan, {
+          sendPrivate: text => sendPrivateReply(params.replyTarget, text, { igUserId: conn.externalAccountId, accessToken: conn.accessToken }),
+          replyPublic: text => replyToComment(params.replyTarget, text, { accessToken: conn.accessToken }),
+          logOutbound: async (text, kind) => {
+            await supabase.from('ai_agent_messages').insert({
+              conversation_id: conversation.id,
+              direction: 'outbound',
+              text: kind === 'private' ? `[в личные сообщения] ${text}` : text,
+              is_ai_generated: false,
+              status: 'sent',
+            })
+          },
+          onError: async (stage, err: any) => {
+            console.error(`ai-agent webhook: comment codeword ${stage} reply failed for`, params.externalId, ':', err?.message || err)
+            await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+          },
+          fallbackPublicText: fallbackOk ? fallbackDefault : null,
+        })
+        return
+      }
+    }
+
+    match = findTemplateMatch(params.incomingText, templates)
   }
 
   if (match) {
@@ -279,6 +452,27 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       await markTokenExpiredIfUnauthorized(conn.connectionId, err)
     }
     return
+  }
+
+  // Прочий комментарий: настроенный шаблон-меню вместо свободного ИИ-ответа
+  // (строка @comment_default). Без неё -- ИИ, как раньше.
+  if (params.source === 'comment') {
+    const defaultText = findCommentDefaultText(allTemplates)
+    if (defaultText) {
+      // Агент включил меню вместо ИИ: если защита от спама (см.
+      // commentDefaultAllowed) запрещает ответ, молчим, а не зовём платный ИИ.
+      if (!(await commentDefaultAllowedNow(conn.agentId, defaultText, params))) return
+      try {
+        await replyToComment(params.replyTarget, defaultText, { accessToken: conn.accessToken })
+        await supabase.from('ai_agent_messages').insert({
+          conversation_id: conversation.id, direction: 'outbound', text: defaultText, is_ai_generated: false, status: 'sent',
+        })
+      } catch (err: any) {
+        console.error('ai-agent webhook: default comment reply failed for', params.externalId, ':', err.message)
+        await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+      }
+      return
+    }
   }
 
   // No template -- check whether a flow's trigger words match before

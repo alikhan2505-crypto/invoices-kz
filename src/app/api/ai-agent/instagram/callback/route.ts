@@ -93,7 +93,12 @@ export async function GET(req: NextRequest) {
     // subscribed manually before any comment event arrived). Required, not
     // best-effort: an unsubscribed connection looks connected but the agent
     // never hears anything.
-    const subRes = await fetch(`https://graph.instagram.com/v21.0/me/subscribed_apps?subscribed_fields=comments,messages&access_token=${encodeURIComponent(longLivedData.access_token)}`, { method: 'POST' })
+    // messaging_postbacks (нажатия «готовых вопросов») добавляется только когда
+    // основатель выставил IG_SUBSCRIBE_POSTBACKS=1 (после того как поле включено
+    // и на уровне приложения Meta). Без переменной подписка прежняя.
+    // Запрос ЗАМЕНЯЕТ весь список полей, поэтому прежние поля перечислены.
+    const subscribedFields = process.env.IG_SUBSCRIBE_POSTBACKS === '1' ? 'comments,messages,messaging_postbacks' : 'comments,messages'
+    const subRes = await fetch(`https://graph.instagram.com/v21.0/me/subscribed_apps?subscribed_fields=${subscribedFields}&access_token=${encodeURIComponent(longLivedData.access_token)}`, { method: 'POST' })
     const subData = await subRes.json()
     if (!subRes.ok || !subData.success) {
       throw new Error(subData.error?.message || 'failed to subscribe the account to webhooks')
@@ -110,7 +115,7 @@ export async function GET(req: NextRequest) {
     console.log(
       'ai-agent Instagram connected:', meData.username,
       '| granted:', tokenData.permissions ?? '(not reported)',
-      '| subscribed_fields: comments,messages',
+      '| subscribed_fields:', subscribedFields,
     )
 
     // Multi-agent (2026-08-20): the signed state carries the target agent id

@@ -4,7 +4,9 @@ import crypto from 'crypto'
 import { findMatchingTemplate } from '@/lib/instagramReplyMatch'
 import { replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { loadTenantConnection, handleTenantIncoming, handleInstagramFlowButtonClick } from '@/lib/aiAgent/webhookHandler'
+import { loadTenantConnection, handleTenantIncoming, handleInstagramFlowButtonClick, loadAttachmentRule } from '@/lib/aiAgent/webhookHandler'
+import { attachmentMenuApplies } from '@/lib/aiAgent/instagramSpecialTemplates'
+import { postbackToIncoming } from '@/lib/instagramPostback'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, sniffImageMimeType, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
@@ -292,11 +294,34 @@ export async function POST(req: NextRequest) {
           fromUsername: value.from?.username || 'unknown',
           incomingText: value.text,
           replyTarget: value.id,
+          // Ответ в ветке под чужим комментарием (parent_id): публичное меню
+          // @comment_default на такие не отправляется.
+          isReply: !!value.parent_id,
         })
       }
     }
 
     for (const messaging of entry.messaging || []) {
+      // Нажатие «готового вопроса» (Ice Breakers, поле messaging_postbacks):
+      // payload идёт в тот же конвейер DM как входящий текст. Старый
+      // одноаккаунтный бот постбеки не обрабатывает.
+      if (messaging.postback) {
+        if (isLegacyAccount) continue
+        const incoming = postbackToIncoming(messaging)
+        if (incoming) {
+          await handleTenantIncoming(tenantConnection!, {
+            source: 'dm',
+            externalId: incoming.externalId,
+            fromUsername: incoming.senderId,
+            incomingText: incoming.text,
+            loggedText: incoming.loggedText,
+            replyTarget: incoming.senderId,
+            fromPostback: true,
+          })
+        }
+        continue
+      }
+
       const msg = messaging.message
       if (!msg?.mid || msg.is_echo) continue
 
@@ -338,7 +363,26 @@ export async function POST(req: NextRequest) {
       // No text -- check for a photo/audio attachment. Can't reply without
       // a sender id or a fetchable attachment url -- defensive skip.
       const attachment = Array.isArray(msg.attachments) ? msg.attachments[0] : undefined
-      if (!replyTarget || !attachment?.payload?.url) continue
+      if (!replyTarget || !attachment) continue
+
+      // Вложение без адреса для скачивания (часть пересланных постов/сторис):
+      // раньше молча игнорировалось. Теперь отвечает ТОЛЬКО агент с особой
+      // строкой @attachment (меню слов), у остальных всё как было.
+      if (!attachment.payload?.url) {
+        const stateNoUrl = await replyStateOf(tenantConnection!.agentId)
+        if (stateNoUrl !== 'reply') continue
+        const ruleNoUrl = await loadAttachmentRule(tenantConnection!.agentId)
+        if (!attachmentMenuApplies(ruleNoUrl, attachment.type)) continue
+        await handleTenantIncoming(tenantConnection!, {
+          source: 'dm',
+          externalId: msg.mid,
+          fromUsername,
+          incomingText: lapsedPlaceholder(attachment.type),
+          replyTarget,
+          attachmentOnly: true,
+        })
+        continue
+      }
 
       // Состояние агента -- до скачивания вложения, расшифровки голосового
       // (Whisper платный) и заготовки «не понимаю такой формат» (A1).
@@ -354,6 +398,26 @@ export async function POST(req: NextRequest) {
           incomingText: lapsedPlaceholder(attachment.type),
           replyTarget,
         })
+        continue
+      }
+
+      // Меню слов вместо «не умею»/распознавания: только у агента со строкой
+      // @attachment. Фото -- только если там же стоит @attachment_image;
+      // голосовое всегда идёт в расшифровку.
+      const attachmentRule = await loadAttachmentRule(tenantConnection!.agentId)
+      if (attachmentMenuApplies(attachmentRule, attachment.type)) {
+        try {
+          await handleTenantIncoming(tenantConnection!, {
+            source: 'dm',
+            externalId: msg.mid,
+            fromUsername,
+            incomingText: lapsedPlaceholder(attachment.type),
+            replyTarget,
+            attachmentOnly: true,
+          })
+        } catch (err: any) {
+          console.error('instagram webhook: attachment menu failed for', msg.mid, ':', err.message)
+        }
         continue
       }
 

@@ -1,6 +1,7 @@
 import type { FlowStep } from './aiAgent/flow'
 import { loadPublishToken } from './instagramPublishToken'
 import { InstagramPublishError } from './instagramReel'
+import { buildIceBreakersBody } from './instagramIceBreakers'
 
 // "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
 // valid against graph.instagram.com — the classic graph.facebook.com host
@@ -466,4 +467,95 @@ export async function sendInstagramFlowStep(recipientId: string, step: FlowStep,
   if (!res.ok) {
     throw new InstagramApiError(data.error?.message || 'Failed to send flow step', res.status)
   }
+}
+
+// Instagram Private Reply (29.10.2026): ЕДИНСТВЕННОЕ личное сообщение автору
+// комментария, по id комментария (POST /<IG_ID>/messages, recipient.comment_id).
+// Документация Meta (Private Replies): одно сообщение на комментарий, не позже
+// 7 дней после комментария (для Live -- только во время эфира); продолжить
+// диалог можно, только когда человек сам ответит (окно 24 часа). Права при
+// Instagram Login: instagram_business_basic + instagram_business_manage_comments
+// (токен Instagram User). manage_comments выдаётся подключению только владельцу-
+// админу (см. instagramScopes.ts), поэтому режим @comment_ack включается лишь для
+// таких агентов; у остальных вызов упал бы с ошибкой разрешений.
+// Бросает InstagramApiError (status = HTTP-код Meta); вызывающий решает, что
+// говорить публично, если не получилось.
+export async function sendPrivateReply(commentId: string, message: string, credentials: { igUserId: string; accessToken: string }): Promise<void> {
+  const res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { comment_id: commentId },
+      message: { text: message },
+      access_token: credentials.accessToken,
+    }),
+    signal: graphSignal(),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new InstagramApiError(data?.error?.message || 'Failed to send private reply', res.status)
+  }
+}
+
+export interface IceBreakerItem { question: string; payload: string }
+
+// Готовые вопросы (Ice Breakers): POST /<IG_ID>/messenger_profile,
+// platform=instagram, до 4 вопросов; locale не отправляется (в документации
+// Instagram он нужен только для набора на отдельный язык).
+// Нажатие приходит вебхуком messaging_postbacks (postback.payload).
+export async function setInstagramIceBreakers(igUserId: string, accessToken: string, items: IceBreakerItem[]): Promise<void> {
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...buildIceBreakersBody(items), access_token: accessToken }),
+    signal: graphSignal(),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new InstagramApiError(data?.error?.message || 'Failed to set ice breakers', res.status)
+  }
+}
+
+export async function getInstagramIceBreakers(igUserId: string, accessToken: string): Promise<unknown> {
+  const res = await fetch(
+    `${GRAPH_API}/${igUserId}/messenger_profile?fields=ice_breakers&platform=instagram&access_token=${encodeURIComponent(accessToken)}`,
+    { signal: graphSignal() },
+  )
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new InstagramApiError(data?.error?.message || 'Failed to read ice breakers', res.status)
+  }
+  return data
+}
+
+export async function deleteInstagramIceBreakers(igUserId: string, accessToken: string): Promise<void> {
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'], access_token: accessToken }),
+    signal: graphSignal(),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new InstagramApiError(data?.error?.message || 'Failed to delete ice breakers', res.status)
+  }
+}
+
+// Поля вебхука, на которые подписан САМ аккаунт (отдельно от подписки
+// приложения в кабинете Meta). OAuth-колбэк подписывает только comments,messages;
+// для нажатий на «готовые вопросы» нужен ещё messaging_postbacks.
+export async function getInstagramSubscribedFields(accessToken: string): Promise<unknown> {
+  const res = await fetch(`${GRAPH_API}/me/subscribed_apps?access_token=${encodeURIComponent(accessToken)}`, { signal: graphSignal() })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new InstagramApiError(data?.error?.message || 'Failed to read subscribed fields', res.status)
+  return data
+}
+
+export async function setInstagramSubscribedFields(accessToken: string, fields: string[]): Promise<void> {
+  const res = await fetch(
+    `${GRAPH_API}/me/subscribed_apps?subscribed_fields=${encodeURIComponent(fields.join(','))}&access_token=${encodeURIComponent(accessToken)}`,
+    { method: 'POST', signal: graphSignal() },
+  )
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new InstagramApiError(data?.error?.message || 'Failed to set subscribed fields', res.status)
 }
