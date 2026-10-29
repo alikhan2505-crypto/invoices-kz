@@ -6,14 +6,14 @@ const future = '2027-01-01T00:00:00'
 const past = '2026-01-01T00:00:00'
 
 describe('админ-гейт', () => {
-  it('включён по умолчанию, пока основатель не проверил раздел', () => {
-    expect(BIN_WATCH_ADMIN_ONLY).toBe(true)
+  it('снят 30.10.2026: основатель проверил раздел и открыл его всем', () => {
+    expect(BIN_WATCH_ADMIN_ONLY).toBe(false)
   })
-  it('открыт только админу', () => {
+  it('при снятом гейте открыт всем', () => {
     expect(canUseBinWatch(true)).toBe(true)
-    expect(canUseBinWatch(false)).toBe(false)
-    expect(canUseBinWatch(null)).toBe(false)
-    expect(canUseBinWatch(undefined)).toBe(false)
+    expect(canUseBinWatch(false)).toBe(true)
+    expect(canUseBinWatch(null)).toBe(true)
+    expect(canUseBinWatch(undefined)).toBe(true)
   })
 })
 

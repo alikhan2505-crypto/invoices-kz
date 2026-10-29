@@ -12,7 +12,8 @@ import { getActivePlan } from '@/lib/plan'
  * шлёт. Открыть всем = поменять на false ЗДЕСЬ, больше нигде. Тот же приём,
  * что SETUP_WIZARD_ADMIN_ONLY в src/lib/aiAgent/setupWizard.ts.
  */
-export const BIN_WATCH_ADMIN_ONLY = true
+// 30.10.2026: основатель проверил раздел вживую и открыл его всем («открывай, лимиты 5 и 50 подтверждаю»).
+export const BIN_WATCH_ADMIN_ONLY = false
 
 /** Доступна ли функция этому пользователю. Единственная проверка гейта в коде. */
 export function canUseBinWatch(isAdmin: boolean | null | undefined): boolean {
