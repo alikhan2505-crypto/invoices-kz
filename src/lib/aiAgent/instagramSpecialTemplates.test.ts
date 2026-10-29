@@ -230,13 +230,13 @@ describe('postbackToIncoming', () => {
 })
 
 describe('ice breakers: тело запроса', () => {
-  it('набор по умолчанию: ровно 4, формат Meta (locale: 'default' обязателен, иначе «Invalid parameter»)', () => {
+  it('набор по умолчанию: ровно 4, формат Meta (locale default обязателен, иначе Invalid parameter)', () => {
     expect(DEFAULT_ICE_BREAKERS.map(i => i.payload)).toEqual(['КОНТРАГЕНТ', 'СЧЁТ', 'НАЛОГИ', 'ТОВАР'])
     const body = buildIceBreakersBody(DEFAULT_ICE_BREAKERS)
     expect(body.platform).toBe('instagram')
     expect(body.ice_breakers).toHaveLength(1)
     expect(body.ice_breakers[0].locale).toBe('default')
-    expect(Object.keys(body.ice_breakers[0])).toEqual(['call_to_actions'])
+    expect(Object.keys(body.ice_breakers[0])).toEqual(['locale', 'call_to_actions'])
     expect(body.ice_breakers[0].call_to_actions[0]).toEqual({ question: 'Проверить контрагента по БИН', payload: 'КОНТРАГЕНТ' })
     expect(body.ice_breakers[0].call_to_actions).toHaveLength(4)
   })
