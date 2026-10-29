@@ -42,7 +42,7 @@ export interface KontragentDict {
     /** «Причина в списке КГД: ...»; перечень причин собирает binRiskText. */
     reasons: (list: string) => string
   }
-  /** Банкротство по решению суда: берётся из того же списка КГД, реабилитацию не проверяем. */
+  /** Банкротство по решению суда: берётся из того же списка КГД, реабилитация показывается отдельной строкой ниже. */
   bankruptcy: { label: string; ok: string; bad: string; unknown: string }
   liquidation: { label: string; ok: string; bad: string }
   arrear: {
@@ -183,7 +183,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     bankruptcy: {
       label: 'Банкротство',
-      ok: 'Решения суда о банкротстве в списке КГД нет. Реабилитационную процедуру здесь не проверяем',
+      ok: 'Решения суда о банкротстве в списке КГД нет',
       bad: 'Признан банкротом по решению суда (список КГД)',
       unknown: 'Не удалось проверить. Это не значит, что банкротства нет',
     },
@@ -247,7 +247,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     sources:
       'Источники: ГБД «Юридические лица» и реестр должников Минюста (data.egov.kz), сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
     notCheckedNote:
-      'Здесь не проверяются реабилитационная процедура, сделки без фактического выполнения работ, лицензии (даём ссылку на поиск) и суды.',
+      'Здесь не проверяются сделки без фактического выполнения работ, лицензии (даём ссылку на поиск) и суды.',
     notCheckedLink: 'Что ещё можно узнать о компании по БИН и где →',
     guideLink: 'Как проверить контрагента по БИН: пошагово →',
     status: raw => raw,
@@ -347,7 +347,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     bankruptcy: {
       label: 'Банкроттық',
-      ok: 'МКК тізімінде банкроттық туралы сот шешімі жоқ. Оңалту рәсімін мұнда тексермейміз',
+      ok: 'МКК тізімінде банкроттық туралы сот шешімі жоқ',
       bad: 'Сот шешімі бойынша банкрот деп танылған (МКК тізімі)',
       unknown: 'Тексеру мүмкін болмады. Бұл банкроттық жоқ дегенді білдірмейді',
     },
@@ -411,7 +411,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     sources:
       'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы мен Әділет министрлігінің борышкерлер тізілімі (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
     notCheckedNote:
-      'Мұнда оңалту рәсімі, жұмыстар нақты орындалмай жасалған мәмілелер, лицензиялар (іздеуге сілтеме береміз) және сот істері тексерілмейді.',
+      'Мұнда жұмыстар нақты орындалмай жасалған мәмілелер, лицензиялар (іздеуге сілтеме береміз) және сот істері тексерілмейді.',
     notCheckedLink: 'Компания туралы БСН бойынша тағы нені және қайдан білуге болады →',
     guideLink: 'Контрагентті БСН бойынша қалай тексеруге болады: қадам-қадаммен →',
     status: translateStatus('kk'),
@@ -511,7 +511,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     bankruptcy: {
       label: 'Bankruptcy',
-      ok: 'No court bankruptcy decision on the KGD list. Rehabilitation proceedings are not checked here',
+      ok: 'No court bankruptcy decision on the KGD list',
       bad: 'Declared bankrupt by a court (KGD list)',
       unknown: 'Could not be checked. This does not mean there is no bankruptcy',
     },
@@ -575,7 +575,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     sources:
       'Sources: the “Legal Entities” state database and the Ministry of Justice debtors register (data.egov.kz), and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
     notCheckedNote:
-      'This check does not cover rehabilitation proceedings, deals without actual delivery of work, licences (we link to the search) or court cases.',
+      'This check does not cover deals without actual delivery of work, licences (we link to the search) or court cases.',
     notCheckedLink: 'What else you can learn about a company by BIN, and where (in Russian) →',
     guideLink: 'How to check a counterparty by BIN, step by step (in Russian) →',
     status: translateStatus('en'),

@@ -90,8 +90,8 @@ describe('реестры: данные', () => {
     expect(debtors.toolNote.ru).toContain('открытых данных')
     const bankruptcy = BIN_REGISTERS.find(x => x.id === 'bankruptcy')!
     expect(bankruptcy.coverage).toBe('partial')
-    expect(bankruptcy.toolNote.ru).toContain('Реабилитационную процедуру не проверяет')
-    expect(bankruptcy.toolNote.kk).toContain('Оңалту рәсімін тексермейді')
+    expect(bankruptcy.toolNote.ru).toContain('Реабилитационную процедуру проверяет по списку КГД')
+    expect(bankruptcy.toolNote.kk).toContain('Оңалту рәсімін МКК тізімі бойынша тексереді')
   })
 
   it('налоговый режим помечен «Да», но с оговоркой про даты с 1 января 2026 и про «не удалось проверить»', () => {
@@ -133,9 +133,9 @@ describe('утверждения о покрытии соответствуют 
     }
   })
 
-  it('реабилитация (26.10.2026) спит: ключ в словаре есть, но строка рисуется только при наличии поля rehabilitation в ответе', () => {
-    // Пока основатель не применил supabase/migrations/kgd_rehabilitation_debtors.sql, API не отдаёт поле
-    // и тексты «реабилитацию не проверяет» в гайде верны. При включении их надо поменять (см. отчёт задачи).
+  it('реабилитация: строка рисуется только при наличии поля rehabilitation в ответе (без таблицы поле не приходит)', () => {
+    // С 29.10.2026 таблица kgd_rehabilitation_debtors применена и заполнена, тексты гайда и инструмента
+    // говорят, что реабилитацию проверяем. Без таблицы API по-прежнему не отдаёт поле и строка не рисуется.
     const tool = readFileSync(join(root, 'src/app/tools/kontragent/KontragentTool.tsx'), 'utf8')
     expect(tool).toContain('c.rehabilitation !== undefined')
     const lib = readFileSync(join(root, 'src/lib/kgdRehabilitation.ts'), 'utf8')
@@ -351,8 +351,8 @@ describe('запись гайда: качество по реестру', () => 
     expect(kk).toContain('тексермейді')
   })
 
-  it('честность: в резюме сказано, что лицензии, реабилитацию и суды инструмент не проверяет', () => {
-    expect(guide.ru.summary).toContain('лицензии, реабилитацию и суды не проверяет')
+  it('честность: в резюме сказано, что лицензии и суды инструмент не проверяет, а реабилитацию проверяет', () => {
+    expect(guide.ru.summary).toContain('лицензии и суды не проверяет')
     expect(guide.kk.summary).toContain('соттарды тексермейді')
   })
 
