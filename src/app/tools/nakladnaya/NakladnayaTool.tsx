@@ -13,6 +13,11 @@ import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
+import { MorePanel, MoreToggle, useMoreFields } from '@/lib/tools-i18n/ToolMoreFields'
+import RequisitesNote from '@/lib/tools-i18n/RequisitesNote'
+import { hasAnyValue, moreHint } from '@/lib/tools-i18n/moreFields'
+import { applyRequisites, loadRequisites, pickRequisites, type RequisiteKey } from '@/lib/tools-i18n/requisites'
+import { useRequisites } from '@/lib/tools-i18n/useRequisites'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
 import { nakladnayaDict } from './dict'
 import {
@@ -36,6 +41,10 @@ const DRAFT_KEY = 'tool-nakladnaya-draft'
 // обратно — следующий документ отправил бы email вопреки отказу.
 const CONSENT_KEY = 'tool-nakladnaya-consent'
 const VAT_TYPES: VatType[] = ['no_vat', 'vat_16', 'vat_0']
+
+// Реквизиты поставщика, общие для четырёх инструментов (requisites.ts). Телефона в
+// накладной нет, поэтому и из общего ключа он сюда не подставляется.
+const REQ_KEYS: readonly RequisiteKey[] = ['binIin', 'companyName', 'address', 'director', 'email']
 
 // Дата заполняется на клиенте после монтирования: сервер и браузер живут в
 // разных часовых поясах, а модуль на сервере может жить сутками.
@@ -63,6 +72,9 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
   // первый же эффект сохранения затёр бы его пустой формой (в dev React
   // запускает эффекты дважды, и черновик терялся бы).
   const [ready, setReady] = useState(false)
+  const { hasSaved, noteApplied, clear: clearSaved } = useRequisites({
+    tool: 'nakladnaya', lang, ready, picked: pickRequisites(f, REQ_KEYS),
+  })
 
   useEffect(() => {
     try { if (localStorage.getItem(CONSENT_KEY) === '0') setMarketingConsent(false) } catch {}
@@ -71,18 +83,21 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
       const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
       if (raw && typeof raw === 'object' && Array.isArray(raw.rows)) draft = raw
     } catch {}
-    setF(prev => {
-      const next: Form = { ...prev, ...(draft || {}) }
-      // Реквизиты и товары из черновика берём, а вчерашнюю дату — нет: иначе
-      // накладная, сделанная на следующий день, молча печаталась бы прошлым
-      // числом (то же правило, что в /tools/kp). Дата на будущее остаётся.
-      const today = localToday()
-      if (!next.date || next.date < today) next.date = today
-      if (!VAT_TYPES.includes(next.vatType)) next.vatType = 'no_vat'
-      if (next.rows.length === 0) next.rows = EMPTY.rows
-      return next
-    })
+    const next: Form = { ...EMPTY, ...(draft || {}) }
+    // Реквизиты и товары из черновика берём, а вчерашнюю дату — нет: иначе
+    // накладная, сделанная на следующий день, молча печаталась бы прошлым
+    // числом (то же правило, что в /tools/kp). Дата на будущее остаётся.
+    const today = localToday()
+    if (!next.date || next.date < today) next.date = today
+    if (!VAT_TYPES.includes(next.vatType)) next.vatType = 'no_vat'
+    if (next.rows.length === 0) next.rows = EMPTY.rows
+    // Запомненные реквизиты ложатся только в ПУСТЫЕ поля (черновик главнее).
+    const withSaved = applyRequisites(next, loadRequisites(), REQ_KEYS)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setF(withSaved.form)
+    noteApplied(withSaved.applied.length)
     setReady(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
     if (!ready) return
@@ -109,6 +124,11 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
   // Итог — по тем же строкам и той же формуле, что попадут в документ.
   const total = useMemo(() => documentTotal(f.rows), [f.rows])
   const vat = vatIncluded(total, f.vatType)
+
+  // «Дополнительно» (только на телефоне): раскрыты сами, если там уже есть значение.
+  const supplierMore = useMoreFields({ tool: 'nakladnaya', lang, forceOpen: hasAnyValue([f.director, f.address, f.email]) })
+  const docMore = useMoreFields({ tool: 'nakladnaya', lang, forceOpen: !['', '1'].includes(f.number.trim()) })
+  const resetSupplier = () => setF(prev => ({ ...prev, binIin: '', companyName: '', address: '', director: '', email: '' }))
 
   const limitReached = quota !== null && quota.remaining <= 0
   useToolView('nakladnaya', lang)
@@ -207,23 +227,23 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
     background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)',
     color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)',
   } as const
-  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1.5'
+  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1 sm:mb-1.5'
   const labelStyle = { color: 'var(--nav-text-muted)' } as const
   const accentLink = { color: 'var(--nav-accent)' } as const
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
-        <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6">
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="nakladnaya" lang={lang} />
         </div>
 
-        <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl leading-tight sm:leading-snug font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}
         </h1>
-        <div className="mb-6">
-          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+        <div className="mb-3 sm:mb-6">
+          <p className="text-[13px] leading-snug sm:text-sm sm:leading-5" style={{ color: 'var(--nav-text-secondary)' }}>
             {t.intro(DOC_QUOTA_DEFAULT_LIMIT)}
           </p>
           {t.docLangNote && (
@@ -233,45 +253,50 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
           )}
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
+          <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {/* Сначала БИН/ИИН: название подставится само на 12-й цифре (кнопка «Найти» - запасной вариант). */}
             <BinNameField id="nk-bin" tool="nakladnaya" role="seller" lang={lang}
               className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
               label={t.binLabel} placeholder={t.binPlaceholder}
-              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} name={f.companyName} onName={name => set({ companyName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="nk-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="nk-company" className={input} style={inputStyle} placeholder={t.companyPlaceholder} autoComplete="organization" value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
             </div>
-            <div>
-              <label htmlFor="nk-director" className={label} style={labelStyle}>{t.directorLabel}</label>
-              <input id="nk-director" className={input} style={inputStyle} placeholder={t.directorPlaceholder} autoComplete="name" value={f.director} onChange={e => set({ director: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="nk-email" className={label} style={labelStyle}>{t.emailLabel}</label>
-              <input id="nk-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
-              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
-                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
-                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
-              </label>
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="nk-address" className={label} style={labelStyle}>{t.addressLabel}</label>
-              <input id="nk-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
-            </div>
+            <MoreToggle m={supplierMore} lang={lang} className="sm:col-span-2"
+              hint={moreHint([t.directorLabel, t.emailLabel, t.addressLabel])} />
+            <MorePanel m={supplierMore}>
+              <div>
+                <label htmlFor="nk-director" className={label} style={labelStyle}>{t.directorLabel}</label>
+                <input id="nk-director" className={input} style={inputStyle} placeholder={t.directorPlaceholder} autoComplete="name" value={f.director} onChange={e => set({ director: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="nk-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+                <input id="nk-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+                <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                  <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
+                  <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+                </label>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="nk-address" className={label} style={labelStyle}>{t.addressLabel}</label>
+                <input id="nk-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
+              </div>
+            </MorePanel>
+            <RequisitesNote lang={lang} visible={hasSaved} onClear={() => clearSaved(resetSupplier)} />
           </div>
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.recipientTitle}</div>
-          <div className="grid sm:grid-cols-2 gap-3">
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.recipientTitle}</div>
+          <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
             <BinNameField id="nk-client-bin" tool="nakladnaya" role="client" lang={lang}
               className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
               label={t.clientBinLabel} placeholder={t.binPlaceholder}
-              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} name={f.clientName} onName={name => set({ clientName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="nk-client" className={label} style={labelStyle}>{t.clientNameLabel}</label>
@@ -280,23 +305,28 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
           </div>
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.docTitle}</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-            <div>
-              <label htmlFor="nk-number" className={label} style={labelStyle}>{t.numberLabel}</label>
-              <input id="nk-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="nk-date" className={label} style={labelStyle}>{t.dateLabel}</label>
-              <input id="nk-date" type="date" lang={lang} className={input} style={inputStyle} value={f.date} onChange={e => set({ date: e.target.value })} />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3 max-sm:hidden" style={{ color: 'var(--nav-text-primary)' }}>{t.docTitle}</div>
+          {/* На телефоне номер и дата свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня); НДС всегда на виду. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+            <div className="col-span-2 sm:col-span-1 sm:order-1">
               <label htmlFor="nk-vat" className={label} style={labelStyle}>{t.vatLabel}</label>
               <select id="nk-vat" className={input} style={inputStyle} value={f.vatType} onChange={e => set({ vatType: e.target.value as VatType })}>
                 {VAT_TYPES.map(v => <option key={v} value={v}>{t.vatOptions[v]}</option>)}
               </select>
             </div>
+            <MoreToggle m={docMore} lang={lang} className="col-span-2"
+              hint={moreHint([], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} />
+            <MorePanel m={docMore}>
+              <div>
+                <label htmlFor="nk-number" className={label} style={labelStyle}>{t.numberLabel}</label>
+                <input id="nk-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="nk-date" className={label} style={labelStyle}>{t.dateLabel}</label>
+                <input id="nk-date" type="date" lang={lang} className={input} style={inputStyle} value={f.date} onChange={e => set({ date: e.target.value })} />
+              </div>
+            </MorePanel>
           </div>
 
           {f.rows.map((r, i) => (

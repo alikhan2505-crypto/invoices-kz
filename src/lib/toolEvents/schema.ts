@@ -8,7 +8,13 @@
 // или Supabase. Списки совпадают с CHECK-ограничениями таблицы: новое событие
 // или инструмент надо добавить и здесь, и в миграции.
 
-export const TOOL_EVENT_NAMES = ['view', 'doc', 'cta', 'limit', 'lead', 'signup'] as const
+// 29.10.2026: три события формы (автоподстановка по БИН, раскрытие «Дополнительно»,
+// подстановка запомненных реквизитов) - чтобы мерить конверсию view -> doc.
+// Без supabase/migrations/tool_events_form.sql строки с ними не пишутся (204, сбой в логе).
+export const TOOL_EVENT_NAMES = [
+  'view', 'doc', 'cta', 'limit', 'lead', 'signup',
+  'tool_form_autofill_bin', 'tool_form_more_open', 'tool_form_saved_applied',
+] as const
 export type ToolEventName = (typeof TOOL_EVENT_NAMES)[number]
 
 export const TOOL_EVENT_TOOLS = ['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'waybills', 'zarplata'] as const

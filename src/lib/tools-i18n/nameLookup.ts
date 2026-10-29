@@ -14,6 +14,10 @@ export type NameLookupCopy = {
   miss: string
   limit: string
   unavailable: string
+  /** Контрольная цифра БИН/ИИН не сходится: автопоиск не запускали (29.10.2026). */
+  invalid: string
+  /** БИН исправили, а название осталось прежним (введено руками, из черновика или запомненного): автопоиск его не трогает. */
+  stale: string
 }
 
 export const NAME_LOOKUP_TEXT: Record<ToolLang, NameLookupCopy> = {
@@ -24,6 +28,8 @@ export const NAME_LOOKUP_TEXT: Record<ToolLang, NameLookupCopy> = {
     miss: 'По этому БИН/ИИН ничего не нашли — введите название вручную',
     limit: 'Поиск для этого поля на этот квартал исчерпан — введите название вручную',
     unavailable: 'Поиск сейчас недоступен — введите название вручную',
+    invalid: 'Похоже, в БИН/ИИН опечатка. Проверьте цифры или введите название вручную',
+    stale: 'Название осталось прежним. Нажмите «Найти», чтобы подставить его из реестра',
   },
   kk: {
     button: 'Табу',
@@ -32,6 +38,8 @@ export const NAME_LOOKUP_TEXT: Record<ToolLang, NameLookupCopy> = {
     miss: 'Бұл БСН/ЖСН бойынша ештеңе табылмады — атауын қолмен енгізіңіз',
     limit: 'Бұл өріс үшін осы тоқсандағы іздеу таусылды — атауын қолмен енгізіңіз',
     unavailable: 'Іздеу қазір қолжетімсіз — атауын қолмен енгізіңіз',
+    invalid: 'БСН/ЖСН-де қате бар сияқты. Сандарды тексеріңіз немесе атауын қолмен енгізіңіз',
+    stale: 'Атауы бұрынғыдай қалды. Тізілімнен қою үшін «Табу» батырмасын басыңыз',
   },
   en: {
     button: 'Find',
@@ -40,6 +48,8 @@ export const NAME_LOOKUP_TEXT: Record<ToolLang, NameLookupCopy> = {
     miss: 'Nothing found for this BIN/IIN — type the name manually',
     limit: 'Lookups for this field are used up for this quarter — type the name manually',
     unavailable: 'Lookup is unavailable right now — type the name manually',
+    invalid: 'This BIN/IIN looks mistyped. Check the digits or type the name manually',
+    stale: 'The name was left as it was. Press Find to fill it in from the registry',
   },
 }
 

@@ -14,6 +14,11 @@ import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
+import { MorePanel, MoreToggle, useMoreFields } from '@/lib/tools-i18n/ToolMoreFields'
+import RequisitesNote from '@/lib/tools-i18n/RequisitesNote'
+import { hasAnyValue, moreHint } from '@/lib/tools-i18n/moreFields'
+import { applyRequisites, loadRequisites, pickRequisites, type RequisiteKey } from '@/lib/tools-i18n/requisites'
+import { useRequisites } from '@/lib/tools-i18n/useRequisites'
 import { kpDict } from './dict'
 import { UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS, KP_DEFAULT_UNIT, type KpRow } from './calc'
@@ -51,6 +56,9 @@ type Form = {
   rows: KpRow[]
 }
 
+// Реквизиты поставщика, общие для четырёх инструментов (requisites.ts).
+const REQ_KEYS: readonly RequisiteKey[] = ['binIin', 'companyName', 'address', 'director', 'phone', 'email']
+
 // Дата пустая до монтирования: «сегодня» на сервере (UTC) и у посетителя
 // (Алматы, UTC+5) до пяти утра — разные дни, и поле расходилось бы при
 // гидрации. Ставим её в эффекте по часам посетителя.
@@ -80,6 +88,9 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
   const { setLang } = useLanguage()
   const [f, setF] = useState<Form>(EMPTY)
   const [ready, setReady] = useState(false)
+  const { hasSaved, noteApplied, clear: clearSaved } = useRequisites({
+    tool: 'kp', lang, ready, picked: pickRequisites(f, REQ_KEYS),
+  })
   // null — квота ещё не пришла (или сервер не ответил): подсказку не рисуем,
   // а кнопка всё равно спросит сервер при нажатии.
   const [quota, setQuota] = useState<Quota | null>(null)
@@ -111,8 +122,13 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
         if (next.validUntil && next.validUntil < next.date) next.validUntil = ''
       }
     } catch {}
-    setF(next)
+    // Запомненные реквизиты ложатся только в ПУСТЫЕ поля (черновик главнее).
+    const withSaved = applyRequisites(next, loadRequisites(), REQ_KEYS)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setF(withSaved.form)
+    noteApplied(withSaved.applied.length)
     setReady(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
     if (!ready) return
@@ -130,6 +146,15 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
 
   // Итог считается ровно по тем строкам, что попадут в документ (calc.ts).
   const total = useMemo(() => kpTotal(f.rows), [f.rows])
+
+  // «Дополнительно» (только на телефоне): раскрыты сами, если там уже есть значение.
+  const supplierMore = useMoreFields({ tool: 'kp', lang, forceOpen: hasAnyValue([f.phone, f.director, f.address, f.email]) })
+  const clientMore = useMoreFields({ tool: 'kp', lang, forceOpen: hasAnyValue([f.clientAddress, f.clientPhone, f.clientEmail]) })
+  const docMore = useMoreFields({
+    tool: 'kp', lang,
+    forceOpen: !['', '1'].includes(f.number.trim()) || hasAnyValue([f.validUntil, f.note]),
+  })
+  const resetSupplier = () => setF(prev => ({ ...prev, binIin: '', companyName: '', address: '', director: '', phone: '', email: '' }))
 
   const limitReached = quota !== null && quota.remaining <= 0
   useToolView('kp', lang)
@@ -241,7 +266,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
   // (globals.css) перебивает `color` в Chrome/Safari, и в тёмной теме ОС
   // набранный текст рисовался почти чёрным по тёмному фону — как у /tools/nalogi.
   const inputStyle = { background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)' } as const
-  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1.5'
+  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1 sm:mb-1.5'
   const labelStyle = { color: 'var(--nav-text-muted)' } as const
   const hintStyle = { color: 'var(--nav-text-muted)' } as const
   // Ссылка «Выставить счёт»: toolLinkPath ведёт на языковую версию schet
@@ -251,69 +276,75 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
-        <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6">
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="kp" lang={lang} />
         </div>
 
-        <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl leading-tight sm:leading-snug font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}
         </h1>
-        <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
+        <p className="text-[13px] leading-snug sm:text-sm sm:leading-5 mb-3 sm:mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
           {t.intro}
         </p>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.fromTitle}</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <h2 className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.fromTitle}</h2>
+          <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {/* Сначала БИН/ИИН: название подставится само на 12-й цифре (кнопка «Найти» - запасной вариант). */}
             <BinNameField id="kp-bin" tool="kp" role="seller" lang={lang}
               className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
               label={t.binLabel} placeholder={t.binPlaceholder}
-              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} name={f.companyName} onName={name => set({ companyName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="kp-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="kp-company" className={input} style={inputStyle} autoComplete="organization" placeholder={t.companyPlaceholder} value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
             </div>
-            <div>
-              <label htmlFor="kp-phone" className={label} style={labelStyle}>{t.phoneLabel}</label>
-              <input id="kp-phone" type="tel" className={input} style={inputStyle} autoComplete="tel" value={f.phone} onChange={e => set({ phone: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="kp-director" className={label} style={labelStyle}>{t.directorLabel}</label>
-              <input id="kp-director" className={input} style={inputStyle} autoComplete="name" placeholder={t.directorPlaceholder} value={f.director} onChange={e => set({ director: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="kp-address" className={label} style={labelStyle}>{t.addressLabel}</label>
-              <input id="kp-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="kp-email" className={label} style={labelStyle}>{t.emailLabel}</label>
-              <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
-              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
-                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => setMarketingConsent(e.target.checked)} />
-                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
-              </label>
-            </div>
+            <MoreToggle m={supplierMore} lang={lang} className="sm:col-span-2"
+              hint={moreHint([t.phoneLabel, t.directorLabel, t.addressLabel, t.emailLabel])} />
+            <MorePanel m={supplierMore}>
+              <div>
+                <label htmlFor="kp-phone" className={label} style={labelStyle}>{t.phoneLabel}</label>
+                <input id="kp-phone" type="tel" className={input} style={inputStyle} autoComplete="tel" value={f.phone} onChange={e => set({ phone: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="kp-director" className={label} style={labelStyle}>{t.directorLabel}</label>
+                <input id="kp-director" className={input} style={inputStyle} autoComplete="name" placeholder={t.directorPlaceholder} value={f.director} onChange={e => set({ director: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="kp-address" className={label} style={labelStyle}>{t.addressLabel}</label>
+                <input id="kp-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="kp-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+                <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+                <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                  <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => setMarketingConsent(e.target.checked)} />
+                  <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+                </label>
+              </div>
+            </MorePanel>
+            <RequisitesNote lang={lang} visible={hasSaved} onClear={() => clearSaved(resetSupplier)} />
           </div>
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.offerTitle}</h2>
-          <div className="grid gap-3 mb-3">
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <h2 className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.offerTitle}</h2>
+          <div className="grid gap-2.5 sm:gap-3 mb-3">
             <BinNameField id="kp-client-bin" tool="kp" role="client" lang={lang}
               className="sm:max-w-[calc(50%-0.375rem)]"
               label={t.clientBinLabel} placeholder={t.binPlaceholder}
-              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} name={f.clientName} onName={name => set({ clientName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div>
               <label htmlFor="kp-client" className={label} style={labelStyle}>{t.clientLabel}</label>
               <input id="kp-client" className={input} style={inputStyle} autoComplete="off" placeholder={t.clientPlaceholder} value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
             </div>
+            <MoreToggle m={clientMore} lang={lang} hint={moreHint([t.clientAddressLabel, t.clientPhoneLabel, t.clientEmailLabel])} />
           </div>
           {/* Адрес, телефон и email покупателя — как у поставщика (правка основателя 14.10). */}
-          <div className="grid sm:grid-cols-3 gap-3 mb-3">
+          <MorePanel m={clientMore} className="grid sm:grid-cols-3 gap-2.5 sm:gap-3 mb-3">
             <div>
               <label htmlFor="kp-client-address" className={label} style={labelStyle}>{t.clientAddressLabel}</label>
               <input id="kp-client-address" className={input} style={inputStyle} autoComplete="off" value={f.clientAddress} onChange={e => set({ clientAddress: e.target.value })} />
@@ -326,8 +357,11 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
               <label htmlFor="kp-client-email" className={label} style={labelStyle}>{t.clientEmailLabel}</label>
               <input id="kp-client-email" type="email" className={input} style={inputStyle} autoComplete="off" value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} />
             </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          </MorePanel>
+          {/* На телефоне номер, дата, срок и примечание свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня). */}
+          <MoreToggle m={docMore} lang={lang} className="mb-3 sm:mb-0"
+            hint={moreHint([t.validLabel, t.noteLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localIsoDate())}` : undefined)} />
+          <MorePanel m={docMore} className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
             <div>
               <label htmlFor="kp-number" className={label} style={labelStyle}>{t.numberLabel}</label>
               <input id="kp-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />
@@ -341,8 +375,12 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
               <input id="kp-valid" type="date" className={input} style={inputStyle} min={f.date || undefined} aria-describedby="kp-valid-hint" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} />
               <div id="kp-valid-hint" className="text-[11px] mt-1" style={hintStyle}>{t.validHint}</div>
             </div>
-          </div>
-          <div className="mb-4 grid sm:grid-cols-2 gap-3 items-start">
+            <div className="col-span-2 sm:col-span-3">
+              <label htmlFor="kp-note" className={label} style={labelStyle}>{t.noteLabel}</label>
+              <input id="kp-note" className={input} style={inputStyle} value={f.note} onChange={e => set({ note: e.target.value })} />
+            </div>
+          </MorePanel>
+          <div className="mb-3 sm:mb-4 grid grid-cols-2 gap-3 items-start">
             <div>
               <label htmlFor="kp-vat" className={label} style={labelStyle}>{t.vatLabel}</label>
               <select id="kp-vat" className={`${input} sm:max-w-[240px]`} style={inputStyle} value={f.vatType} onChange={e => set({ vatType: e.target.value as Form['vatType'] })}>
@@ -393,10 +431,6 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
                 <div className="text-[11px] mt-0.5" style={hintStyle}>{t.vatIncluded(formatTenge(f.vatType === 'vat_16' ? kpVatIncluded(total) : 0), f.vatType === 'vat_16' ? 16 : 0)}</div>
               )}
             </div>
-          </div>
-          <div className="mt-3">
-            <label htmlFor="kp-note" className={label} style={labelStyle}>{t.noteLabel}</label>
-            <input id="kp-note" className={input} style={inputStyle} value={f.note} onChange={e => set({ note: e.target.value })} />
           </div>
         </div>
 

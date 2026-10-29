@@ -14,6 +14,11 @@ import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
+import { MorePanel, MoreToggle, useMoreFields } from '@/lib/tools-i18n/ToolMoreFields'
+import RequisitesNote from '@/lib/tools-i18n/RequisitesNote'
+import { hasAnyValue, moreHint } from '@/lib/tools-i18n/moreFields'
+import { applyRequisites, loadRequisites, pickRequisites, requisitesMatch, type RequisiteKey } from '@/lib/tools-i18n/requisites'
+import { useRequisites } from '@/lib/tools-i18n/useRequisites'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
 import { schetDict } from './dict'
 import { autoKbe, isDraftKbeManual, needsManualKbe, suggestKbe } from '@/lib/kbe'
@@ -43,6 +48,11 @@ const CONSENT_KEY = 'tool-schet-consent'
 // пишем отдельным ключом явно: '1' — правили руками, '0' — следует за подсказкой
 // (по самому черновику автоподставленное 17 не отличить от введённого вручную).
 const KBE_MANUAL_KEY = 'tool-schet-kbe-manual'
+
+// Реквизиты поставщика, общие для четырёх инструментов (requisites.ts). КБе сюда
+// не входит: он следует за названием, и в общий ключ его кладём только когда его
+// правили руками.
+const REQ_KEYS: readonly RequisiteKey[] = ['binIin', 'companyName', 'address', 'director', 'email', 'bankBik', 'otherBankName', 'otherBankBik', 'iik']
 
 // Дата заполняется на клиенте после монтирования: сервер и браузер живут в
 // разных часовых поясах, а модуль на сервере может жить сутками.
@@ -81,6 +91,10 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
   // true — КБе ввели руками (или он остался из старого черновика): подсказка
   // его больше не перезаписывает.
   const [kbeManual, setKbeManual] = useState(false)
+  const { hasSaved, noteApplied, clear: clearSaved } = useRequisites({
+    tool: 'schet', lang, ready,
+    picked: { ...pickRequisites(f, REQ_KEYS), kbe: kbeManual ? f.kbe : '' },
+  })
 
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
@@ -91,26 +105,36 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
       const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
       if (raw && typeof raw === 'object' && Array.isArray(raw.rows)) draft = raw
     } catch {}
+    let manual = false
     try {
       const flag = localStorage.getItem(KBE_MANUAL_KEY)
-      const manual = isDraftKbeManual(flag, draft?.kbe)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setKbeManual(manual)
+      manual = isDraftKbeManual(flag, draft?.kbe)
       // Черновик из версии без флага: фиксируем вывод, чтобы дальше он не плыл.
       if (flag !== '0' && flag !== '1') localStorage.setItem(KBE_MANUAL_KEY, manual ? '1' : '0')
     } catch {}
-    setF(prev => {
-      const next: Form = { ...prev, ...(draft || {}) }
-      // Реквизиты и позиции из черновика берём, а вчерашнюю дату — нет: иначе
-      // счёт, сделанный на следующий день, молча печатался бы прошлым числом
-      // (то же правило, что в /tools/kp и /tools/nakladnaya).
-      const today = localToday()
-      if (!next.date || next.date < today) next.date = today
-      if (!VAT_TYPES.includes(next.vatType)) next.vatType = 'no_vat'
-      if (next.rows.length === 0) next.rows = EMPTY.rows
-      return next
-    })
+    let next: Form = { ...EMPTY, ...(draft || {}) }
+    // Реквизиты и позиции из черновика берём, а вчерашнюю дату — нет: иначе
+    // счёт, сделанный на следующий день, молча печатался бы прошлым числом
+    // (то же правило, что в /tools/kp и /tools/nakladnaya).
+    const today = localToday()
+    if (!next.date || next.date < today) next.date = today
+    if (!VAT_TYPES.includes(next.vatType)) next.vatType = 'no_vat'
+    if (next.rows.length === 0) next.rows = EMPTY.rows
+    // Запомненные реквизиты поставщика ложатся только в ПУСТЫЕ поля (черновик главнее).
+    const saved = loadRequisites()
+    // Запомненное ложится только к тому же юрлицу: КБе чужой фирмы в счёт этой не берём.
+    const sameParty = requisitesMatch(next, saved)
+    const withSaved = applyRequisites(next, saved, REQ_KEYS)
+    next = withSaved.form
+    let appliedCount = withSaved.applied.length
+    if (!manual && sameParty && saved.kbe) { next = { ...next, kbe: saved.kbe }; manual = true; appliedCount++ }
+    try { if (manual) localStorage.setItem(KBE_MANUAL_KEY, '1') } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setKbeManual(manual)
+    setF(next)
+    noteApplied(appliedCount)
     setReady(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
     if (!ready) return
@@ -151,6 +175,18 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
   // Итог — по тем же строкам и той же формуле, что попадут в документ.
   const total = useMemo(() => documentTotal(f.rows), [f.rows])
   const vat = vatIncluded(total, f.vatType)
+
+  // «Дополнительно» (только на телефоне): КБе, руководитель, адрес, email поставщика и
+  // номер/дата/срок оплаты/примечание счёта. Раскрыты сами, если там уже есть значение.
+  const supplierMore = useMoreFields({ tool: 'schet', lang, forceOpen: kbeManual || hasAnyValue([f.director, f.address, f.email]) })
+  const docMore = useMoreFields({
+    tool: 'schet', lang,
+    forceOpen: !['', '1'].includes(f.number.trim()) || hasAnyValue([f.dueDate, f.note]),
+  })
+  const resetSupplier = () => {
+    setKbeManual(false)
+    setF(prev => ({ ...prev, binIin: '', companyName: '', address: '', director: '', email: '', bankBik: '', otherBankName: '', otherBankBik: '', iik: '', kbe: '19' }))
+  }
 
   const limitReached = quota !== null && quota.remaining <= 0
   useToolView('schet', lang)
@@ -275,23 +311,23 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)',
     color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)',
   } as const
-  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1.5'
+  const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1 sm:mb-1.5'
   const labelStyle = { color: 'var(--nav-text-muted)' } as const
   const accentLink = { color: 'var(--nav-accent)' } as const
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
-        <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6">
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="schet" lang={lang} />
         </div>
 
-        <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl leading-tight sm:leading-snug font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}
         </h1>
-        <div className="mb-6">
-          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+        <div className="mb-3 sm:mb-6">
+          <p className="text-[13px] leading-snug sm:text-sm sm:leading-5" style={{ color: 'var(--nav-text-secondary)' }}>
             {t.intro(DOC_QUOTA_DEFAULT_LIMIT)}
           </p>
           {t.docLangNote && (
@@ -301,31 +337,32 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
           )}
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
+          <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {/* Сначала БИН/ИИН: название подставится само на 12-й цифре (кнопка «Найти» - запасной вариант). */}
             <BinNameField id="sc-bin" tool="schet" role="seller" lang={lang}
               className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
               label={t.binLabel} placeholder={t.binPlaceholder}
-              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} name={f.companyName} onName={name => set({ companyName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="sc-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="sc-company" className={input} style={inputStyle} placeholder={t.companyPlaceholder} autoComplete="organization" value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
             </div>
             <div>
-              <label htmlFor="sc-bank" className={label} style={labelStyle}>{t.bankLabel}</label>
+              {/* Ссылка на справочник БИК - в строке подписи: на телефоне это экономит строку. */}
+              <div className="flex items-baseline justify-between gap-2">
+                <label htmlFor="sc-bank" className={label} style={labelStyle}>{t.bankLabel}</label>
+                {bikLink && (
+                  <Link href={bikLink.href} className="text-[11px] underline mb-1 sm:mb-1.5 text-right" style={{ color: 'var(--nav-text-secondary)' }}>{bikLink.label}</Link>
+                )}
+              </div>
               <select id="sc-bank" className={input} style={inputStyle} value={f.bankBik} onChange={e => set({ bankBik: e.target.value })}>
                 <option value="">{t.bankPlaceholder}</option>
                 {KAZAKHSTAN_BANKS.map(b => <option key={b.bik} value={b.bik}>{b.name}</option>)}
                 <option value={OTHER_BANK}>{t.otherBank}</option>
               </select>
-              {bikLink && (
-                <div className="text-xs mt-1">
-                  <Link href={bikLink.href} className="underline" style={{ color: 'var(--nav-text-secondary)' }}>{bikLink.label}</Link>
-                </div>
-              )}
             </div>
             {f.bankBik === OTHER_BANK && (
               <>
@@ -341,73 +378,87 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
             )}
             <div>
               <label htmlFor="sc-iik" className={label} style={labelStyle}>{t.iikLabel}</label>
-              <input id="sc-iik" className={input} style={inputStyle} autoComplete="off" placeholder={t.iikPlaceholder} value={f.iik} onChange={e => set({ iik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 20) })} />
+              <input id="sc-iik" className={input} style={inputStyle} autoComplete="off" spellCheck={false} placeholder={t.iikPlaceholder} value={f.iik} onChange={e => set({ iik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 20) })} />
             </div>
-            <div>
-              <label htmlFor="sc-kbe" className={label} style={labelStyle}>{t.kbeLabel}</label>
-              <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" aria-describedby="sc-kbe-hint" value={f.kbe} onChange={e => changeKbe(e.target.value)} />
-              <div id="sc-kbe-hint" className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
-                {needsManualKbe({ name: f.companyName, bin: f.binIin }) ? t.kbeHintManual : t.kbeHint}{!kbeManual && kbeSuggestion !== null && ` ${t.kbeAuto}`}
+            <MoreToggle m={supplierMore} lang={lang} className="sm:col-span-2"
+              hint={moreHint([t.kbeLabel, t.directorLabel, t.addressLabel, t.emailLabel])} />
+            <MorePanel m={supplierMore}>
+              <div>
+                <label htmlFor="sc-kbe" className={label} style={labelStyle}>{t.kbeLabel}</label>
+                <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" aria-describedby="sc-kbe-hint" value={f.kbe} onChange={e => changeKbe(e.target.value)} />
+                <div id="sc-kbe-hint" className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                  {needsManualKbe({ name: f.companyName, bin: f.binIin }) ? t.kbeHintManual : t.kbeHint}{!kbeManual && kbeSuggestion !== null && ` ${t.kbeAuto}`}
+                </div>
               </div>
-            </div>
-            <div>
-              <label htmlFor="sc-director" className={label} style={labelStyle}>{t.directorLabel}</label>
-              <input id="sc-director" className={input} style={inputStyle} placeholder={t.directorPlaceholder} autoComplete="name" value={f.director} onChange={e => set({ director: e.target.value })} />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="sc-address" className={label} style={labelStyle}>{t.addressLabel}</label>
-              <input id="sc-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="sc-email" className={label} style={labelStyle}>{t.emailLabel}</label>
-              <input id="sc-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
-              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
-                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
-                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
-              </label>
-            </div>
+              <div>
+                <label htmlFor="sc-director" className={label} style={labelStyle}>{t.directorLabel}</label>
+                <input id="sc-director" className={input} style={inputStyle} placeholder={t.directorPlaceholder} autoComplete="name" value={f.director} onChange={e => set({ director: e.target.value })} />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="sc-address" className={label} style={labelStyle}>{t.addressLabel}</label>
+                <input id="sc-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="sc-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+                <input id="sc-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+                <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                  <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
+                  <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+                </label>
+              </div>
+            </MorePanel>
+            <RequisitesNote lang={lang} visible={hasSaved} onClear={() => clearSaved(resetSupplier)} />
           </div>
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.clientTitle}</div>
-          <div className="grid gap-3">
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.clientTitle}</div>
+          <div className="grid gap-2.5 sm:gap-3">
             <BinNameField id="sc-client-bin" tool="schet" role="client" lang={lang}
               className="sm:max-w-[calc(50%-0.375rem)]"
               label={t.clientBinLabel} placeholder={t.binPlaceholder}
-              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} name={f.clientName} onName={name => set({ clientName: name })}
               inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div>
               <label htmlFor="sc-client" className={label} style={labelStyle}>{t.clientNameLabel}</label>
               <input id="sc-client" className={input} style={inputStyle} autoComplete="off" value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
             </div>
           </div>
-          <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+          <div className="text-[11px] leading-snug mt-1.5 sm:mt-2" style={{ color: 'var(--nav-text-muted)' }}>
             {t.checkHint}<Link href={toolLinkPath('kontragent', lang)} style={accentLink}>{t.checkLink}</Link>{t.checkAfter}
           </div>
         </div>
 
-        <div className="nav-glass rounded-2xl p-5 mb-4">
-          <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceTitle}</div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div>
-              <label htmlFor="sc-number" className={label} style={labelStyle}>{t.numberLabel}</label>
-              <input id="sc-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="sc-date" className={label} style={labelStyle}>{t.dateLabel}</label>
-              <input id="sc-date" type="date" lang={lang} className={input} style={inputStyle} value={f.date} onChange={e => set({ date: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="sc-due" className={label} style={labelStyle}>{t.dueDateLabel}</label>
-              <input id="sc-due" type="date" lang={lang} className={input} style={inputStyle} value={f.dueDate} onChange={e => set({ dueDate: e.target.value })} />
-            </div>
-            <div>
+        <div className="nav-glass rounded-2xl p-3.5 sm:p-5 mb-2.5 sm:mb-4">
+          <div className="text-sm font-bold mb-2 sm:mb-3 max-sm:hidden" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceTitle}</div>
+          {/* На телефоне номер, дата и срок оплаты свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня); НДС всегда на виду. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+            <div className="col-span-2 sm:col-span-1 sm:order-1">
               <label htmlFor="sc-vat" className={label} style={labelStyle}>{t.vatLabel}</label>
               <select id="sc-vat" className={input} style={inputStyle} value={f.vatType} onChange={e => set({ vatType: e.target.value as VatType })}>
                 {VAT_TYPES.map(v => <option key={v} value={v}>{t.vatOptions[v]}</option>)}
               </select>
             </div>
+            <MoreToggle m={docMore} lang={lang} className="col-span-2 sm:order-none"
+              hint={moreHint([t.dueDateLabel, t.noteLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} />
+            <MorePanel m={docMore}>
+              <div>
+                <label htmlFor="sc-number" className={label} style={labelStyle}>{t.numberLabel}</label>
+                <input id="sc-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="sc-date" className={label} style={labelStyle}>{t.dateLabel}</label>
+                <input id="sc-date" type="date" lang={lang} className={input} style={inputStyle} value={f.date} onChange={e => set({ date: e.target.value })} />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label htmlFor="sc-due" className={label} style={labelStyle}>{t.dueDateLabel}</label>
+                <input id="sc-due" type="date" lang={lang} className={input} style={inputStyle} value={f.dueDate} onChange={e => set({ dueDate: e.target.value })} />
+              </div>
+              <div className="col-span-2 sm:col-span-4 sm:order-2">
+                <label htmlFor="sc-note" className={label} style={labelStyle}>{t.noteLabel}</label>
+                <input id="sc-note" className={input} style={inputStyle} autoComplete="off" value={f.note} onChange={e => set({ note: e.target.value })} />
+              </div>
+            </MorePanel>
           </div>
 
           {f.rows.map((r, i) => (
@@ -425,7 +476,7 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
                 className="text-lg leading-none disabled:opacity-30" style={{ color: 'var(--nav-text-muted)' }} aria-label={t.removeRow(i + 1)}>×</button>
             </div>
           ))}
-          <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
+          <div className="flex items-start justify-between flex-wrap gap-2 mt-2.5 sm:mt-3">
             <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={accentLink}>{t.addRow}</button>
             <div className="text-right" aria-live="polite">
@@ -438,10 +489,6 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
                 </div>
               )}
             </div>
-          </div>
-          <div className="mt-3">
-            <label htmlFor="sc-note" className={label} style={labelStyle}>{t.noteLabel}</label>
-            <input id="sc-note" className={input} style={inputStyle} autoComplete="off" value={f.note} onChange={e => set({ note: e.target.value })} />
           </div>
         </div>
 
