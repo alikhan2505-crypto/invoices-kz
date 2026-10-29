@@ -33,6 +33,7 @@
 //                     Без него фото по-прежнему идёт в ИИ с распознаванием.
 
 import { triggerMatches, isSpecialTrigger } from '@/lib/triggerMatch'
+import { parseTemplateReplyText } from '@/lib/instagramButtonTemplate'
 
 export const SPECIAL_TRIGGERS = {
   commentAck: '@comment_ack',
@@ -64,8 +65,11 @@ export function findSpecialTemplate(rows: TemplateRow[], marker: string): Templa
 }
 
 // Тексты строк-маркеров хранятся как есть; пустой текст = маркер выключен.
+// Служебный блок @@button (ответ-карточка, instagramButtonTemplate.ts) сюда не
+// попадает: публичные ответы, Private Reply и меню шлются только обычным текстом.
 function textOf(row: TemplateRow | null): string | null {
-  const t = row?.reply_text?.trim()
+  if (!row || typeof row.reply_text !== 'string') return null
+  const t = parseTemplateReplyText(row.reply_text).plainText.trim()
   return t ? t : null
 }
 
@@ -86,7 +90,7 @@ export function planCommentReply(rows: TemplateRow[], commentText: string): Comm
   for (const r of rows) {
     if (r.channel !== 'dm' || !rowHasMarker(r, SPECIAL_TRIGGERS.codeword)) continue
     if (r.trigger_words.some(w => !isSpecialTrigger(w) && triggerMatches(lower, w))) {
-      const dmText = r.reply_text?.trim()
+      const dmText = textOf(r)
       if (!dmText) continue
       return { kind: 'codeword', ackText: ack, dmText, templateId: r.id }
     }

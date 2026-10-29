@@ -10,6 +10,7 @@ const h = vi.hoisted(() => {
     messages: [] as any[],
     sends: [] as { kind: string; to: string; text: string }[],
     failPrivate: false,
+    failButton: null as null | { status: number },
     ownerIsAdmin: true,
     convs: {} as Record<string, string>,
     aiCalls: 0,
@@ -139,6 +140,10 @@ vi.mock('@/lib/instagram', async () => {
     sendDirectMessage: async (id: string, text: string) => { h.state.sends.push({ kind: 'dm', to: id, text }) },
     sendDirectImage: async () => {},
     sendInstagramFlowStep: async () => {},
+    sendInstagramButtonTemplate: async (id: string, b: any) => {
+      if (h.state.failButton) throw new InstagramApiError('Invalid parameter (code 100)', h.state.failButton.status)
+      h.state.sends.push({ kind: 'button', to: id, text: JSON.stringify(b) })
+    },
     sendPrivateReply: async (id: string, text: string) => {
       if (h.state.failPrivate) throw new InstagramApiError('(#10) Private reply already sent', 400)
       h.state.sends.push({ kind: 'private', to: id, text })
@@ -179,6 +184,7 @@ beforeEach(() => {
   h.state.messages = []
   h.state.sends = []
   h.state.failPrivate = false
+  h.state.failButton = null
   h.state.ownerIsAdmin = true
   h.state.convs = {}
   h.state.aiCalls = 0
@@ -354,5 +360,89 @@ describe('агент с особыми строками', () => {
     await handleTenantIncoming(conn, dm('d1', 'контрагент'))
     await handleTenantIncoming(conn, dm('d2', 'контрагент'))
     expect(h.state.sends).toHaveLength(2)
+  })
+})
+
+// Ответ-карточка с кнопкой (строка шаблона с блоком @@button, instagramButtonTemplate.ts).
+const OLD_TEXT = 'Вот проверка по БИН 👇 https://invoices.kz/go/dm-kontragent\n\nПокажет неблагонадёжность, ликвидацию, налоговый долг и НДС по данным КГД. 3 проверки в квартал бесплатно.'
+const BTN_ROW = `${OLD_TEXT}\n\n@@button\ntitle: Вот проверка по БИН 👇\nsubtitle: Неблагонадёжность, ликвидация, налоговый долг, НДС. 3 проверки в квартал\nbutton: Открыть проверку\nurl: https://invoices.kz/go/dm-kontragent-btn`
+const BUTTON = {
+  title: 'Вот проверка по БИН 👇',
+  subtitle: 'Неблагонадёжность, ликвидация, налоговый долг, НДС. 3 проверки в квартал',
+  buttonTitle: 'Открыть проверку',
+  url: 'https://invoices.kz/go/dm-kontragent-btn',
+}
+const LOGGED = 'Вот проверка по БИН 👇\nНеблагонадёжность, ликвидация, налоговый долг, НДС. 3 проверки в квартал\nhttps://invoices.kz/go/dm-kontragent-btn'
+
+describe('ответ-карточка с кнопкой на КОНТРАГЕНТ', () => {
+  beforeEach(() => {
+    h.state.templates = [
+      ...SPECIAL,
+      t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW),
+    ]
+  })
+  const outbound = () => h.state.messages.filter(m => m.direction === 'outbound').map(m => m.text)
+
+  it('слово, набранное руками (может быть десктоп): по умолчанию обычный текст, карточка не шлётся', async () => {
+    await handleTenantIncoming(conn, dm('d1', 'контрагент'))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: OLD_TEXT }])
+    expect(outbound()).toEqual([OLD_TEXT])
+    expect(h.state.aiCalls).toBe(0)
+  })
+
+  it('слово, набранное руками, при «typed: yes» в блоке: карточка, текст не дублируется, в журнале читаемый текст', async () => {
+    h.state.templates = [...SPECIAL, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], `${BTN_ROW}\ntyped: yes`)]
+    await handleTenantIncoming(conn, dm('d1', 'контрагент'))
+    expect(h.state.sends).toEqual([{ kind: 'button', to: 'u1', text: JSON.stringify(BUTTON) }])
+    expect(outbound()).toEqual([LOGGED])
+  })
+
+  it('нажатие «готового вопроса» (postback): тоже карточка', async () => {
+    await handleTenantIncoming(conn, dm('pb:m1', 'КОНТРАГЕНТ', { loggedText: 'Проверить контрагента по БИН', fromPostback: true }))
+    expect(h.state.sends.map(s => s.kind)).toEqual(['button'])
+    expect(outbound()).toEqual([LOGGED])
+  })
+
+  it('Meta пришлёт и postback, и сообщение с подписью кнопки: ответ один (защита от эха цела)', async () => {
+    await handleTenantIncoming(conn, dm('pb:m1', 'КОНТРАГЕНТ', { loggedText: 'Проверить контрагента по БИН', fromPostback: true }))
+    await handleTenantIncoming(conn, dm('mid-1', 'Проверить контрагента по БИН'))
+    expect(h.state.sends).toHaveLength(1)
+  })
+
+  it('повторная доставка того же сообщения: карточка не дублируется', async () => {
+    const pb = () => dm('pb:m9', 'бин', { fromPostback: true })
+    await handleTenantIncoming(conn, pb())
+    await handleTenantIncoming(conn, pb())
+    expect(h.state.sends).toHaveLength(1)
+  })
+
+  it.each([400, 403, 0])('Meta отвергла карточку (HTTP %i): тот же ответ уходит текстом со ссылкой, один раз, в журнале текст', async status => {
+    h.state.failButton = { status }
+    await handleTenantIncoming(conn, dm('pb:m1', 'КОНТРАГЕНТ', { loggedText: 'Проверить контрагента по БИН', fromPostback: true }))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: OLD_TEXT }])
+    expect(outbound()).toEqual([OLD_TEXT])
+  })
+
+  it('комментарий с кодовым словом: Private Reply и публичный ответ -- обычный текст без разметки', async () => {
+    await handleTenantIncoming(conn, comment('cm1', 'Контрагент'))
+    expect(h.state.sends).toEqual([
+      { kind: 'private', to: 'cm1', text: OLD_TEXT },
+      { kind: 'comment', to: 'cm1', text: 'Ссылка отправлена вам в личные сообщения' },
+    ])
+    expect(JSON.stringify(h.state.sends)).not.toContain('@@button')
+  })
+
+  it('другие шаблоны остаются обычным текстом', async () => {
+    h.state.templates.push(t('hi2', 'dm', ['=привет'], 'Меню слов'))
+    await handleTenantIncoming(conn, dm('d2', 'привет'))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: 'Меню слов' }])
+  })
+})
+
+describe('служебный блок не утекает клиенту в других местах', () => {
+  it('шаблон на все каналы с блоком: в комментарии публикуется чистый текст', async () => {
+    h.state.templates = [t('p', null, ['цена'], 'Тарифы тут\n\n@@button\ntitle: Т\nbutton: Открыть\nurl: https://invoices.kz/x')]
+    await handleTenantIncoming(conn, comment('c1', 'Цена?'))
+    expect(h.state.sends).toEqual([{ kind: 'comment', to: 'c1', text: 'Тарифы тут' }])
   })
 })

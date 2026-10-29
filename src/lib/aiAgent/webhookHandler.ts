@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
-import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, sendPrivateReply, InstagramApiError } from '@/lib/instagram'
+import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, sendInstagramButtonTemplate, sendPrivateReply, InstagramApiError } from '@/lib/instagram'
+import { parseTemplateReplyText, type ButtonTemplate } from '@/lib/instagramButtonTemplate'
+import { sendTemplateReply } from './templateButtonReply'
 import { pickProductPhoto } from './productPhoto'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildCollectFieldsToExtract } from './promptContext'
@@ -356,7 +358,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // же, что давал фильтр .or(...)), а DM-шаблоны нужны только режиму «кодовое
   // слово в комментарии» (строка @comment_ack, см. instagramSpecialTemplates.ts).
   // Без особых строк у агента поведение прежнее.
-  let match: { id: string; reply_text: string } | null = null
+  let match: { id: string; reply_text: string; button: ButtonTemplate | null; cardOnTyped: boolean } | null = null
   let templates: TemplateRow[] = []
   let allTemplates: TemplateRow[] = []
   if (!params.media) {
@@ -381,7 +383,8 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     // Вложение без текста: меню слов вместо «не умею» (строка @attachment).
     if (params.attachmentOnly) {
       const menu = findSpecialTemplate(templates, SPECIAL_TRIGGERS.attachment)
-      const menuText = menu?.reply_text?.trim() || UNSUPPORTED_MEDIA_REPLY_TEXT
+      // Служебный блок @@button (если его вписали и сюда) клиенту не показываем.
+      const menuText = (menu ? parseTemplateReplyText(menu.reply_text ?? '').plainText.trim() : '') || UNSUPPORTED_MEDIA_REPLY_TEXT
       try {
         await sendDirectMessage(params.replyTarget, menuText, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
         await supabase.from('ai_agent_messages').insert({
@@ -435,15 +438,34 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
 
   if (match) {
     try {
+      // Журнал: у карточки с кнопкой -- читаемый текст (заголовок, подзаголовок,
+      // ссылка), у обычного ответа -- сам текст.
+      let loggedText = match.reply_text
       if (params.source === 'comment') {
+        // Публичный ответ -- всегда обычный текст (match.reply_text уже без
+        // служебного блока @@button), карточек в комментариях нет.
         await replyToComment(params.replyTarget, match.reply_text, { accessToken: conn.accessToken })
       } else {
-        await sendDirectMessage(params.replyTarget, match.reply_text, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+        // Директ: и слово текстом, и нажатие «готового вопроса» (ice breaker) идут
+        // сюда одним конвейером. Строка с @@button уходит карточкой с кнопкой, а
+        // при отказе Meta -- тем же обычным текстом (templateButtonReply.ts).
+        const creds = { igUserId: conn.externalAccountId, accessToken: conn.accessToken }
+        // Карточка -- только на нажатие ice breaker (fromPostback): на десктопе
+        // Instagram она не поддержана и запасной текст не включился бы.
+        const sent = await sendTemplateReply(match, {
+          sendButton: b => sendInstagramButtonTemplate(params.replyTarget, b, creds),
+          sendText: t => sendDirectMessage(params.replyTarget, t, creds),
+          onButtonFailed: async err => {
+            console.error('ai-agent webhook: button template send failed, falling back to text for', params.externalId, ':', (err as any)?.message || err)
+            await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+          },
+        }, !!params.fromPostback)
+        loggedText = sent.loggedText
       }
       await supabase.from('ai_agent_messages').insert({
         conversation_id: conversation.id,
         direction: 'outbound',
-        text: match.reply_text,
+        text: loggedText,
         is_ai_generated: false,
         status: 'sent',
       })
@@ -751,11 +773,18 @@ export async function mergeCollectedData(conversationId: string, extractedFields
 // src/lib/triggerMatch.ts, shared by both matchers and findFlowTriggerMatch,
 // so change it there, not here. Exported (2026-08-20) so the Telegram tenant
 // path (telegramWebhookHandler.ts) matches templates with the exact same rule.
-export function findTemplateMatch(text: string, templates: { id: string; trigger_words: string[]; reply_text: string }[]): { id: string; reply_text: string } | null {
+//
+// reply_text в результате -- ВСЕГДА обычный текст без служебного блока @@button
+// (instagramButtonTemplate.ts), поэтому Telegram/WhatsApp/сайт/комментарии, не
+// знающие про карточки, никогда не покажут клиенту разметку; карточка (если
+// строка ею помечена и корректна) лежит в button, её отправляет только директ
+// Instagram. У строки без блока reply_text не меняется ни на символ.
+export function findTemplateMatch(text: string, templates: { id: string; trigger_words: string[]; reply_text: string }[]): { id: string; reply_text: string; button: ButtonTemplate | null; cardOnTyped: boolean } | null {
   const lower = text.toLowerCase()
   for (const t of templates) {
     if (t.trigger_words.some(w => triggerMatches(lower, w))) {
-      return { id: t.id, reply_text: t.reply_text }
+      const parsed = parseTemplateReplyText(t.reply_text)
+      return { id: t.id, reply_text: parsed.plainText, button: parsed.button, cardOnTyped: parsed.cardOnTyped }
     }
   }
   return null

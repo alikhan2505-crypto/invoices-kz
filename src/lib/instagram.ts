@@ -2,6 +2,7 @@ import type { FlowStep } from './aiAgent/flow'
 import { loadPublishToken } from './instagramPublishToken'
 import { InstagramPublishError } from './instagramReel'
 import { buildIceBreakersBody } from './instagramIceBreakers'
+import { buildButtonTemplateMessage, type ButtonTemplate } from './instagramButtonTemplate'
 
 // "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
 // valid against graph.instagram.com — the classic graph.facebook.com host
@@ -400,6 +401,34 @@ export async function sendDirectMessage(recipientId: string, message: string, cr
   const data = await res.json()
   if (!res.ok) {
     throw new InstagramApiError(data.error?.message || 'Failed to send direct message', res.status)
+  }
+}
+
+// Ответ-карточка с кнопкой: шаблон generic (один элемент, одна кнопка web_url),
+// формат и лимиты -- instagramButtonTemplate.ts. Токен идёт заголовком
+// Authorization: Bearer (не в теле и не в URL), в тексте ошибки -- только то, что
+// сказала Meta (код и подкод), без токена. status 0 = ответа от Meta нет вообще
+// (таймаут, обрыв сети): доставлена карточка или нет, неизвестно.
+export async function sendInstagramButtonTemplate(recipientId: string, button: ButtonTemplate, credentials: { igUserId: string; accessToken: string }): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bearer(credentials.accessToken) },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: buildButtonTemplateMessage(button),
+      }),
+      signal: graphSignal(),
+    })
+  } catch (err: any) {
+    throw new InstagramApiError(`No response from Instagram (${err?.name || 'network error'})`, 0)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const e = data?.error
+    const detail = [e?.code && `code ${e.code}`, e?.error_subcode && `subcode ${e.error_subcode}`].filter(Boolean).join(', ')
+    throw new InstagramApiError(`${e?.message || 'Failed to send button template'}${detail ? ` (${detail})` : ''}`, res.status)
   }
 }
 

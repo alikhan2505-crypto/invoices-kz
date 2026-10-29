@@ -75,6 +75,10 @@ export const GO_LINKS: readonly GoLink[] = [
   link('dm-marzha', '/tools/margin', 'dm', 'outreach', 'margin_oct', 'личные сообщения: ответ на слово МАРЖА'),
   link('dm-kontragent', '/tools/kontragent', 'dm', 'outreach', 'kontragent_oct', 'личные сообщения: ответ на слово БИН'),
   link('dm-nalogi', '/tools/nalogi', 'dm', 'outreach', 'nalogi_oct', 'личные сообщения: ответ на слово НАЛОГИ'),
+  // Тот же инструмент, но для КНОПКИ в карточке ответа (шаблон Instagram generic,
+  // см. instagramButtonTemplate.ts): отдельная кампания kontragent_oct_btn, чтобы
+  // маркетинг отличал нажатие кнопки от клика по ссылке в тексте (dm-kontragent).
+  link('dm-kontragent-btn', '/tools/kontragent', 'dm', 'outreach', 'kontragent_oct_btn', 'личные сообщения: КНОПКА «Открыть проверку» в ответе на слово БИН/КОНТРАГЕНТ'),
   link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
   // Личные сообщения (25.10.2026, ещё 8 кодовых слов из роликов).

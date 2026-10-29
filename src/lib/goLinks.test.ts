@@ -73,6 +73,15 @@ describe('кодовые слова директа 25.10.2026', () => {
   })
 })
 
+describe('кнопка КОНТРАГЕНТ в директе (отдельная кампания)', () => {
+  it('dm-kontragent-btn: тот же инструмент, кампания kontragent_oct_btn, старая ссылка не тронута', () => {
+    expect(resolveGo('dm-kontragent-btn')).toBe('/tools/kontragent?utm_source=dm&utm_medium=outreach&utm_campaign=kontragent_oct_btn')
+    expect(findGoLink('dm-kontragent-btn')!.host).toBeUndefined()
+    expect(resolveGo('dm-kontragent')).toBe('/tools/kontragent?utm_source=dm&utm_medium=outreach&utm_campaign=kontragent_oct')
+    expect(goRedirects().find(x => x.source === '/go/dm-kontragent-btn')?.destination).toBe(resolveGo('dm-kontragent-btn'))
+  })
+})
+
 describe('goDestination / resolveGo', () => {
   it('builds the path with the three utm params', () => {
     expect(resolveGo('nakladnye')).toBe('/tools/waybills?utm_source=tg_chat&utm_medium=chat_post&utm_campaign=waybills_oct')
