@@ -68,9 +68,17 @@ describe('postback (нажатие «готового вопроса»)', () => 
     await post([{ ...base, postback: { mid: 'M1', title: 'x', payload: '' } }])
     expect(h.incoming).toHaveLength(0)
   })
-  it('быстрый ответ с любым payload (в том числе не btn:) идёт в сценарии, как раньше: на текст не превращается', async () => {
+  it('быстрый ответ с payload не btn: это нажатие ice breaker, пришедшее сообщением: идёт в конвейер DM как слово', async () => {
     await post([{ ...base, message: { mid: 'Q1', text: 'Налоги ИП на упрощёнке', quick_reply: { payload: 'НАЛОГИ' } } }])
-    expect(h.incoming).toEqual([{ flowClick: { externalId: 'Q1', replyTarget: 'u1', clickedPayload: 'НАЛОГИ' } }])
+    expect(h.incoming).toEqual([expect.objectContaining({
+      source: 'dm', externalId: 'pb:Q1', incomingText: 'НАЛОГИ', loggedText: 'Налоги ИП на упрощёнке', replyTarget: 'u1', fromPostback: true,
+    })])
+  })
+  it('postback в формате changes (field messaging_postbacks) тоже идёт в конвейер DM', async () => {
+    const body = JSON.stringify({ object: 'instagram', entry: [{ id: 'ig1', time: 1, changes: [{ field: 'messaging_postbacks', value: { ...base, postback: { mid: 'C1', title: 'Счёт', payload: 'СЧЁТ' } } }] }] })
+    const sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(body).digest('hex')
+    await POST(new NextRequest('http://localhost/api/instagram/webhook', { method: 'POST', body, headers: { 'x-hub-signature-256': sig } }))
+    expect(h.incoming).toEqual([expect.objectContaining({ externalId: 'pb:C1', incomingText: 'СЧЁТ', fromPostback: true })])
   })
   it('быстрый ответ сценария btn: идёт в сценарии, как раньше', async () => {
     await post([{ ...base, message: { mid: 'Q2', text: 'Да', quick_reply: { payload: 'btn:s1:0' } } }])

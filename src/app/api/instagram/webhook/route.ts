@@ -238,6 +238,34 @@ async function handleIncoming(params: {
   }
 }
 
+// Виды событий в теле вебхука для диагностики (без персональных данных).
+function summarizeWebhookPayload(payload: any) {
+  return (Array.isArray(payload?.entry) ? payload.entry : []).map((e: any) => ({
+    acc: String(e?.id ?? '').slice(-4),
+    changes: (Array.isArray(e?.changes) ? e.changes : []).map((c: any) => String(c?.field ?? '?')),
+    messaging: (Array.isArray(e?.messaging) ? e.messaging : []).map((m: any) =>
+      m?.postback ? 'postback' : m?.message ? (m.message.is_echo ? 'echo' : m.message.text ? 'text' : m.message.attachments ? 'attachment' : 'message') : Object.keys(m || {}).filter(k => !['sender', 'recipient', 'timestamp'].includes(k)).join('+') || 'empty'),
+  }))
+}
+
+// Нажатие «готового вопроса» (postback) -> тот же конвейер DM, что и слово, набранное руками.
+async function handlePostbackEvent(conn: NonNullable<Awaited<ReturnType<typeof loadTenantConnection>>>, messaging: any) {
+  const incoming = postbackToIncoming(messaging)
+  if (!incoming) {
+    console.log('instagram webhook: postback without usable payload (skipped)')
+    return
+  }
+  await handleTenantIncoming(conn, {
+    source: 'dm',
+    externalId: incoming.externalId,
+    fromUsername: incoming.senderId,
+    incomingText: incoming.text,
+    loggedText: incoming.loggedText,
+    replyTarget: incoming.senderId,
+    fromPostback: true,
+  })
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-hub-signature-256')
@@ -247,6 +275,11 @@ export async function POST(req: NextRequest) {
 
   const payload = JSON.parse(rawBody)
   const replyStateOf = createReplyStateLoader()
+
+  // Диагностика доставки (29.10.2026: нажатие ice breaker не дошло до обработчика, и по логам
+  // нельзя было понять, приходило ли событие вообще). Одна строка на запрос: только виды событий
+  // и последние 4 цифры id аккаунта, без текстов, имён и идентификаторов людей.
+  console.log('instagram webhook event kinds:', JSON.stringify(summarizeWebhookPayload(payload)))
 
   for (const entry of payload.entry || []) {
     // entry.id is the Instagram-scoped account id the event occurred on --
@@ -271,6 +304,12 @@ export async function POST(req: NextRequest) {
     const ownAccountId = isLegacyAccount ? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID : tenantConnection!.externalAccountId
 
     for (const change of entry.changes || []) {
+      // Нажатие «готового вопроса» в формате changes (field messaging_postbacks, value = событие
+      // как в messaging[]): на случай, если Meta доставляет его так, а не через entry.messaging.
+      if (change.field === 'messaging_postbacks' || change.field === 'messaging_postback') {
+        if (!isLegacyAccount && change.value?.postback) await handlePostbackEvent(tenantConnection!, change.value)
+        continue
+      }
       if (change.field !== 'comments') continue
       const value = change.value
       if (!value?.id || !value?.text) continue
@@ -307,18 +346,7 @@ export async function POST(req: NextRequest) {
       // одноаккаунтный бот постбеки не обрабатывает.
       if (messaging.postback) {
         if (isLegacyAccount) continue
-        const incoming = postbackToIncoming(messaging)
-        if (incoming) {
-          await handleTenantIncoming(tenantConnection!, {
-            source: 'dm',
-            externalId: incoming.externalId,
-            fromUsername: incoming.senderId,
-            incomingText: incoming.text,
-            loggedText: incoming.loggedText,
-            replyTarget: incoming.senderId,
-            fromPostback: true,
-          })
-        }
+        await handlePostbackEvent(tenantConnection!, messaging)
         continue
       }
 
@@ -330,6 +358,18 @@ export async function POST(req: NextRequest) {
 
       const quickReplyPayload = msg.quick_reply?.payload
       if (quickReplyPayload && replyTarget && !isLegacyAccount) {
+        // Кнопки сценариев всегда имеют payload «btn:<шаг>:<номер>» (sendInstagramFlowStep). Любой другой
+        // payload быстрого ответа это нажатие «готового вопроса» (ice breaker), которое Meta может
+        // доставить как сообщение, а не как postback: раньше оно уходило в сценарии и молча терялось,
+        // если диалога с этим человеком ещё не было (29.10.2026: живой тест основателя без ответа).
+        if (typeof quickReplyPayload === 'string' && !quickReplyPayload.startsWith('btn:')) {
+          await handlePostbackEvent(tenantConnection!, {
+            sender: messaging.sender,
+            timestamp: messaging.timestamp,
+            postback: { mid: msg.mid, title: typeof msg.text === 'string' ? msg.text : '', payload: quickReplyPayload },
+          })
+          continue
+        }
         await handleInstagramFlowButtonClick(tenantConnection!, { externalId: msg.mid, replyTarget, clickedPayload: quickReplyPayload })
         continue
       }
