@@ -43,9 +43,10 @@ describe('/api/instagram/ice-breakers', () => {
   it('POST с confirm: ставит вопросы и подписывает аккаунт на messaging_postbacks', async () => {
     const res = await POST(req('POST', { agentId: 'a', confirm: true, subscribePostbacks: true }))
     expect(res.status).toBe(200)
-    expect(h.calls[0].url).toBe('https://graph.instagram.com/v21.0/ig1/messenger_profile')
+    expect(h.calls[0].url).toBe('https://graph.instagram.com/v21.0/ig1/messenger_profile?access_token=tok')
     expect(h.calls[0].method).toBe('POST')
     expect(h.calls[0].body.platform).toBe('instagram')
+    expect(h.calls[0].body).not.toHaveProperty('access_token')
     expect(h.calls[0].body.ice_breakers[0]).not.toHaveProperty('locale')
     expect(h.calls[1].url).toContain('/me/subscribed_apps?subscribed_fields=comments%2Cmessages%2Cmessaging_postbacks')
   })

@@ -504,15 +504,19 @@ export interface IceBreakerItem { question: string; payload: string }
 // Instagram он нужен только для набора на отдельный язык).
 // Нажатие приходит вебхуком messaging_postbacks (postback.payload).
 export async function setInstagramIceBreakers(igUserId: string, accessToken: string, items: IceBreakerItem[]): Promise<void> {
-  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
+  // Токен -- в строке запроса, как в документации Meta (в теле Meta отвечала
+  // «Invalid parameter»). В сообщение об ошибке идут код и подкод Meta, без токена.
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile?access_token=${encodeURIComponent(accessToken)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...buildIceBreakersBody(items), access_token: accessToken }),
+    body: JSON.stringify(buildIceBreakersBody(items)),
     signal: graphSignal(),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new InstagramApiError(data?.error?.message || 'Failed to set ice breakers', res.status)
+    const e = data?.error
+    const detail = [e?.code && `code ${e.code}`, e?.error_subcode && `subcode ${e.error_subcode}`, e?.error_user_msg].filter(Boolean).join(', ')
+    throw new InstagramApiError(`${e?.message || 'Failed to set ice breakers'}${detail ? ` (${detail})` : ''}`, res.status)
   }
 }
 
