@@ -40,14 +40,20 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Подпись проверяется секретом приложения Instagram, а если он не подошёл, секретом самого
+// приложения Meta (тот же WHATSAPP_APP_SECRET, что у вебхука WhatsApp): тестовые события из
+// кабинета и DevTools, а возможно и часть реальных (postback), подписываются именно им
+// (29.10.2026: тестовое событие messaging_postbacks пришло с корректным заголовком, но
+// не прошло проверку INSTAGRAM_APP_SECRET). Оба секрета принадлежат нашему приложению.
 function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
-  const appSecret = process.env.INSTAGRAM_APP_SECRET
-  if (!appSecret || !signatureHeader) return false
-  const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')
-  const expectedBuf = Buffer.from(expected)
+  if (!signatureHeader) return false
   const actualBuf = Buffer.from(signatureHeader)
-  if (expectedBuf.length !== actualBuf.length) return false
-  return crypto.timingSafeEqual(expectedBuf, actualBuf)
+  for (const appSecret of [process.env.INSTAGRAM_APP_SECRET, process.env.WHATSAPP_APP_SECRET]) {
+    if (!appSecret) continue
+    const expectedBuf = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'))
+    if (expectedBuf.length === actualBuf.length && crypto.timingSafeEqual(expectedBuf, actualBuf)) return true
+  }
+  return false
 }
 
 async function handleIncoming(params: {

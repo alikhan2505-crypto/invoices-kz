@@ -55,6 +55,26 @@ beforeEach(() => {
   }))
 })
 
+describe('подпись вебхука', () => {
+  const sendSigned = (secret: string) => {
+    const body = JSON.stringify({ object: 'instagram', entry: [{ id: 'ig1', time: 1, messaging: [{ ...base, postback: { mid: 'S1', title: 'x', payload: 'СЧЁТ' } }] }] })
+    const sig = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex')
+    return POST(new NextRequest('http://localhost/api/instagram/webhook', { method: 'POST', body, headers: { 'x-hub-signature-256': sig } }))
+  }
+  it('секрет приложения Meta (WHATSAPP_APP_SECRET) тоже принимается', async () => {
+    process.env.WHATSAPP_APP_SECRET = 'meta-app-secret'
+    expect((await sendSigned('meta-app-secret')).status).toBe(200)
+    expect(h.incoming).toHaveLength(1)
+    delete process.env.WHATSAPP_APP_SECRET
+  })
+  it('чужой секрет отклоняется (401), событие не обрабатывается', async () => {
+    process.env.WHATSAPP_APP_SECRET = 'meta-app-secret'
+    expect((await sendSigned('someone-else')).status).toBe(401)
+    expect(h.incoming).toHaveLength(0)
+    delete process.env.WHATSAPP_APP_SECRET
+  })
+})
+
 describe('postback (нажатие «готового вопроса»)', () => {
   it('payload идёт в конвейер DM как текст, с меткой pb: и подписью кнопки', async () => {
     await post([{ ...base, postback: { mid: 'M1', title: 'Проверить контрагента по БИН', payload: 'КОНТРАГЕНТ' } }])
