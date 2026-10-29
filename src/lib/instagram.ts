@@ -503,12 +503,15 @@ export interface IceBreakerItem { question: string; payload: string }
 // platform=instagram, до 4 вопросов, locale: 'default' (без него Meta отвечает
 // «Invalid parameter», см. instagramIceBreakers.ts).
 // Нажатие приходит вебхуком messaging_postbacks (postback.payload).
+// Токен «готовых вопросов» и подписок идёт заголовком Authorization, не в строке
+// запроса: URL попадает в логи прокси и платформы, заголовок -- нет.
+const bearer = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` })
+
 export async function setInstagramIceBreakers(igUserId: string, accessToken: string, items: IceBreakerItem[]): Promise<void> {
-  // Токен -- в строке запроса, как в документации Meta (в теле Meta отвечала
-  // «Invalid parameter»). В сообщение об ошибке идут код и подкод Meta, без токена.
-  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile?access_token=${encodeURIComponent(accessToken)}`, {
+  // В сообщение об ошибке идут код и подкод Meta, без токена.
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...bearer(accessToken) },
     body: JSON.stringify(buildIceBreakersBody(items)),
     signal: graphSignal(),
   })
@@ -522,8 +525,8 @@ export async function setInstagramIceBreakers(igUserId: string, accessToken: str
 
 export async function getInstagramIceBreakers(igUserId: string, accessToken: string): Promise<unknown> {
   const res = await fetch(
-    `${GRAPH_API}/${igUserId}/messenger_profile?fields=ice_breakers&platform=instagram&access_token=${encodeURIComponent(accessToken)}`,
-    { signal: graphSignal() },
+    `${GRAPH_API}/${igUserId}/messenger_profile?fields=ice_breakers&platform=instagram`,
+    { headers: bearer(accessToken), signal: graphSignal() },
   )
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -535,8 +538,8 @@ export async function getInstagramIceBreakers(igUserId: string, accessToken: str
 export async function deleteInstagramIceBreakers(igUserId: string, accessToken: string): Promise<void> {
   const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'], access_token: accessToken }),
+    headers: { 'Content-Type': 'application/json', ...bearer(accessToken) },
+    body: JSON.stringify({ platform: 'instagram', fields: ['ice_breakers'] }),
     signal: graphSignal(),
   })
   const data = await res.json().catch(() => ({}))
@@ -549,7 +552,7 @@ export async function deleteInstagramIceBreakers(igUserId: string, accessToken: 
 // приложения в кабинете Meta). OAuth-колбэк подписывает только comments,messages;
 // для нажатий на «готовые вопросы» нужен ещё messaging_postbacks.
 export async function getInstagramSubscribedFields(accessToken: string): Promise<unknown> {
-  const res = await fetch(`${GRAPH_API}/me/subscribed_apps?access_token=${encodeURIComponent(accessToken)}`, { signal: graphSignal() })
+  const res = await fetch(`${GRAPH_API}/me/subscribed_apps`, { headers: bearer(accessToken), signal: graphSignal() })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new InstagramApiError(data?.error?.message || 'Failed to read subscribed fields', res.status)
   return data
@@ -557,8 +560,8 @@ export async function getInstagramSubscribedFields(accessToken: string): Promise
 
 export async function setInstagramSubscribedFields(accessToken: string, fields: string[]): Promise<void> {
   const res = await fetch(
-    `${GRAPH_API}/me/subscribed_apps?subscribed_fields=${encodeURIComponent(fields.join(','))}&access_token=${encodeURIComponent(accessToken)}`,
-    { method: 'POST', signal: graphSignal() },
+    `${GRAPH_API}/me/subscribed_apps?subscribed_fields=${encodeURIComponent(fields.join(','))}`,
+    { method: 'POST', headers: bearer(accessToken), signal: graphSignal() },
   )
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new InstagramApiError(data?.error?.message || 'Failed to set subscribed fields', res.status)
