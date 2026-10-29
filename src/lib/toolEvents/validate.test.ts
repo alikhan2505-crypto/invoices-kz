@@ -101,3 +101,23 @@ describe('eventRateLimited', () => {
     expect(eventRateLimited('10.0.0.1', now + 61 + 60_001 + 60)).toBe(false)
   })
 })
+
+describe('utm.content (токен диалога Instagram-агента)', () => {
+  const base = { event: 'view', tool: 'kontragent' }
+  it('валидный токен попадает в строку как utm_content', () => {
+    const row = parseToolEventPayload({ ...base, utm: { source: 'dm', content: 'AbCdEf0123456789' } })
+    expect(row?.utm_content).toBe('AbCdEf0123456789')
+  })
+  it('без токена ключа utm_content в строке НЕТ (до миграции колонки нет, лишний ключ ронял бы вставку)', () => {
+    const row = parseToolEventPayload({ ...base, utm: { source: 'dm' } })
+    expect(row).not.toBeNull()
+    expect('utm_content' in row!).toBe(false)
+  })
+  it('мусор, пробелы, длинное, чужие символы -- отбрасывается, событие остаётся', () => {
+    for (const bad of ['short', 'a'.repeat(65), 'has space token!', '<script>alert(1)</script>', 'ivan_petrov@gmail.com', 123, null]) {
+      const row = parseToolEventPayload({ ...base, utm: { source: 'dm', content: bad } })
+      expect(row).not.toBeNull()
+      expect('utm_content' in row!).toBe(false)
+    }
+  })
+})

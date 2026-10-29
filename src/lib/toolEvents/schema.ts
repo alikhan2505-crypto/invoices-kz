@@ -38,7 +38,14 @@ export interface ToolEventUtm {
   source?: string
   medium?: string
   campaign?: string
+  // 29.10.2026: непрозрачный токен диалога из ссылки напоминания Instagram-агента
+  // (src/lib/aiAgent/dmReminder.ts). Случайная строка, личных данных не несёт.
+  content?: string
 }
+
+// Токен utm_content: только URL-безопасные символы, 8..64. Всё остальное сервер
+// и клиент отбрасывают (произвольный utm_content в аналитику не берём).
+export const UTM_CONTENT_RE = /^[A-Za-z0-9_-]{8,64}$/
 
 // Тело POST /api/tools/event.
 export interface ToolEventPayload {

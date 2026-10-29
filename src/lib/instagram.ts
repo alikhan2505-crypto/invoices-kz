@@ -358,7 +358,7 @@ export async function getMediaInsights(igMediaId: string): Promise<MediaInsights
 // single-tenant caller's `console.error(err.message)` handling needs no
 // changes.
 export class InstagramApiError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(message: string, public status: number, public metaCode?: number, public metaSubcode?: number) {
     super(message)
     this.name = 'InstagramApiError'
   }
@@ -429,6 +429,36 @@ export async function sendInstagramButtonTemplate(recipientId: string, button: B
     const e = data?.error
     const detail = [e?.code && `code ${e.code}`, e?.error_subcode && `subcode ${e.error_subcode}`].filter(Boolean).join(', ')
     throw new InstagramApiError(`${e?.message || 'Failed to send button template'}${detail ? ` (${detail})` : ''}`, res.status)
+  }
+}
+
+// Обычное текстовое сообщение с токеном в заголовке Authorization: Bearer (не в
+// теле и не в URL), как у sendInstagramButtonTemplate. Для служебных отправок
+// (напоминание после КОНТРАГЕНТ, aiAgent/dmReminder.ts): в сообщении об ошибке
+// только то, что сказала Meta (код и подкод), без токена; status 0 = ответа нет
+// вообще (таймаут, обрыв сети), доставлено сообщение или нет, неизвестно.
+export async function sendInstagramTextMessage(recipientId: string, text: string, credentials: { igUserId: string; accessToken: string }): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bearer(credentials.accessToken) },
+      body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+      signal: graphSignal(),
+    })
+  } catch (err: any) {
+    throw new InstagramApiError(`No response from Instagram (${err?.name || 'network error'})`, 0)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const e = data?.error
+    const detail = [e?.code && `code ${e.code}`, e?.error_subcode && `subcode ${e.error_subcode}`].filter(Boolean).join(', ')
+    throw new InstagramApiError(
+      `${e?.message || 'Failed to send text message'}${detail ? ` (${detail})` : ''}`,
+      res.status,
+      typeof e?.code === 'number' ? e.code : undefined,
+      typeof e?.error_subcode === 'number' ? e.error_subcode : undefined,
+    )
   }
 }
 

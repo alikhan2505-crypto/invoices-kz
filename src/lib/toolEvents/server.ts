@@ -85,7 +85,18 @@ export async function handleToolEvent(req: NextRequest): Promise<Response> {
     }
 
     const { error } = await service.from('tool_events').insert({ ...row, internal, user_id: userId })
-    if (error) warnOnce('insert failed', error.message, error.code)
+    if (error) {
+      // Код задеплоен, а tool_events_utm_content.sql ещё не применён: колонки utm_content
+      // нет (Postgres 42703 / PostgREST PGRST204). Событие не теряем, пишем без токена.
+      if (row.utm_content && (error.code === '42703' || error.code === 'PGRST204')) {
+        warnOnce('utm_content column missing, event stored without it', undefined, error.code)
+        const { utm_content: _drop, ...rest } = row
+        const retry = await service.from('tool_events').insert({ ...rest, internal, user_id: userId })
+        if (retry.error) warnOnce('insert failed', retry.error.message, retry.error.code)
+      } else {
+        warnOnce('insert failed', error.message, error.code)
+      }
+    }
   } catch (e) {
     warnOnce('handler threw', e instanceof Error ? e.message : String(e))
   }

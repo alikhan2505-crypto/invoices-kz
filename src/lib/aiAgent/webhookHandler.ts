@@ -32,6 +32,7 @@ import {
   SPECIAL_TRIGGERS, type TemplateRow, type AttachmentRule,
 } from './instagramSpecialTemplates'
 import { ownerHasCommentsScope } from './instagramScopes'
+import { reminderConfigFromRows, replyHasTrackedLink, withTokenInReply, prepareReminderTracking, confirmReminderLinkSent } from './dmReminder'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,7 +53,7 @@ export interface TenantConnection {
 // banner, instead of silently retrying a token that will never work again.
 // Any other error (network blip, malformed request, Meta outage) is left
 // alone -- only a confirmed 401 means the token itself is the problem.
-async function markTokenExpiredIfUnauthorized(connectionId: string, err: unknown): Promise<void> {
+export async function markTokenExpiredIfUnauthorized(connectionId: string, err: unknown): Promise<void> {
   if (err instanceof InstagramApiError && err.status === 401) {
     await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connectionId)
   }
@@ -437,6 +438,15 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   }
 
   if (match) {
+    // Напоминание через ~2 часа (dmReminder.ts), ВЫКЛЮЧЕНО по умолчанию: работает, только
+    // если у агента есть строка @reminder, и только для директа с отслеживаемой ссылкой
+    // (КОНТРАГЕНТ). Диалогу выдаётся случайный токен, он дописывается к ссылке (текст и
+    // кнопка) как utm_content. Любой сбой трекинга -- ответ уходит как раньше, без токена.
+    let reminderToken: string | null = null
+    if (params.source === 'dm' && reminderConfigFromRows(templates).enabled && replyHasTrackedLink(match)) {
+      reminderToken = await prepareReminderTracking(supabase, { agentId: conn.agentId, conversationId: conversation.id })
+      if (reminderToken) match = withTokenInReply(match, reminderToken)
+    }
     try {
       // Журнал: у карточки с кнопкой -- читаемый текст (заголовок, подзаголовок,
       // ссылка), у обычного ответа -- сам текст.
@@ -461,6 +471,8 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
           },
         }, !!params.fromPostback)
         loggedText = sent.loggedText
+        // Ответ со ссылкой ушёл: с этого момента идёт отсчёт 2 часов до напоминания.
+        if (reminderToken) await confirmReminderLinkSent(supabase, conversation.id)
       }
       await supabase.from('ai_agent_messages').insert({
         conversation_id: conversation.id,

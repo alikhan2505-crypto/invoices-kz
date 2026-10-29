@@ -56,4 +56,14 @@ describe('pickUtm', () => {
     expect(pickUtm('', '[1]')).toEqual({ utm: {}, persist: false })
     expect(pickUtm(`?utm_source=${'a'.repeat(300)}`, null).utm.source).toHaveLength(100)
   })
+  it('utm_content: берётся только токен диалога (16 url-безопасных символов), чужие значения нет', () => {
+    expect(pickUtm('?utm_source=dm&utm_content=AbCdEf0123456789', null)).toEqual({ utm: { source: 'dm', content: 'AbCdEf0123456789' }, persist: true })
+    expect(pickUtm('?utm_source=dm&utm_content=ivan%40mail.kz', null).utm).toEqual({ source: 'dm' })
+    expect(pickUtm('?utm_content=short', null)).toEqual({ utm: {}, persist: false })
+  })
+  it('токен без прочих меток тоже запоминается в сессии, и следующие события несут его', () => {
+    const first = pickUtm('?utm_content=AbCdEf0123456789', null)
+    expect(first.persist).toBe(true)
+    expect(pickUtm('', JSON.stringify(first.utm)).utm).toEqual({ content: 'AbCdEf0123456789' })
+  })
 })

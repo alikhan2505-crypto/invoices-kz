@@ -82,6 +82,13 @@ describe('кнопка КОНТРАГЕНТ в директе (отдельна�
   })
 })
 
+describe('ссылка в напоминании КОНТРАГЕНТ', () => {
+  it('dm-kontragent-rem: тот же инструмент, отдельная кампания kontragent_oct_rem', () => {
+    expect(resolveGo('dm-kontragent-rem')).toBe('/tools/kontragent?utm_source=dm&utm_medium=outreach&utm_campaign=kontragent_oct_rem')
+    expect(goRedirects().find(x => x.source === '/go/dm-kontragent-rem')?.destination).toBe(resolveGo('dm-kontragent-rem'))
+  })
+})
+
 describe('goDestination / resolveGo', () => {
   it('builds the path with the three utm params', () => {
     expect(resolveGo('nakladnye')).toBe('/tools/waybills?utm_source=tg_chat&utm_medium=chat_post&utm_campaign=waybills_oct')

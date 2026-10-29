@@ -1,5 +1,5 @@
 import {
-  FIRST_TOUCH_TTL_MS, isToolEventTool, VISITOR_ID_RE,
+  FIRST_TOUCH_TTL_MS, isToolEventTool, UTM_CONTENT_RE, VISITOR_ID_RE,
   type ToolEventLang, type ToolEventMedium, type ToolEventName, type ToolEventPayload,
   type ToolEventTool, type ToolEventToolOrNone, type ToolEventUtm,
 } from '@/lib/toolEvents/schema'
@@ -87,13 +87,20 @@ function cleanUtmValue(x: unknown): string | undefined {
   return typeof x === 'string' && x.trim() ? x.trim().slice(0, 100) : undefined
 }
 
+// utm_content: только токен диалога Instagram-агента (случайная строка, см.
+// aiAgent/dmReminder.ts); любое другое значение не берём.
+function cleanUtmContent(x: unknown): string | undefined {
+  return typeof x === 'string' && UTM_CONTENT_RE.test(x.trim()) ? x.trim() : undefined
+}
+
 export function pickUtm(search: string, storedRaw: string | null): { utm: ToolEventUtm; persist: boolean } {
   const p = new URLSearchParams(search)
   const fromUrl: ToolEventUtm = {}
   const s = cleanUtmValue(p.get('utm_source')); if (s) fromUrl.source = s
   const m = cleanUtmValue(p.get('utm_medium')); if (m) fromUrl.medium = m
   const c = cleanUtmValue(p.get('utm_campaign')); if (c) fromUrl.campaign = c
-  if (fromUrl.source || fromUrl.medium || fromUrl.campaign) return { utm: fromUrl, persist: true }
+  const ct = cleanUtmContent(p.get('utm_content')); if (ct) fromUrl.content = ct
+  if (fromUrl.source || fromUrl.medium || fromUrl.campaign || fromUrl.content) return { utm: fromUrl, persist: true }
   try {
     const v = storedRaw ? JSON.parse(storedRaw) : null
     if (v && typeof v === 'object' && !Array.isArray(v)) {
@@ -101,6 +108,7 @@ export function pickUtm(search: string, storedRaw: string | null): { utm: ToolEv
       const ss = cleanUtmValue(v.source); if (ss) utm.source = ss
       const sm = cleanUtmValue(v.medium); if (sm) utm.medium = sm
       const sc = cleanUtmValue(v.campaign); if (sc) utm.campaign = sc
+      const sct = cleanUtmContent(v.content); if (sct) utm.content = sct
       return { utm, persist: false }
     }
   } catch {}

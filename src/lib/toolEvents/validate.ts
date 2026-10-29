@@ -1,5 +1,5 @@
 import {
-  isToolEventName, isToolEventTool, TOOL_EVENT_LANGS, TOOL_EVENT_MEDIUMS, VISITOR_ID_RE,
+  isToolEventName, isToolEventTool, TOOL_EVENT_LANGS, TOOL_EVENT_MEDIUMS, UTM_CONTENT_RE, VISITOR_ID_RE,
   type ToolEventLang, type ToolEventMedium, type ToolEventName, type ToolEventToolOrNone,
 } from './schema'
 
@@ -23,6 +23,9 @@ export interface ToolEventRow {
   utm_source: string | null
   utm_medium: string | null
   utm_campaign: string | null
+  // Есть в строке ТОЛЬКО когда пришёл валидный токен: до миграции
+  // tool_events_utm_content.sql колонки нет, и лишний ключ ронял бы вставку всех событий.
+  utm_content?: string
   referrer_host: string | null
   device: 'mobile' | 'desktop' | null
   internal: boolean
@@ -50,6 +53,7 @@ export function parseToolEventPayload(raw: unknown): ToolEventRow | null {
   const utm = b.utm && typeof b.utm === 'object' && !Array.isArray(b.utm) ? (b.utm as Record<string, unknown>) : {}
   const host = typeof b.referrerHost === 'string' ? b.referrerHost.trim().toLowerCase() : ''
   const device = b.device === 'mobile' || b.device === 'desktop' ? b.device : null
+  const content = typeof utm.content === 'string' && UTM_CONTENT_RE.test(utm.content.trim()) ? utm.content.trim() : null
 
   return {
     event: b.event,
@@ -60,6 +64,7 @@ export function parseToolEventPayload(raw: unknown): ToolEventRow | null {
     utm_source: utmValue(utm.source),
     utm_medium: utmValue(utm.medium),
     utm_campaign: utmValue(utm.campaign),
+    ...(content ? { utm_content: content } : {}),
     referrer_host: HOST_RE.test(host) ? host : null,
     device,
     internal: b.internal === true,

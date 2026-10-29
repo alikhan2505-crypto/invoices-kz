@@ -31,6 +31,11 @@
 //                     (пересланный рилс/пост/сторис, share, видео, файл).
 //   @attachment_image доп. маркер в той же строке: то же и для обычного ФОТО.
 //                     Без него фото по-прежнему идёт в ИИ с распознаванием.
+//   @reminder         (channel dm) ВКЛЮЧАЕТ напоминание через ~2 часа после ответа на
+//                     КОНТРАГЕНТ, если человек не открыл ссылку и не писал; reply_text --
+//                     текст напоминания (пусто = текст по умолчанию из кода). Вся логика
+//                     и гарантии -- в dmReminder.ts. Выключить: удалить строку или
+//                     заменить маркер на @reminder_off.
 
 import { triggerMatches, isSpecialTrigger } from '@/lib/triggerMatch'
 import { parseTemplateReplyText } from '@/lib/instagramButtonTemplate'
@@ -41,6 +46,7 @@ export const SPECIAL_TRIGGERS = {
   attachment: '@attachment',
   attachmentImage: '@attachment_image',
   codeword: '@codeword',
+  reminder: '@reminder',
 } as const
 
 export interface TemplateRow {

@@ -11,6 +11,8 @@ const h = vi.hoisted(() => {
     sends: [] as { kind: string; to: string; text: string }[],
     failPrivate: false,
     failButton: null as null | { status: number },
+    failDm: false,
+    reminders: [] as any[],
     ownerIsAdmin: true,
     convs: {} as Record<string, string>,
     aiCalls: 0,
@@ -25,11 +27,29 @@ vi.mock('@supabase/supabase-js', () => {
   return {
     createClient: () => ({
       from(table: string) {
-        const q: any = { table, op: 'select', payload: null, filters: [] as any[], or: null as string | null, order: false }
+        const q: any = { table, op: 'select', payload: null, filters: [] as any[], or: null as string | null, order: false, cols: undefined as string | undefined }
         const resolve = (mode: string) => {
           state.queries.push({ table, op: q.op })
           const f = (c: string) => q.filters.find((x: any) => x[1] === c)
+          if (table === 'ig_dm_reminders') {
+            const conv = q.filters.find((x: any) => x[1] === 'conversation_id')?.[2]
+            const status = q.filters.find((x: any) => x[1] === 'status')?.[2]
+            if (q.op === 'upsert') {
+              if (!state.reminders.some(r => r.conversation_id === q.payload.conversation_id)) state.reminders.push({ ...q.payload })
+              return { data: null, error: null }
+            }
+            if (q.op === 'update') {
+              for (const r of state.reminders) if (r.conversation_id === conv && r.status === status) Object.assign(r, q.payload)
+              return { data: null, error: null }
+            }
+            return { data: state.reminders.find(r => r.conversation_id === conv) ?? null, error: null }
+          }
           if (table === 'ai_agent_messages') {
+            if (q.op === 'select' && q.cols === 'created_at') {
+              const inbound = state.messages.filter(m => m.direction === 'inbound')
+              const last = inbound[inbound.length - 1]
+              return { data: last ? { created_at: last.created_at } : null, error: null }
+            }
             if (q.op === 'insert') {
               const ext = q.payload.external_id
               if (ext && state.messages.some(m => m.external_id === ext)) return { data: null, error: { code: '23505', message: 'dup' } }
@@ -84,7 +104,7 @@ vi.mock('@supabase/supabase-js', () => {
           return { data: mode === 'await' ? [] : null, error: null }
         }
         const b: any = {
-          select() { return b },
+          select(c?: string) { q.cols = c; return b },
           insert(p: any) { q.op = 'insert'; q.payload = p; return b },
           upsert(p: any) { q.op = 'upsert'; q.payload = p; return b },
           update(p: any) { q.op = 'update'; q.payload = p; return b },
@@ -137,7 +157,10 @@ vi.mock('@/lib/instagram', async () => {
   return {
     InstagramApiError,
     replyToComment: async (id: string, text: string) => { h.state.sends.push({ kind: 'comment', to: id, text }) },
-    sendDirectMessage: async (id: string, text: string) => { h.state.sends.push({ kind: 'dm', to: id, text }) },
+    sendDirectMessage: async (id: string, text: string) => {
+      if (h.state.failDm) throw new InstagramApiError('(#10) outside window', 400)
+      h.state.sends.push({ kind: 'dm', to: id, text })
+    },
     sendDirectImage: async () => {},
     sendInstagramFlowStep: async () => {},
     sendInstagramButtonTemplate: async (id: string, b: any) => {
@@ -185,6 +208,8 @@ beforeEach(() => {
   h.state.sends = []
   h.state.failPrivate = false
   h.state.failButton = null
+  h.state.failDm = false
+  h.state.reminders = []
   h.state.ownerIsAdmin = true
   h.state.convs = {}
   h.state.aiCalls = 0
@@ -444,5 +469,83 @@ describe('служебный блок не утекает клиенту в др
     h.state.templates = [t('p', null, ['цена'], 'Тарифы тут\n\n@@button\ntitle: Т\nbutton: Открыть\nurl: https://invoices.kz/x')]
     await handleTenantIncoming(conn, comment('c1', 'Цена?'))
     expect(h.state.sends).toEqual([{ kind: 'comment', to: 'c1', text: 'Тарифы тут' }])
+  })
+})
+
+// Напоминание через 2 часа (dmReminder.ts): токен диалога в ссылках ответа на КОНТРАГЕНТ.
+describe('токен напоминания в ответе на КОНТРАГЕНТ', () => {
+  const REM = t('rem', 'dm', ['@reminder'], '')
+  const SCHET = t('schet', 'dm', ['^счёт', '@codeword'], 'Ссылка на счёт https://invoices.kz/go/dm-schet')
+  const TOKEN_LINK = /https:\/\/invoices\.kz\/go\/dm-kontragent\?utm_content=([A-Za-z0-9_-]{16})/
+
+  it('БЕЗ строки @reminder: ответ байт-в-байт прежний, ни токена, ни записей (выключено по умолчанию)', async () => {
+    h.state.templates = [...SPECIAL, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    await handleTenantIncoming(conn, dm('d1', 'контрагент'))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: OLD_TEXT }])
+    expect(h.state.reminders).toEqual([])
+    expect(JSON.stringify(h.state.sends)).not.toContain('utm_content')
+  })
+
+  it('со строкой @reminder: слово текстом -- токен в ссылке, строка pending, в журнале то же, что получил клиент', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    await handleTenantIncoming(conn, dm('d1', 'контрагент'))
+    const sent = h.state.sends[0]
+    expect(sent.kind).toBe('dm')
+    const m = sent.text.match(TOKEN_LINK)
+    expect(m).not.toBeNull()
+    expect(h.state.reminders).toHaveLength(1)
+    expect(h.state.reminders[0]).toMatchObject({ status: 'pending', token: m![1], agent_id: 'agent1' })
+    expect(h.state.messages.filter(x => x.direction === 'outbound').map(x => x.text)).toEqual([sent.text])
+    // токен не выводится из данных человека
+    expect(m![1]).not.toMatch(/u1|ivan/i)
+  })
+
+  it('нажатие «готового вопроса»: карточка, у кнопки тот же токен', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    await handleTenantIncoming(conn, dm('pb:m1', 'КОНТРАГЕНТ', { loggedText: 'Проверить контрагента по БИН', fromPostback: true }))
+    expect(h.state.sends.map(s => s.kind)).toEqual(['button'])
+    const btn = JSON.parse(h.state.sends[0].text)
+    expect(btn.url).toMatch(/^https:\/\/invoices\.kz\/go\/dm-kontragent-btn\?utm_content=[A-Za-z0-9_-]{16}$/)
+    expect(h.state.reminders[0]).toMatchObject({ status: 'pending', token: btn.url.split('=')[1] })
+  })
+
+  it('второе КОНТРАГЕНТ в том же диалоге: строка одна, токен прежний (одно напоминание на диалог)', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    await handleTenantIncoming(conn, dm('d1', 'контрагент'))
+    await handleTenantIncoming(conn, dm('d2', 'контрагент'))
+    expect(h.state.reminders).toHaveLength(1)
+    const tokens = h.state.sends.map(s => s.text.match(TOKEN_LINK)?.[1])
+    expect(tokens[0]).toBeTruthy()
+    expect(tokens[1]).toBe(tokens[0])
+  })
+
+  it('другие кодовые слова (СЧЁТ) токен не получают и напоминаний не создают', async () => {
+    h.state.templates = [...SPECIAL, REM, SCHET]
+    await handleTenantIncoming(conn, dm('d1', 'счёт'))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: 'Ссылка на счёт https://invoices.kz/go/dm-schet' }])
+    expect(h.state.reminders).toEqual([])
+  })
+
+  it('отправка ответа не удалась: строка остаётся prepared, напоминания о неполученной ссылке не будет', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    h.state.failDm = true
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(handleTenantIncoming(conn, dm('d1', 'контрагент'))).resolves.toBeUndefined()
+    log.mockRestore()
+    expect(h.state.reminders).toHaveLength(1)
+    expect(h.state.reminders[0].status).toBe('prepared')
+  })
+
+  it('комментарий с кодовым словом (Private Reply): токена и напоминания нет', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kontr', 'dm', ['контрагент', 'бин', '@codeword'], BTN_ROW)]
+    await handleTenantIncoming(conn, comment('cm1', 'Контрагент'))
+    expect(JSON.stringify(h.state.sends)).not.toContain('utm_content')
+    expect(h.state.reminders).toEqual([])
+  })
+
+  it('строка @reminder не срабатывает на текст клиента', async () => {
+    h.state.templates = [...SPECIAL, REM]
+    await handleTenantIncoming(conn, dm('d1', '@reminder'))
+    expect(h.state.sends[0].text).toBe('AI-ответ')
   })
 })
