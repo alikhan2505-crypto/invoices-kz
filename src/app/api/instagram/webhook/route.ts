@@ -270,6 +270,8 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-hub-signature-256')
   if (!verifySignature(rawBody, signature)) {
+    // Без этой строки отброшенный по подписи вебхук был невидим (29.10.2026, поиск потерянных тапов).
+    console.warn('instagram webhook: invalid signature', JSON.stringify({ hasHeader: !!signature, bodyLen: rawBody.length }))
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
