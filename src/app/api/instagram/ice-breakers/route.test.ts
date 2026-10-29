@@ -47,7 +47,7 @@ describe('/api/instagram/ice-breakers', () => {
     expect(h.calls[0].method).toBe('POST')
     expect(h.calls[0].body.platform).toBe('instagram')
     expect(h.calls[0].body).not.toHaveProperty('access_token')
-    expect(h.calls[0].body.ice_breakers[0]).not.toHaveProperty('locale')
+    expect(h.calls[0].body.ice_breakers[0].locale).toBe('default')
     expect(h.calls[1].url).toContain('/me/subscribed_apps?subscribed_fields=comments%2Cmessages%2Cmessaging_postbacks')
   })
 

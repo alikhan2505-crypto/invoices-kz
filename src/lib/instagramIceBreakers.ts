@@ -1,11 +1,11 @@
 // Чистая часть «готовых вопросов» Instagram (Ice Breakers), без сети.
 // Формат (документация Meta, Ice Breakers): POST /<IG_ID>/messenger_profile
 // { platform: 'instagram', ice_breakers: [{ call_to_actions: [{question, payload}] }] }
-// Максимум 4 вопроса. Поле locale в документации Instagram необязательно (в примере
-// оно есть только для набора на отдельный язык, например zh_CN); значение
-// «default» -- правило Messenger Platform, для Instagram оно в документации не
-// названо, поэтому не отправляется. Ice Breakers не показываются в десктопной
-// версии Instagram.
+// Максимум 4 вопроса. locale: 'default' ОБЯЗАТЕЛЕН на деле, хотя в документации
+// Instagram он «необязательный»: без него Meta отвечает «Invalid parameter»
+// (code 100, subcode 2534058: набор ключей должен быть (call_to_actions, locale)).
+// Проверено живьём 29.10.2026. Ice Breakers не показываются в десктопной версии
+// Instagram.
 
 import type { IceBreakerItem } from './instagram'
 
@@ -45,6 +45,6 @@ export function buildIceBreakersBody(items: IceBreakerItem[]) {
   if (!checked.ok) throw new Error(checked.error)
   return {
     platform: 'instagram',
-    ice_breakers: [{ call_to_actions: checked.items }],
+    ice_breakers: [{ locale: 'default', call_to_actions: checked.items }],
   }
 }

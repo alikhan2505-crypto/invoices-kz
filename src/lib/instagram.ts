@@ -500,8 +500,8 @@ export async function sendPrivateReply(commentId: string, message: string, crede
 export interface IceBreakerItem { question: string; payload: string }
 
 // Готовые вопросы (Ice Breakers): POST /<IG_ID>/messenger_profile,
-// platform=instagram, до 4 вопросов; locale не отправляется (в документации
-// Instagram он нужен только для набора на отдельный язык).
+// platform=instagram, до 4 вопросов, locale: 'default' (без него Meta отвечает
+// «Invalid parameter», см. instagramIceBreakers.ts).
 // Нажатие приходит вебхуком messaging_postbacks (postback.payload).
 export async function setInstagramIceBreakers(igUserId: string, accessToken: string, items: IceBreakerItem[]): Promise<void> {
   // Токен -- в строке запроса, как в документации Meta (в теле Meta отвечала
