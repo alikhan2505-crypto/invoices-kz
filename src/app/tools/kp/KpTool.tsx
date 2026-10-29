@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
+import KkReviewNotice from '@/components/KkReviewNotice'
 import { track } from '@vercel/analytics'
 import { generateKP } from '@/lib/generateKP'
 import { KK_DOC_UNDER_REVIEW, type KpLang } from '@/lib/kpI18n'
@@ -280,6 +281,9 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="kp" lang={lang} />
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts): под шапкой, над заголовком; для ru/en и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-4 sm:mb-5" />}
 
         <h1 className="text-xl sm:text-2xl lg:text-3xl leading-tight sm:leading-snug font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}

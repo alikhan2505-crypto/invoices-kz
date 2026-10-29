@@ -15,13 +15,14 @@
 // Пока миграция не применена или аккаунт — админ, сервер отвечает
 // available: false, и карточки нет вовсе.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { withReturnPath } from '@/lib/returnPath'
-import { claimProfileBonus, fetchProfileBonusStatus, showBonusToast, BONUS_TRIED_KEY as TRIED_KEY } from '@/lib/profileBonusClient'
+import { claimProfileBonus, takeProfileBonusStatus, showBonusToast, BONUS_TRIED_KEY as TRIED_KEY } from '@/lib/profileBonusClient'
 import {
   PROFILE_BONUS_BLOCKS, PROFILE_BONUS_TENGE, isTerminalBonusReason, blockToFix,
   type BonusStatusResponse, type ProfileBonusBlock, type BonusIneligibleReason, type BonusClaimResponse,
@@ -105,12 +106,18 @@ export default function ProfileBonusCard() {
   const cardRef = useRef<HTMLElement | null>(null)
   const [heightHint, setHeightHint] = useState(0)
 
-  useEffect(() => { setHeightHint(readHeightHint()) }, [])
+  // До первой отрисовки, а не после неё: обычный эффект срабатывал уже после
+  // того, как страница показала колонку без плашки, и плашка (замер 29.10:
+  // +296 px у кнопки «Удалить аккаунт») сдвигала её через ~100 мс.
+  useLayoutEffect(() => { setHeightHint(readHeightHint()) }, [])
   // Запомнить высоту показанной карточки; если карточки нет, подсказку сбросить.
+  // Короткую плашку «всё получено» (div, а не section) не запоминаем: на следующем
+  // заходе карточки уже не будет, и держать для неё место значило бы дать скачок вверх.
   useEffect(() => {
     if (!status || !rows) return
     try {
-      const h = cardRef.current?.offsetHeight ?? 0
+      const el = cardRef.current
+      const h = el && el.tagName === 'SECTION' ? el.offsetHeight : 0
       if (h > 0) localStorage.setItem(HEIGHT_HINT_KEY, String(h))
       else localStorage.removeItem(HEIGHT_HINT_KEY)
     } catch {}
@@ -133,10 +140,10 @@ export default function ProfileBonusCard() {
     applyRow(block, rowFromClaim(block, result))
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false
     async function run() {
-      const s = await fetchProfileBonusStatus()
+      const s = await takeProfileBonusStatus()
       if (cancelled) return
       if (!s || !s.available) {
         // Карточки не будет: убрать держащую место плашку и забыть подсказку.
@@ -144,7 +151,6 @@ export default function ProfileBonusCard() {
         setHeightHint(0)
         return
       }
-      setStatus(s)
       const initial = Object.fromEntries(
         PROFILE_BONUS_BLOCKS.map(b => [b, { state: s.blocks[b].state, reason: s.blocks[b].reason }]),
       ) as Record<ProfileBonusBlock, RowState>
@@ -157,9 +163,13 @@ export default function ProfileBonusCard() {
         else if (tried.reason) initial[b] = { state: 'missing', reason: tried.reason }
       }
       rowsRef.current = initial
-      setRows(initial)
-      // Всё было закрыто ещё до захода — «всё получено» не показываем.
+      // Всё было закрыто ещё до захода — «всё получено» не показываем. Выставляем
+      // до setState: при синхронной отрисовке ниже рендер уже читает этот флаг.
       announcedRef.current = PROFILE_BONUS_BLOCKS.every(b => isDone(initial[b]))
+      // Синхронно и до отрисовки: ответ часто уже готов (его просит страница, пока
+      // грузит свои данные), и тогда карточка попадает в первый же кадр колонки, а не
+      // появляется через 1-3 кадра и не сдвигает всё ниже на ~300 px.
+      flushSync(() => { setStatus(s); setRows(initial) })
 
       // По одному: реквизиты и банк смотрят в один и тот же реестр.
       for (const block of toClaim) {

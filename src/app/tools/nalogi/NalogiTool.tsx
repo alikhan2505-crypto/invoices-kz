@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
+import KkReviewNotice from '@/components/KkReviewNotice'
 import { track } from '@vercel/analytics'
 import { calculateIpTaxes, MRP_2026, MZP_2026 } from '@/lib/ipTaxes'
 import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
@@ -142,6 +143,9 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="nalogi" lang={lang} />
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts): под шапкой, над заголовком; для ru/en и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-4 sm:mb-5" />}
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}

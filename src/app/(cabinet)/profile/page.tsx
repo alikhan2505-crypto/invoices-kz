@@ -18,6 +18,7 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import Skeleton from '@/components/Skeleton'
 import ProfileBonusCard from '@/components/ProfileBonusCard'
+import { prefetchProfileBonusStatus } from '@/lib/profileBonusClient'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { binWatchDict } from '@/lib/i18n/binWatch'
@@ -287,6 +288,8 @@ export default function Profile() {
   const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
+    // Статус карточки «Готовность к счёту» грузится параллельно данным страницы, а не после них.
+    prefetchProfileBonusStatus()
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }

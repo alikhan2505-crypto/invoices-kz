@@ -14,7 +14,9 @@ import { TOOL_CHROME, TOOL_LANGS, TOOL_LANG_LABEL, TOOL_LANG_NAME, toolPath, typ
 export function useToolDocumentLang(lang: ToolLang) {
   const { lang: siteLang } = useLanguage()
   const siteLangRef = useRef(siteLang)
-  siteLangRef.current = siteLang
+  // Ref обновляем в эффекте, а не в рендере (правило react-hooks/refs): cleanup
+  // ниже срабатывает при уходе со страницы и читает актуальный язык сайта.
+  useEffect(() => { siteLangRef.current = siteLang }, [siteLang])
   useEffect(() => {
     const id = window.setTimeout(() => document.documentElement.setAttribute('lang', lang), 0)
     return () => {

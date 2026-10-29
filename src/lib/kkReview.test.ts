@@ -95,6 +95,29 @@ describe('реестр kkReview', () => {
     expect(KK_REVIEW_BIK_SLUGS.length).toBe(BIK_BANK_PAGES.length)
   })
 
+  // Плашка стоит под шапкой, над заголовком страницы (а не над логотипом): тот
+  // же порядок на инструментах, в гайдах и на страницах банков.
+  it('плашка везде после шапки и до заголовка h1, общего layout над логотипом нет', () => {
+    const root = process.cwd()
+    expect(fs.existsSync(path.join(root, 'src', 'app', 'tools', 'kk', 'layout.tsx'))).toBe(false)
+    const files = [
+      ...LOCALIZED_TOOL_SLUGS.map(slug => `src/app/tools/${slug}/${slug === 'kp' ? 'Kp' : slug[0].toUpperCase() + slug.slice(1)}Tool.tsx`),
+      'src/lib/tools-i18n/ToolsIndexView.tsx',
+      'src/app/guides/GuideShell.tsx',
+      'src/app/guides/kk/page.tsx',
+      'src/app/bik/BikShell.tsx',
+    ]
+    for (const f of files) {
+      const src = fs.readFileSync(path.join(root, f), 'utf8')
+      const notice = src.indexOf('<KkReviewNotice')
+      const header = Math.max(src.indexOf('<ToolLangSwitch'), src.indexOf('<BrandWordmark'))
+      const h1 = src.indexOf('<h1')
+      expect(notice, `${f}: плашки нет`).toBeGreaterThan(-1)
+      expect(notice, `${f}: плашка выше шапки`).toBeGreaterThan(header)
+      expect(notice, `${f}: плашка ниже заголовка`).toBeLessThan(h1)
+    }
+  })
+
   it('в тексте записей и в реестре нет длинного тире', () => {
     const text = JSON.stringify(KK_REVIEW_ENTRIES)
     expect(text.includes('—')).toBe(false)

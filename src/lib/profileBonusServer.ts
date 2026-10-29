@@ -212,18 +212,26 @@ export async function getProfileBonusStatus(userId: string): Promise<BonusStatus
       signature: { state: 'missing' },
     },
   }
-  const profile = await loadProfile(userId)
+  // База в Сингапуре, функция в США: каждый последовательный запрос стоит ~250 мс,
+  // а три чтения друг от друга не зависят, поэтому идут одним заходом. Счета
+  // читаем всегда: нужны они только если банковый бонус ещё не получен, но
+  // лишнее чтение по индексу дешевле лишнего захода туда и обратно.
+  const [profile, granted, accountsRead] = await Promise.all([
+    loadProfile(userId),
+    loadGrantedBlocks(userId),
+    loadBankAccounts(userId).then(rows => ({ rows, error: null as Error | null }), (error: Error) => ({ rows: [], error })),
+  ])
   if (!profile) return unavailable
   const account = accountFacts(profile)
   if (account.isAdmin || account.deleted) return unavailable
-
-  const granted = await loadGrantedBlocks(userId)
   if (granted === null) return unavailable
+  if (accountsRead.error && !granted.has('bank')) throw accountsRead.error
 
-  const accounts = granted.has('bank') ? [] : await loadBankAccounts(userId)
+  const accounts = granted.has('bank') ? [] : accountsRead.rows
   const result: BonusStatusResponse = { ...unavailable, available: true, blocks: { ...unavailable.blocks } }
-  for (const block of PROFILE_BONUS_BLOCKS) {
-    if (granted.has(block)) { result.blocks[block] = { state: 'claimed' }; continue }
+  // Проверки по (block, bin) тоже независимы: реквизиты и банк спрашиваем вместе.
+  await Promise.all(PROFILE_BONUS_BLOCKS.map(async block => {
+    if (granted.has(block)) { result.blocks[block] = { state: 'claimed' }; return }
     let pre: BonusDecision
     if (block === 'requisites') pre = requisitesPrecheck(profile)
     else if (block === 'bank') {
@@ -236,9 +244,9 @@ export async function getProfileBonusStatus(userId: string): Promise<BonusStatus
     }
     if (pre.eligible && block !== 'signature' && (await binAlreadyRewarded(userId, block, pre.bin))) {
       result.blocks[block] = { state: 'missing', reason: 'bin_already_rewarded' }
-      continue
+      return
     }
     result.blocks[block] = pre.eligible ? { state: 'ready' } : { state: 'missing', reason: pre.reason }
-  }
+  }))
   return result
 }

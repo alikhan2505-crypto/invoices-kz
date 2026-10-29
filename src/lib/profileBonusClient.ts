@@ -52,6 +52,30 @@ export async function fetchProfileBonusStatus(): Promise<BonusStatusResponse | n
   }
 }
 
+// Опережающий запрос состояния для карточки «Готовность к счёту» на /profile.
+// Страница сначала грузит свои данные (профиль, счётчики: несколько секунд до
+// базы в Сингапуре), и только потом монтирует карточку; без опережения запрос
+// статуса стартовал бы лишь после этого и время складывалось (8-9 с вместо 4-5).
+// Страница зовёт prefetch в самом начале, карточка забирает готовый ответ (take);
+// запись живёт до конца текущего тика (так один раз проходят и двойной запуск
+// эффекта в dev-режиме React), а повторный заход за свежими данными всегда
+// идёт новым запросом.
+const PREFETCH_TTL_MS = 30_000
+let prefetched: { promise: Promise<BonusStatusResponse | null>; at: number } | null = null
+
+export function prefetchProfileBonusStatus(): void {
+  if (prefetched && Date.now() - prefetched.at < PREFETCH_TTL_MS) return
+  prefetched = { promise: fetchProfileBonusStatus(), at: Date.now() }
+}
+
+/** Готовый (или ещё летящий) опережающий ответ, иначе обычный запрос. */
+export function takeProfileBonusStatus(): Promise<BonusStatusResponse | null> {
+  const entry = prefetched
+  const hit = entry && Date.now() - entry.at < PREFETCH_TTL_MS ? entry.promise : null
+  if (entry) setTimeout(() => { if (prefetched === entry) prefetched = null }, 0)
+  return hit ?? fetchProfileBonusStatus()
+}
+
 export function showBonusToast(text: string): void {
   if (typeof document === 'undefined') return
   // Две всплывашки подряд (реквизиты + банк) — друг над другом, а не одна на другой.

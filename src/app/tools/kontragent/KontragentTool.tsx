@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
+import KkReviewNotice from '@/components/KkReviewNotice'
 import { motion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
@@ -188,6 +189,9 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="kontragent" lang={lang} />
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts): под шапкой, над заголовком; для ru/en и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-4 sm:mb-5" />}
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}

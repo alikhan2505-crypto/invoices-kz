@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { bikHubLink } from '@/lib/bikLinks'
 import BrandWordmark from '@/components/BrandWordmark'
+import KkReviewNotice from '@/components/KkReviewNotice'
 import { track } from '@vercel/analytics'
 import { KAZAKHSTAN_BANKS, OTHER_BANK } from '@/lib/kazakhstanBanks'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -96,9 +97,16 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     picked: { ...pickRequisites(f, REQ_KEYS), kbe: kbeManual ? f.kbe : '' },
   })
 
+  // Согласие на рассылку для email продавца — галочка стоит по умолчанию
+  // (решение основателя 14.10.2026, как в /tools/kp); снять можно здесь и по
+  // ссылке «Отписаться» в любом письме (политика конфиденциальности).
+  const [marketingConsent, setMarketingConsent] = useState(true)
+
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
   useEffect(() => {
+    // Чтение localStorage возможно только после монтирования (SSR/гидратация), поэтому setState в эффекте.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     try { if (localStorage.getItem(CONSENT_KEY) === '0') setMarketingConsent(false) } catch {}
     let draft: Partial<Form> | null = null
     try {
@@ -129,7 +137,6 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     let appliedCount = withSaved.applied.length
     if (!manual && sameParty && saved.kbe) { next = { ...next, kbe: saved.kbe }; manual = true; appliedCount++ }
     try { if (manual) localStorage.setItem(KBE_MANUAL_KEY, '1') } catch {}
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setKbeManual(manual)
     setF(next)
     noteApplied(appliedCount)
@@ -156,10 +163,6 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     try { localStorage.setItem(KBE_MANUAL_KEY, '1') } catch {}
     set({ kbe: digits(value).slice(0, 2) })
   }
-  // Согласие на рассылку для email продавца — галочка стоит по умолчанию
-  // (решение основателя 14.10.2026, как в /tools/kp); снять можно здесь и по
-  // ссылке «Отписаться» в любом письме (политика конфиденциальности).
-  const [marketingConsent, setMarketingConsent] = useState(true)
   const changeConsent = (on: boolean) => {
     setMarketingConsent(on)
     try { localStorage.setItem(CONSENT_KEY, on ? '1' : '0') } catch {}
@@ -322,6 +325,9 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
           <BrandWordmark height={15} />
           <ToolLangSwitch slug="schet" lang={lang} />
         </div>
+
+        {/* Плашка «текст проверяется» (реестр: src/lib/kkReview.ts): под шапкой, над заголовком; для ru/en и вне реестра её нет. */}
+        {lang === 'kk' && <KkReviewNotice className="mb-4 sm:mb-5" />}
 
         <h1 className="text-xl sm:text-2xl lg:text-3xl leading-tight sm:leading-snug font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}

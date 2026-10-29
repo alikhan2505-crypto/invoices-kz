@@ -4,9 +4,12 @@
 //
 // Что здесь есть:
 //  - страницы (scope 'page'): адреса kk-страниц, на которых показывается плашка
-//    «текст проверяется» (src/components/KkReviewNotice.tsx). Подключена в трёх
-//    общих обёртках: src/app/tools/kk/layout.tsx, src/app/guides/GuideShell.tsx
-//    и src/app/bik/BikShell.tsx, поэтому на страницы ничего дописывать не нужно;
+//    «текст проверяется» (src/components/KkReviewNotice.tsx). Везде стоит под
+//    шапкой (логотип и переключатель языка), над заголовком страницы: в общих
+//    обёртках src/app/guides/GuideShell.tsx, src/app/bik/BikShell.tsx,
+//    src/app/guides/kk/page.tsx и в шапке каждого инструмента (src/app/tools/*/
+//    *Tool.tsx, индекс src/lib/tools-i18n/ToolsIndexView.tsx). Новый
+//    инструмент: поставить плашку сразу после шапки, как в соседних;
 //  - документы и интерфейс (scope 'document' и 'ui'): справочно, без плашки
 //    (у документа свой флаг KK_DOC_UNDER_REVIEW в src/lib/kpI18n.ts, язык
 //    интерфейса переключается кнопкой, а не адресом).
