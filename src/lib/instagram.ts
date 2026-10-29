@@ -396,11 +396,10 @@ export async function sendDirectMessage(recipientId: string, message: string, cr
 
   const res = await fetch(`${GRAPH_API}/${igUserId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...bearer(accessToken) },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: { text: message },
-      access_token: accessToken,
     }),
   })
   const data = await res.json()
@@ -477,11 +476,10 @@ export async function sendDirectImage(recipientId: string, imageUrl: string, cre
 
   const res = await fetch(`${GRAPH_API}/${igUserId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...bearer(accessToken) },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: { attachment: { type: 'image', payload: { url: imageUrl } } },
-      access_token: accessToken,
     }),
   })
   const data = await res.json()
@@ -520,11 +518,10 @@ export function buildInstagramFlowMessage(step: FlowStep): InstagramFlowMessage 
 export async function sendInstagramFlowStep(recipientId: string, step: FlowStep, credentials: { igUserId: string; accessToken: string }): Promise<void> {
   const res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...bearer(credentials.accessToken) },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: buildInstagramFlowMessage(step),
-      access_token: credentials.accessToken,
     }),
   })
   const data = await res.json()
