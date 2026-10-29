@@ -24,6 +24,7 @@ import { useBinLookup } from '@/components/useBinLookup'
 import { AISOIP_DATASET_URL } from '@/lib/aisoip'
 import { taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import PageHeader from '@/components/PageHeader'
+import BinWatchButton from '@/components/BinWatchButton'
 import PageContainer from '@/components/PageContainer'
 
 
@@ -1475,6 +1476,8 @@ export default function CreateInvoicePage() {
                               <div className="pt-1" style={{ color: 'var(--nav-text-muted)' }}>
                                 {c.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
                               </div>
+                              {/* «Следить за этим БИН»: пока админ-гейт включён, видна только админу. */}
+                              <BinWatchButton bin={c.bin} lang={lang} className="pt-2" />
                             </>
                           )
                         })()}

@@ -44,6 +44,8 @@ export type NotificationEventKey =
   // Настраивается в другом месте / отдельная колонка
   | 'cfo_morning_digest'
   | 'welcome_series'
+  // Владельцу - слежение за БИН (пока только админам, см. src/lib/binWatch/config.ts)
+  | 'bin_watch_changed'
   // Что получают клиенты продавца
   | 'client_invoice_email'
   | 'client_recurring_invoice'
@@ -230,6 +232,13 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     descRu: 'Несколько писем в первую неделю: бонусы за профиль, обзор сервисов, приёмы.',
     channels: ['email'], toggleable: ['email'],
     sentFrom: ['src/app/api/hooks/welcome-instant/route.ts', 'src/app/api/cron/welcome-drip/route.ts'],
+  },
+  {
+    key: 'bin_watch_changed', audience: 'owner', group: 'account',
+    labelRu: 'Контрагент на слежении: новый признак риска',
+    descRu: 'Письмо не чаще раза в сутки, если у БИН из вашего списка слежения появился новый признак риска.',
+    channels: ['email'], toggleable: ['email'],
+    sentFrom: ['src/app/api/cron/bin-watch/route.ts', 'src/lib/binWatch/run.ts'],
   },
   // ---------- Что получают клиенты продавца ----------
   {

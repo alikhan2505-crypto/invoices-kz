@@ -18,6 +18,7 @@ import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import type { ToolEventMedium } from '@/lib/toolEvents/schema'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
+import BinWatchButton from '@/components/BinWatchButton'
 import { kontragentDict } from './dict'
 
 // Один и тот же инструмент для /tools/kontragent, /tools/kk/kontragent и
@@ -413,6 +414,14 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                     </div>
                   </div>
                 </div>
+
+                {/* «Следить за этим БИН»: пока админ-гейт включён, видна только вошедшему админу. */}
+                <BinWatchButton
+                  bin={c.bin}
+                  lang={lang}
+                  className="mt-3"
+                  onSignInClick={() => { setLang(lang); track('tool_kontragent_watch_click', { lang }) }}
+                />
 
                 {c.hasFullCard && (
                   <div className="rounded-xl p-4 mt-3" style={{ background: 'var(--nav-surface-glass)', border: '1px dashed var(--nav-border)' }}>

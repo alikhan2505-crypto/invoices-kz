@@ -191,6 +191,13 @@ export interface PerformBinLookupOptions {
    * повторы Минюста растягивают ответ до ~9 с.
    */
   extras?: boolean
+  /**
+   * Сколько миллисекунд строка кэша считается свежей (по умолчанию сутки). Слежение
+   * за БИН (крон /api/cron/bin-watch) ставит меньше суток: иначе ночной прогон мог
+   * бы прочитать данные, закэшированные почти сутки назад, и узнавать об изменении
+   * на день позже.
+   */
+  cacheTtlMs?: number
 }
 
 export async function performBinLookup(
@@ -204,7 +211,7 @@ export async function performBinLookup(
     .eq('bin', bin)
     .maybeSingle()
 
-  if (cached && Date.now() - new Date(cached.fetched_at).getTime() < CACHE_TTL_MS) {
+  if (cached && Date.now() - new Date(cached.fetched_at).getTime() < (options.cacheTtlMs ?? CACHE_TTL_MS)) {
     const company: BinLookupResult = {
       bin: cached.bin,
       name: cached.name,

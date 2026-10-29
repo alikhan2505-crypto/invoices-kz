@@ -1,4 +1,5 @@
 'use client'
+import { BIN_WATCH_MAIL_EVENT, canUseBinWatch } from '@/lib/binWatch/config'
 // /profile/notifications — Telegram как главный канал (пошаговое подключение
 // с автоопределением), тумблеры по каждому событию × каналу, сгруппированные
 // по продуктам, и отдельный блок «Что получают ваши клиенты».
@@ -650,7 +651,7 @@ export default function Notifications() {
 
   const ownerGroups = OWNER_GROUP_ORDER
     .filter(g => isAdmin || !ADMIN_ONLY_GROUPS.has(g))
-    .map(g => ({ group: g, events: NOTIFICATION_EVENTS.filter(e => e.audience === 'owner' && e.group === g) }))
+    .map(g => ({ group: g, events: NOTIFICATION_EVENTS.filter(e => e.audience === 'owner' && e.group === g && (e.key !== BIN_WATCH_MAIL_EVENT || canUseBinWatch(isAdmin))) }))
     .filter(g => g.events.length > 0 || g.group === 'account')
   const clientEvents = NOTIFICATION_EVENTS.filter(e => e.audience === 'client')
   const anyPending = pending.size > 0

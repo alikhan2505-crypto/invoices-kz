@@ -20,6 +20,8 @@ import Skeleton from '@/components/Skeleton'
 import ProfileBonusCard from '@/components/ProfileBonusCard'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
+import { binWatchDict } from '@/lib/i18n/binWatch'
+import { canUseBinWatch } from '@/lib/binWatch/config'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -172,6 +174,14 @@ function AdminIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="5" y="11" width="14" height="9" rx="2" />
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+function EyeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   )
 }
@@ -446,6 +456,8 @@ export default function Profile() {
 
   const documentItems: (MenuItem & { allowed?: boolean })[] = [
     { icon: <PeopleIcon />, label: t.clientsMenuLabel, href: '/profile/clients', count: loading ? undefined : stats.clients },
+    // «Слежение за БИН»: пока админ-гейт включён (src/lib/binWatch/config.ts), пункт виден только админу.
+    ...(canUseBinWatch(isAdmin) ? [{ icon: <EyeIcon />, label: binWatchDict[lang].menuLabel, href: '/profile/bin-watch' }] : []),
     { icon: <TagIcon />, label: t.servicesMenuLabel, href: '/profile/services', count: loading ? undefined : stats.services },
     { icon: <StarIcon />, label: t.templatesMenuLabel, href: '/profile/templates', proOnly: true, allowed: activePlan.canTemplates },
     { icon: <DocumentIcon />, label: t.documentsMenuLabel, href: '/profile/documents', proOnly: true, allowed: activePlan.canKpAvrNakl },

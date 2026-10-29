@@ -417,6 +417,11 @@ export const notificationEventTexts: Record<NotificationEventKey, EventTexts> = 
     kk: { label: 'Тіркелгеннен кейінгі кеңес хаттары', desc: 'Алғашқы аптада бірнеше хат: профиль үшін бонустар, қызметтерге шолу, жұмыс тәсілдері.' },
     en: { label: 'Tips emails after sign-up', desc: 'A few emails in your first week: profile bonuses, a tour of the services, handy tricks.' },
   },
+  bin_watch_changed: {
+    ru: { label: 'Контрагент на слежении: новый признак риска', desc: 'Письмо не чаще раза в сутки, если у БИН из вашего списка слежения появился новый признак риска.' },
+    kk: { label: 'Бақылаудағы контрагент: жаңа тәуекел белгісі', desc: 'Бақылау тізіміндегі БСН бойынша жаңа тәуекел белгісі пайда болса, хат тәулігіне бір реттен жиі келмейді.' },
+    en: { label: 'Watched counterparty: a new risk sign', desc: 'An email at most once a day when a BIN on your watch list gets a new risk sign.' },
+  },
   // ---------- Что получают клиенты продавца ----------
   client_invoice_email: {
     ru: { label: 'Письмо со счётом', desc: 'Уходит, только когда вы сами нажимаете «Отправить» на счёте.' },
