@@ -4,7 +4,7 @@ import { track } from '@vercel/analytics'
 import type { NameLookupRole, NameLookupTool } from '@/lib/toolQuota'
 import type { ToolLang } from './index'
 import { lookupAriaLabel, NAME_LOOKUP_TEXT } from './nameLookup'
-import { createAutoLookup, onlyBinDigits, sharedLookupSession, type AutoLookup, type AutoStatus } from './binAutofill'
+import { AUTO_NAME_LOOKUP_ENABLED, createAutoLookup, onlyBinDigits, sharedLookupSession, type AutoLookup, type AutoStatus } from './binAutofill'
 import { logToolEvent } from './toolEvents'
 
 // Поле БИН/ИИН для бесплатных документов /tools: название подставляется САМО,
@@ -53,6 +53,7 @@ export default function BinNameField({
     const c = createAutoLookup(sharedLookupSession(), {
       tool, role,
       getName: () => live.current.name,
+      autoSearch: AUTO_NAME_LOOKUP_ENABLED,
       onStatus: setStatus,
       onName: n => live.current.onName(n),
       onAutofilled: () => {
@@ -116,7 +117,7 @@ export default function BinNameField({
             const next = onlyBinDigits(e.target.value)
             typed.current = next
             onChange(next)
-            ctl.current?.change(next) // только живой ввод запускает автопоиск
+            ctl.current?.change(next) // только живой ввод; сеть трогает, только если автопоиск включён (binAutofill.ts)
           }} />
         <button type="button" onClick={() => void lookup()} disabled={!canLookup}
           aria-label={lookupAriaLabel(t.button, label)}

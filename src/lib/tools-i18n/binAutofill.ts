@@ -94,6 +94,12 @@ export interface AutoLookupHost {
   onName: (name: string) => void
   /** Автоподстановка реально положила название (для аналитики). */
   onAutofilled?: () => void
+  /**
+   * Искать ли название при наборе (по умолчанию да). false: только по кнопке; набор БИН
+   * лишь проверяет контрольную цифру и показывает подсказку «название осталось прежним»,
+   * сеть не трогает (решение основателя 29.10.2026 для бесплатных инструментов).
+   */
+  autoSearch?: boolean
 }
 
 export interface AutoLookup {
@@ -110,6 +116,15 @@ export interface AutoLookup {
 }
 
 export const AUTO_DEBOUNCE_MS = 450
+
+/**
+ * Решение основателя 29.10.2026 (вопрос 28): в бесплатных инструментах /tools/* название по
+ * БИН подставляется ТОЛЬКО по кнопке «Найти» (живой реестр тратит квартальный лимит IP).
+ * Подстановка при наборе остаётся для остальных версий (кабинет: /create использует свой
+ * поиск useBinLookup). Автопоиск написан и покрыт тестами: чтобы включить его для платных
+ * пользователей этих форм, достаточно передать true здесь (или завести проверку тарифа).
+ */
+export const AUTO_NAME_LOOKUP_ENABLED = false
 
 export function createAutoLookup(
   session: LookupSession,
@@ -156,6 +171,11 @@ export function createAutoLookup(
       clearTimer()
       if (bin.length !== 12) { host.onStatus('idle'); return }
       if (!isLookupWorthy(bin)) { host.onStatus('invalid'); return }
+      // Только кнопка: без сети; если в поле уже стоит название от другого БИН, предупреждаем.
+      if (host.autoSearch === false) {
+        host.onStatus(host.getName().trim() !== '' && bin !== owner ? 'stale' : 'idle')
+        return
+      }
       // Название уже стоит (руками, из черновика, из запомненного) и это не наша подстановка:
       // не трогаем и не тратим запрос, но говорим, что оно не обновлялось (БИН другой).
       if (!writable()) { host.onStatus(bin === owner ? 'idle' : 'stale'); return }

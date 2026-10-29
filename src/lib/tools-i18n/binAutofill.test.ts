@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUTO_DEBOUNCE_MS, createAutoLookup, createLookupSession, isLookupWorthy,
+  AUTO_DEBOUNCE_MS, AUTO_NAME_LOOKUP_ENABLED, createAutoLookup, createLookupSession, isLookupWorthy,
   type AutoStatus, type LookupArgs, type LookupOutcome,
 } from './binAutofill'
 
@@ -11,7 +11,7 @@ const BAD = '123456789012'
 
 const found = (name: string): LookupOutcome => ({ status: 'found', name })
 
-function setup(fn: (a: LookupArgs) => Promise<LookupOutcome>, initialName = '') {
+function setup(fn: (a: LookupArgs) => Promise<LookupOutcome>, initialName = '', autoSearch?: boolean) {
   const calls: LookupArgs[] = []
   const session = createLookupSession(a => { calls.push(a); return fn(a) })
   const state = { name: initialName, statuses: [] as AutoStatus[], autofilled: 0 }
@@ -21,6 +21,7 @@ function setup(fn: (a: LookupArgs) => Promise<LookupOutcome>, initialName = '') 
     onStatus: s => state.statuses.push(s),
     onName: n => { state.name = n },
     onAutofilled: () => { state.autofilled++ },
+    autoSearch,
   })
   return { calls, session, state, ctl }
 }
@@ -227,5 +228,42 @@ describe('auto lookup', () => {
     ctl.dispose()
     await flush()
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('только по кнопке (решение основателя 29.10.2026 для бесплатных инструментов)', () => {
+  it('в бесплатных формах автопоиск выключен', () => {
+    expect(AUTO_NAME_LOOKUP_ENABLED).toBe(false)
+  })
+  it('набор 12 цифр не трогает сеть и не подставляет название', async () => {
+    const { calls, state, ctl } = setup(async () => found('ТОО Тест'), '', false)
+    ctl.change(BIN_A)
+    await flush()
+    expect(calls).toHaveLength(0)
+    expect(state.name).toBe('')
+    expect(state.statuses.at(-1)).toBe('idle')
+  })
+  it('неверная контрольная цифра по-прежнему подсказывается, без сети', async () => {
+    const { calls, state, ctl } = setup(async () => found('x'), '', false)
+    ctl.change(BAD)
+    await flush()
+    expect(calls).toHaveLength(0)
+    expect(state.statuses.at(-1)).toBe('invalid')
+  })
+  it('название от прошлого БИН осталось: подсказка «не обновилось», сети нет', async () => {
+    const { calls, state, ctl } = setup(async () => found('x'), 'ТОО Старое', false)
+    ctl.adopt(BIN_A)
+    ctl.change(BIN_B)
+    await flush()
+    expect(calls).toHaveLength(0)
+    expect(state.statuses.at(-1)).toBe('stale')
+    ctl.change(BIN_A) // вернулись к БИН, которому принадлежит название
+    expect(state.statuses.at(-1)).toBe('idle')
+  })
+  it('по умолчанию (autoSearch не задан) автопоиск работает, как раньше', async () => {
+    const { calls, ctl } = setup(async () => found('ТОО Тест'))
+    ctl.change(BIN_A)
+    await flush()
+    expect(calls).toHaveLength(1)
   })
 })
