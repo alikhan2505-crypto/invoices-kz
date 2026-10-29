@@ -16,6 +16,10 @@ const GRAPH_API = 'https://graph.instagram.com/v21.0'
 // промежуточном статусе. По таймауту fetch бросает исключение: опрос статуса
 // считает его временным сбоем, create/publish -- отказом.
 const GRAPH_REQUEST_TIMEOUT_MS = 20_000
+
+// Токен Instagram идёт заголовком Authorization, не в строке запроса: URL попадает в логи
+// прокси и платформы, заголовок -- нет.
+const bearer = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` })
 const graphSignal = () => AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS)
 
 async function createContainer(igUserId: string, accessToken: string, params: Record<string, string | boolean>): Promise<string> {
@@ -82,8 +86,8 @@ export async function waitForContainer(
     let httpOk = false
     try {
       const statusRes = await fetch(
-        `${GRAPH_API}/${containerId}?fields=status_code,status&access_token=${accessToken}`,
-        { signal: graphSignal() },
+        `${GRAPH_API}/${containerId}?fields=status_code,status`,
+        { headers: bearer(accessToken), signal: graphSignal() },
       )
       httpOk = statusRes.ok
       data = await statusRes.json().catch(() => null)
@@ -179,7 +183,7 @@ async function resolveIgUserId(accessToken: string): Promise<string> {
   const configured = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
   if (configured) return configured
   if (cachedIgUserId) return cachedIgUserId
-  const res = await fetch(`${GRAPH_API}/me?fields=user_id&access_token=${accessToken}`, { signal: graphSignal() })
+  const res = await fetch(`${GRAPH_API}/me?fields=user_id`, { headers: bearer(accessToken), signal: graphSignal() })
   const data = await res.json()
   const id = data?.user_id ? String(data.user_id) : ''
   if (!res.ok || !id) {
@@ -305,7 +309,7 @@ export async function publishReel(
   // уже состоявшуюся публикацию.
   let permalink: string | null = null
   try {
-    const res = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink&access_token=${accessToken}`, { signal: graphSignal() })
+    const res = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink`, { headers: bearer(accessToken), signal: graphSignal() })
     const data = await res.json()
     if (res.ok && typeof data?.permalink === 'string') permalink = data.permalink
   } catch {
@@ -330,7 +334,8 @@ export async function getMediaInsights(igMediaId: string): Promise<MediaInsights
   if (!accessToken) throw new Error('Instagram not configured')
 
   const res = await fetch(
-    `${GRAPH_API}/${igMediaId}/insights?metric=reach,likes,comments,saved,shares&access_token=${accessToken}`
+    `${GRAPH_API}/${igMediaId}/insights?metric=reach,likes,comments,saved,shares`,
+    { headers: bearer(accessToken) },
   )
   const data = await res.json()
   if (!res.ok) {
@@ -562,10 +567,6 @@ export interface IceBreakerItem { question: string; payload: string }
 // platform=instagram, до 4 вопросов, locale: 'default' (без него Meta отвечает
 // «Invalid parameter», см. instagramIceBreakers.ts).
 // Нажатие приходит вебхуком messaging_postbacks (postback.payload).
-// Токен «готовых вопросов» и подписок идёт заголовком Authorization, не в строке
-// запроса: URL попадает в логи прокси и платформы, заголовок -- нет.
-const bearer = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` })
-
 export async function setInstagramIceBreakers(igUserId: string, accessToken: string, items: IceBreakerItem[]): Promise<void> {
   // В сообщение об ошибке идут код и подкод Meta, без токена.
   const res = await fetch(`${GRAPH_API}/${igUserId}/messenger_profile`, {
