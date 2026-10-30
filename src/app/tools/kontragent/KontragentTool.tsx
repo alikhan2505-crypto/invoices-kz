@@ -20,6 +20,8 @@ import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import type { ToolEventMedium } from '@/lib/toolEvents/schema'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinWatchButton from '@/components/BinWatchButton'
+import PersonCheckPanel from '@/components/PersonCheckPanel'
+import { usePersonCheckAccess } from '@/components/usePersonCheckAccess'
 import { kontragentDict } from './dict'
 
 // Один и тот же инструмент для /tools/kontragent, /tools/kk/kontragent и
@@ -125,6 +127,11 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
   const { setLang } = useLanguage()
   const [bin, setBin] = useState('')
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' })
+  // Вкладка «Физлицо · СБ»: только админу и только на русском, пока включён гейт
+  // (src/lib/personCheck/config.ts). Всем остальным страница выглядит как раньше.
+  const personAllowed = usePersonCheckAccess() && lang === 'ru'
+  const [tab, setTab] = useState<'company' | 'person'>('company')
+  const showPerson = personAllowed && tab === 'person'
   const valid = isValidBin(bin)
   useToolView('kontragent', lang)
   useToolLimitEvent('kontragent', lang, outcome.kind === 'limit')
@@ -200,6 +207,30 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
           {t.intro}
         </p>
 
+        {personAllowed && (
+          <div className="flex gap-1 p-1 rounded-2xl mb-4" role="group" aria-label="Кого проверяем" style={{ background: 'var(--nav-surface-glass)' }}>
+            {([['company', 'Компания или ИП', 'по БИН'], ['person', 'Физическое лицо · СБ', 'по ИИН']] as const).map(([id, title, sub]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                aria-pressed={tab === id}
+                className="flex-1 rounded-xl px-3 py-2.5 min-h-11 text-sm font-semibold transition-colors"
+                style={tab === id
+                  ? { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', boxShadow: '0 1px 2px var(--nav-border)' }
+                  : { background: 'transparent', color: 'var(--nav-text-secondary)' }}
+              >
+                {title}
+                <span className="block text-[11px] font-medium" style={{ color: 'var(--nav-text-muted)' }}>{sub}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Не размонтируем при смене вкладки: введённый ИИН и результат остаются, повторный запрос к реестрам не нужен. */}
+        {personAllowed && <div hidden={!showPerson}><PersonCheckPanel /></div>}
+
+        {!showPerson && (<>
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <label htmlFor="bin" className="text-[11px] font-semibold uppercase tracking-wide block mb-2" style={{ color: 'var(--nav-text-muted)' }}>
             {t.binLabel}
@@ -449,6 +480,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
             )
           })()}
         </div>
+        </>)}
 
         <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
           {t.sources}
