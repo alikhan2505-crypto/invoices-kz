@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { personRequestText as T } from './requestText'
+import { personRequestText as T, REQUESTABLE_CERTIFICATES, OTHER_LISTED_CERTIFICATES } from './requestText'
 
 // Тексты блока «Запросить справки» не должны обещать того, чего источники не
 // подтверждают: см. комментарий в начале requestText.ts.
@@ -16,7 +16,6 @@ describe('requestText: без лишних обещаний', () => {
   it('окно ответа человека 2 часа, как на странице услуги', () => {
     expect(T.windowMs).toBe(2 * 3_600_000)
     expect(T.steps.map(s => s.text).join(' ')).toContain('2 часов')
-    expect(T.steps.map(s => s.title).join(' ')).toContain('Справка о несудимости')
   })
 
   it('мы ничего не получаем и не храним: сказано прямо', () => {
@@ -35,5 +34,22 @@ describe('requestText: без лишних обещаний', () => {
 
   it('таймер показывает время в Алматы и минуты', () => {
     expect(T.timerLeft('14:30', 90)).toBe('Человек должен ответить до 14:30 (Алматы), осталось 90 мин')
+  })
+
+  it('справки с проверенным заказом: рабочие адреса страниц egov и уникальные коды', () => {
+    expect(REQUESTABLE_CERTIFICATES.length).toBeGreaterThanOrEqual(4)
+    for (const c of REQUESTABLE_CERTIFICATES) {
+      expect(c.href).toMatch(/^https:\/\/egov\.kz\/ru\/services\/presale\/[A-Za-z0-9]+$/)
+      expect(c.href).not.toContain('SR.11')
+    }
+    expect(new Set(REQUESTABLE_CERTIFICATES.map(c => c.id)).size).toBe(REQUESTABLE_CERTIFICATES.length)
+    expect(new Set(REQUESTABLE_CERTIFICATES.map(c => c.code)).size).toBe(REQUESTABLE_CERTIFICATES.length)
+    expect(T.serviceHref).toBe(REQUESTABLE_CERTIFICATES[0].href) // по умолчанию открывается несудимость
+  })
+
+  it('справки без проверенного заказа не получают ссылку и не выдаются за проверенные', () => {
+    expect(OTHER_LISTED_CERTIFICATES.length).toBeGreaterThan(10)
+    expect(JSON.stringify(OTHER_LISTED_CERTIFICATES)).not.toContain('http')
+    expect(T.certsOtherLead).toMatch(/не проверял/)
   })
 })

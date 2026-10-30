@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { personRequestText as T } from '@/lib/personCheck/requestText'
+import { OTHER_LISTED_CERTIFICATES, REQUESTABLE_CERTIFICATES, personRequestText as T } from '@/lib/personCheck/requestText'
 
 // «Запросить справки у человека»: проводник без хранения данных (30.10.2026).
 // Мы НЕ получаем, не видим и не храним справки: запрос подписывает пользователь на
@@ -27,6 +27,8 @@ function formatClock(ms: number): string {
 
 export default function PersonRequestGuide({ iin, valid }: { iin: string; valid: boolean }) {
   const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const [certId, setCertId] = useState<string>(REQUESTABLE_CERTIFICATES[0].id)
+  const cert = REQUESTABLE_CERTIFICATES.find(c => c.id === certId) ?? REQUESTABLE_CERTIFICATES[0]
   const [sentAt, setSentAt] = useState<number | null>(null)
   const [now, setNow] = useState(0)
 
@@ -70,6 +72,35 @@ export default function PersonRequestGuide({ iin, valid }: { iin: string; valid:
       <h2 id="person-request-title" className="text-base font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{T.title}</h2>
       <p className="text-[13px] mb-4" style={secondary}>{T.lead}</p>
 
+      <fieldset className="mb-4">
+        <legend className="text-[11px] font-bold uppercase tracking-wider mb-1" style={muted}>{T.certsTitle}</legend>
+        <p className="text-[12px] mb-2" style={secondary}>{T.certsLead}</p>
+        <div className="space-y-2">
+          {REQUESTABLE_CERTIFICATES.map(c => {
+            const on = c.id === certId
+            return (
+              <label key={c.id} className="flex items-start gap-3 rounded-xl p-3 cursor-pointer min-h-11"
+                style={{ border: `1px solid ${on ? 'var(--nav-accent)' : 'var(--nav-border)'}`, background: on ? 'var(--nav-accent-soft)' : 'transparent' }}>
+                <input type="radio" name="person-cert" value={c.id} checked={on} onChange={() => setCertId(c.id)} className="mt-1 flex-shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{c.title}</span>
+                  <span className="block text-[12px] mt-0.5" style={secondary}>{c.shows}</span>
+                  {on && c.extra && <span className="block text-[12px] mt-1" style={muted}>{c.extra}</span>}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+        <div className="text-[11px] mt-2" style={muted}>{T.certsVerified}</div>
+        <details className="mt-2">
+          <summary className="text-[12px] font-semibold cursor-pointer min-h-11 inline-flex items-center" style={{ color: 'var(--nav-accent)' }}>{T.certsOtherTitle} ({OTHER_LISTED_CERTIFICATES.length}) <span aria-hidden="true" className="ml-1">+</span></summary>
+          <p className="text-[12px] mt-1 mb-1.5" style={secondary}>{T.certsOtherLead}</p>
+          <ul className="text-[12px] list-disc pl-5 space-y-0.5" style={secondary}>
+            {OTHER_LISTED_CERTIFICATES.map(n => <li key={n}>{n}</li>)}
+          </ul>
+        </details>
+      </fieldset>
+
       <ol className="space-y-3 mb-4">
         {T.steps.map((s, i) => (
           <li key={s.title} className="flex gap-3">
@@ -89,7 +120,7 @@ export default function PersonRequestGuide({ iin, valid }: { iin: string; valid:
           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
           {T.copyButton}
         </button>
-        <a href={T.serviceHref} target="_blank" rel="noopener noreferrer"
+        <a href={cert.href} target="_blank" rel="noopener noreferrer"
           className="rounded-xl px-4 py-2.5 min-h-11 inline-flex items-center text-[13px] font-semibold"
           style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-accent)' }}>
           {T.openButton}
@@ -99,7 +130,6 @@ export default function PersonRequestGuide({ iin, valid }: { iin: string; valid:
         </span>
       </div>
 
-      <p className="text-[12px] mt-3" style={secondary}>{T.otherNote}</p>
       <p className="text-[12px] mt-1.5" style={muted}>
         <a href={T.infoHref} target="_blank" rel="noopener noreferrer" className="font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>{T.infoLink}</a>
         {'. '}{T.infoNote}
