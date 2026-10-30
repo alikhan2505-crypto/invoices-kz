@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import Source1688Button from './Source1688Button'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -72,6 +73,7 @@ function CollectionTable({ collection }: { collection: Collection }) {
           style={{ borderTop: i > 0 ? '1px solid var(--nav-border-soft)' : undefined }}>
           <span className="col-span-2 lg:col-span-1 font-medium line-clamp-1 flex items-center gap-1.5" style={{ color: 'var(--nav-text-primary)' }}>
             {p.name}{p.shopUrl && <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-accent)' }}>↗</span>}
+            <Source1688Button product={{ name: p.name, price: p.price, brand: p.brand, imageUrl: p.imageUrl }} />
           </span>
           <span className="font-mono tabular-nums text-xs lg:text-sm" style={{ color: 'var(--nav-text-primary)' }}>{p.price.toLocaleString('ru-KZ')} ₸</span>
           <span className="text-xs lg:text-sm flex items-center gap-1" style={{ color: 'var(--nav-text-muted)' }}><StarIcon />{p.rating.toFixed(1)}</span>

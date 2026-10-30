@@ -14,6 +14,7 @@ import {
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import { readMarginPrefill } from '@/lib/kaspiShop/source1688'
 
 // Same house conventions as the rest of Kaspi Shop (page.tsx, niches/page.tsx) --
 // kept byte-identical rather than inventing new ones for this page.
@@ -86,6 +87,14 @@ export default function KaspiShopMargin() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
+
+  // Ссылка из «Ниш» (кнопка «Найти на 1688» -> «Посчитать маржу») несёт название, цену Kaspi и оценку веса.
+  useEffect(() => {
+    const pre = readMarginPrefill(window.location.search)
+    if (pre.name) setProductName(pre.name)
+    if (pre.price) setKaspiPrice(pre.price)
+    if (pre.weight) setWeightGrams(pre.weight)
+  }, [])
 
   // Auto-fill the delivery estimate from weight -- but only until the
   // seller directly edits the field. Same "don't clobber a manual override"

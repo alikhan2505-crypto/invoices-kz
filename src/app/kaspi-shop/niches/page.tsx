@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import NicheCollections from '@/components/kaspiShop/NicheCollections'
+import Source1688Button from '@/components/kaspiShop/Source1688Button'
 import { getActivePlan } from '@/lib/plan'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
@@ -154,6 +155,7 @@ function TrendingProductsTable({ products, showCategory, emptyLabel }: { product
           style={{ borderTop: i > 0 ? '1px solid var(--nav-border-soft)' : undefined }}>
           <span className="col-span-2 lg:col-span-1 font-medium line-clamp-1 flex items-center gap-1.5" style={{ color: 'var(--nav-text-primary)' }}>
             {p.name}{p.shopUrl && <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-accent)' }}>↗</span>}
+            <Source1688Button product={{ name: p.name, price: p.price, brand: p.brand, category: p.category, imageUrl: p.imageUrl }} />
           </span>
           {showCategory && <span className="text-xs lg:text-sm truncate" style={{ color: 'var(--nav-text-secondary)' }}>{p.category}</span>}
           <span className="font-mono tabular-nums text-xs lg:text-sm" style={{ color: 'var(--nav-text-primary)' }}>{p.price.toLocaleString('ru-KZ')} ₸</span>
