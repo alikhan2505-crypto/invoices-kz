@@ -159,6 +159,10 @@ export default function PersonCheckPanel() {
             <div className="rounded-xl p-4 mt-4" style={{ border: '1px dashed var(--nav-border)' }}>
               <div className="text-[13px] font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{personText.conviction.title}</div>
               <p className="text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>{personText.conviction.text}</p>
+              <a href={personText.conviction.href} target="_blank" rel="noopener noreferrer"
+                className="inline-block text-[12px] font-semibold mt-1.5 underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
+                {personText.conviction.link}
+              </a>
             </div>
           </motion.div>
         )}
