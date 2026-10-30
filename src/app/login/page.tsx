@@ -18,6 +18,15 @@ import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 // включена Captcha protection): без ключа поведение прежнее.
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''
 
+// Вход через Facebook выключен (30.10.2026): за всё время ни одной учётки через него
+// (auth.identities: facebook 0). Supabase шлёт в Facebook scope=email, а Meta-приложение
+// 1763701871429757 (то же, что Instagram/WhatsApp) относится к типу Business: сценария
+// «Вход через Facebook» для обычных пользователей в нём нет, разрешение email не выдано,
+// адреса возврата Supabase (/auth/v1/callback) в списке нет. Человек уходит на Facebook и
+// не возвращается. Включать обратно только после отдельного Consumer-приложения Meta с
+// входом через Facebook и его ключей в Supabase (Auth → Providers → Facebook).
+const FACEBOOK_LOGIN_ENABLED = false
+
 // The signed-in user's enabled_products (for homeFor) and tour state (a
 // newcomer goes to the dashboard tour first) -- see postLoginDestination.ts.
 async function loadOwnProfile(userId?: string) {
@@ -285,13 +294,13 @@ export default function Login() {
               </svg>
               {t.googleSignInButton}
             </button>
-            <button onClick={signInWithFacebook}
+            {FACEBOOK_LOGIN_ENABLED && <button onClick={signInWithFacebook}
               className="w-full border border-gray-200 text-[#1C2056] rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3">
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#1877F2" d="M24 12c0-6.6-5.4-12-12-12S0 5.4 0 12c0 6 4.4 11 10.1 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.3l-.5 3.5h-2.8v8.4C19.6 23 24 18 24 12z"/>
               </svg>
               {t.facebookSignInButton}
-            </button>
+            </button>}
 
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 h-px bg-gray-200"></div>
