@@ -88,6 +88,7 @@ describe('ссылка в напоминании КОНТРАГЕНТ', () => {
       ['bio-kontragent', '/tools/kontragent', 'kontragent_bio'], ['bio-schet', '/tools/schet', 'schet_bio'],
       ['bio-nalogi', '/tools/nalogi', 'nalogi_bio'], ['bio-akt', '/tools/avr', 'avr_bio'], ['bio-kp', '/tools/kp', 'kp_bio'],
     ]) expect(resolveGo(code), code).toBe(`${p}?utm_source=ig&utm_medium=bio_link&utm_campaign=${campaign}`)
+    expect(resolveGo('bot-kontragent')).toBe('/tools/kontragent?utm_source=tg_bot&utm_medium=bot&utm_campaign=kontragent_bot')
     expect(resolveGo('dm-kontragent-rem')).toBe('/tools/kontragent?utm_source=dm&utm_medium=outreach&utm_campaign=kontragent_oct_rem')
     expect(goRedirects().find(x => x.source === '/go/dm-kontragent-rem')?.destination).toBe(resolveGo('dm-kontragent-rem'))
   })

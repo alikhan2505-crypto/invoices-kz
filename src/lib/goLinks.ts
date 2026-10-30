@@ -98,6 +98,8 @@ export const GO_LINKS: readonly GoLink[] = [
   link('bio-nalogi', '/tools/nalogi', 'ig', 'bio_link', 'nalogi_bio', 'профиль Instagram, страница со ссылками: налоги ИП'),
   link('bio-akt', '/tools/avr', 'ig', 'bio_link', 'avr_bio', 'профиль Instagram, страница со ссылками: акт выполненных работ'),
   link('bio-kp', '/tools/kp', 'ig', 'bio_link', 'kp_bio', 'профиль Instagram, страница со ссылками: коммерческое предложение'),
+  // Telegram-бот «Проверка БИН» (30.10.2026): кнопка под ответом бота.
+  link('bot-kontragent', '/tools/kontragent', 'tg_bot', 'bot', 'kontragent_bot', 'Telegram-бот проверки БИН: кнопка под результатом'),
   hostLink('dm-agent', 'agent.invoices.kz', '/lp/agent', 'dm', 'outreach', 'agent_oct', 'личные сообщения: ответ на слово АГЕНТ (лендинг ИИ-агента)'),
   hostLink('dm-bot', 'kaspi.invoices.kz', '/lp/kaspi', 'dm', 'outreach', 'kaspi_bot_oct', 'личные сообщения: ответ на слово БОТ (лендинг Kaspi Bot, тариф Про)'),
 ]
