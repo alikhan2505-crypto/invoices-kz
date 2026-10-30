@@ -78,6 +78,20 @@ export interface FunnelDay {
   signups: number
 }
 
+// Шаги страницы входа и клик «Следить за БИН» (30.10.2026): события login_* и tool_watch_click.
+// В общую воронку по инструментам не входят, считаются отдельным блоком «Вход».
+export const LOGIN_STEP_EVENTS = [
+  'login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent',
+  'login_send_error', 'login_google', 'login_facebook', 'login_passkey', 'tool_watch_click',
+] as const
+export type LoginStepEvent = (typeof LOGIN_STEP_EVENTS)[number]
+
+export interface LoginStepRow { event: LoginStepEvent; events: number; visitors: number }
+// По источнику (utm_source): сколько разных людей открыли форму, нажали «получить ссылку»,
+// получили письмо и нажали Google.
+export interface LoginSourceRow { source: string | null; open: number; press: number; sent: number; google: number }
+export interface LoginFunnel { steps: LoginStepRow[]; bySource: LoginSourceRow[] }
+
 export interface ToolFunnel {
   days: number
   includeInternal: boolean
@@ -90,6 +104,7 @@ export interface ToolFunnel {
   unattributedSignups: number
   series: FunnelDay[]
   rowsConsidered: number
+  login: LoginFunnel
 }
 
 export function almatyDay(iso: string | number | Date): string {
@@ -198,15 +213,34 @@ export function aggregateToolFunnel(
   let unattributed = new Set<string>()
   let considered = 0
   let anon = 0
+  // Блок «Вход»: по шагу число событий и разных людей; по источнику разные люди на ключевых шагах.
+  const loginSteps = new Map<LoginStepEvent, { events: number; visitors: Set<string> }>(
+    LOGIN_STEP_EVENTS.map(e => [e, { events: 0, visitors: new Set<string>() }]),
+  )
+  const loginBySource = new Map<string, { source: string | null; sets: Record<'open' | 'press' | 'sent' | 'google', Set<string>> }>()
 
   for (const r of rows) {
-    // События формы (tool_form_*, 29.10.2026), шаги входа (login_*) и клик «Следить»
-    // (tool_watch_*, 30.10.2026) в воронку не входят: их читают SQL-запросом.
+    // События формы (tool_form_*, 29.10.2026) в воронку по инструментам не входят: их читают SQL-запросом.
     const ev = String(r.event)
-    if (ev.startsWith('tool_form_') || ev.startsWith('login_') || ev.startsWith('tool_watch_')) continue
+    if (ev.startsWith('tool_form_')) continue
     const at = Date.parse(r.created_at)
     if (!Number.isFinite(at) || at < sinceMs) continue
     if (!opts.includeInternal && (r.internal || (r.visitor && internalVisitors.has(r.visitor)))) continue
+    // Шаги входа и клик «Следить» (30.10.2026): отдельный блок, в общие счётчики не попадают.
+    if ((LOGIN_STEP_EVENTS as readonly string[]).includes(ev)) {
+      const step = loginSteps.get(ev as LoginStepEvent)!
+      const who = r.visitor || `anon:${anon++}`
+      step.events++
+      step.visitors.add(who)
+      const key = normUtm(r.utm_source) ?? ''
+      let row = loginBySource.get(key)
+      if (!row) { row = { source: key || null, sets: { open: new Set(), press: new Set(), sent: new Set(), google: new Set() } }; loginBySource.set(key, row) }
+      if (ev === 'login_open') row.sets.open.add(who)
+      else if (ev === 'login_email_press') row.sets.press.add(who)
+      else if (ev === 'login_link_sent') row.sets.sent.add(who)
+      else if (ev === 'login_google') row.sets.google.add(who)
+      continue
+    }
     considered++
 
     // Посетитель без id — отдельный человек на каждую строку (для
@@ -271,5 +305,11 @@ export function aggregateToolFunnel(
     unattributedSignups: unattributed.size,
     series: [...seriesMap.entries()].map(([day, d]) => ({ day, visitors: d.visitors.size, docs: d.docs, signups: d.signups.size })),
     rowsConsidered: considered,
+    login: {
+      steps: LOGIN_STEP_EVENTS.map(e => ({ event: e, events: loginSteps.get(e)!.events, visitors: loginSteps.get(e)!.visitors.size })),
+      bySource: [...loginBySource.values()]
+        .map(x => ({ source: x.source, open: x.sets.open.size, press: x.sets.press.size, sent: x.sets.sent.size, google: x.sets.google.size }))
+        .sort((a, c) => c.open - a.open || c.press - a.press),
+    },
   }
 }

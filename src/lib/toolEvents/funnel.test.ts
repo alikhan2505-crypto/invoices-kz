@@ -59,6 +59,26 @@ describe('aggregateToolFunnel', () => {
     expect(f.unattributedSignups).toBe(0)
   })
 
+  it('collects the login block: distinct people per step and per source, internal excluded', () => {
+    const src = (s: string) => ({ utm_source: s })
+    const f = run([
+      ev('login_open', 'none', 'v1', src('tools')), ev('login_open', 'none', 'v1', src('tools')), ev('login_open', 'none', 'v2', src('dm')),
+      ev('login_email_press', 'none', 'v1', src('tools')), ev('login_link_sent', 'none', 'v1', src('tools')),
+      ev('login_google', 'none', 'v2', src('dm')), ev('login_captcha_missing', 'none', 'v3'),
+      ev('tool_watch_click', 'kontragent', 'v1', src('tools')),
+      ev('login_open', 'none', 'v9', { internal: true }),
+    ])
+    const step = (e: string) => f.login.steps.find(x => x.event === e)!
+    expect(step('login_open')).toMatchObject({ events: 3, visitors: 2 })
+    expect(step('login_email_press')).toMatchObject({ events: 1, visitors: 1 })
+    expect(step('login_captcha_missing')).toMatchObject({ events: 1, visitors: 1 })
+    expect(step('tool_watch_click')).toMatchObject({ events: 1, visitors: 1 })
+    expect(f.login.bySource.find(r => r.source === 'tools')).toMatchObject({ open: 1, press: 1, sent: 1, google: 0 })
+    expect(f.login.bySource.find(r => r.source === 'dm')).toMatchObject({ open: 1, press: 0, sent: 0, google: 1 })
+    // в общую воронку эти события не входят
+    expect(f.rowsConsidered).toBe(0)
+  })
+
   it('treats each view without a visitor id as its own visitor', () => {
     const f = run([ev('view', 'kp', null), ev('view', 'kp', null)])
     expect(tool(f, 'kp').visitors).toBe(2)

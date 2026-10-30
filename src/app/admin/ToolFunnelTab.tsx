@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { FunnelCounts, ToolFunnel } from '@/lib/toolEvents/funnel'
+import type { FunnelCounts, LoginFunnel, ToolFunnel } from '@/lib/toolEvents/funnel'
 import type { TrafficResponse } from '@/lib/visits/sourcesServer'
 import { VISITOR_ID_RE } from '@/lib/toolEvents/schema'
 import { VISITOR_KEY } from '@/lib/tools-i18n/toolEvents'
@@ -288,7 +288,67 @@ export default function ToolFunnelTab() {
             Метка читается из адреса при заходе и держится до конца вкладки; регистрация несёт метку первого касания (до 30 дней). Регистрации без инструмента в этот разрез не попадают.
           </div>
 
+          <LoginBlock login={funnel.login} />
+
           <TrafficBlock traffic={traffic} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// Подписи шагов страницы входа (30.10.2026). Люди = разные браузеры (visitor), события = нажатия.
+const LOGIN_STEP_LABELS: Record<string, string> = {
+  login_open: 'Открыли форму входа',
+  login_email_press: 'Нажали «Получить ссылку»',
+  login_captcha_missing: 'Нажали, но капча не прошла',
+  login_link_sent: 'Письмо отправлено',
+  login_send_error: 'Ошибка отправки письма',
+  login_google: 'Нажали Google',
+  login_facebook: 'Нажали Facebook',
+  login_passkey: 'Нажали Face ID / Touch ID',
+  tool_watch_click: 'Нажали «Следить за БИН» (невошедшие)',
+}
+
+function LoginBlock({ login }: { login: LoginFunnel | undefined }) {
+  if (!login) return null
+  const total = login.steps.reduce((n, s) => n + s.events, 0)
+  return (
+    <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto">
+      <div className="px-4 pt-4 pb-2">
+        <div className="font-medium text-sm">Вход и регистрация (страница /login)</div>
+        <div className="text-[11px] text-gray-500 mt-0.5">Где теряются люди между «нажал регистрацию» и «получил письмо». Люди = разные браузеры. Данные пишутся с 30.10.2026.</div>
+      </div>
+      {total === 0 ? (
+        <div className="px-4 py-3 text-sm text-gray-500 border-t border-gray-700">За период шагов входа нет.</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-[1fr_80px_80px] gap-2 px-4 py-2 border-y border-gray-700 text-[11px] text-gray-400 uppercase">
+            <div>Шаг</div><div className="text-right">Людей</div><div className="text-right">Нажатий</div>
+          </div>
+          <div className="divide-y divide-gray-700">
+            {login.steps.map(s => (
+              <div key={s.event} className="grid grid-cols-[1fr_80px_80px] gap-2 px-4 py-2 text-sm">
+                <div>{LOGIN_STEP_LABELS[s.event] ?? s.event}</div>
+                <div className="text-right tabular-nums">{s.visitors}</div>
+                <div className="text-right tabular-nums text-gray-400">{s.events}</div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-2 px-4 py-2 border-y border-gray-700 text-[11px] text-gray-400 uppercase mt-2">
+            <div>Источник (utm)</div><div className="text-right">Открыли</div><div className="text-right">Нажали</div><div className="text-right">Письмо</div><div className="text-right">Google</div>
+          </div>
+          <div className="divide-y divide-gray-700">
+            {login.bySource.map(r => (
+              <div key={r.source ?? ''} className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-2 px-4 py-2 text-sm">
+                <div>{r.source ?? '(без метки)'}</div>
+                <div className="text-right tabular-nums">{r.open}</div>
+                <div className="text-right tabular-nums">{r.press}</div>
+                <div className="text-right tabular-nums">{r.sent}</div>
+                <div className="text-right tabular-nums">{r.google}</div>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>
