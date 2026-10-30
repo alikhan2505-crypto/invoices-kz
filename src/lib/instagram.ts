@@ -378,8 +378,8 @@ export async function replyToComment(commentId: string, message: string, credent
 
   const res = await fetch(`${GRAPH_API}/${commentId}/replies`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, access_token: accessToken }),
+    headers: { 'Content-Type': 'application/json', ...bearer(accessToken) },
+    body: JSON.stringify({ message }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -544,11 +544,10 @@ export async function sendInstagramFlowStep(recipientId: string, step: FlowStep,
 export async function sendPrivateReply(commentId: string, message: string, credentials: { igUserId: string; accessToken: string }): Promise<void> {
   const res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...bearer(credentials.accessToken) },
     body: JSON.stringify({
       recipient: { comment_id: commentId },
       message: { text: message },
-      access_token: credentials.accessToken,
     }),
     signal: graphSignal(),
   })

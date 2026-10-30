@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { sendDirectMessage, sendDirectImage, sendInstagramFlowStep } from './instagram'
+import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, sendPrivateReply } from './instagram'
 
 // Отправка сообщений Instagram: токен только в заголовке Authorization, не в теле и не в адресе
 // (URL и тело не должны нести токен: адреса попадают в логи прокси и платформы).
@@ -43,6 +43,23 @@ describe('отправка сообщений: токен в заголовке'
     await sendInstagramFlowStep('u1', { id: 's1', text: 'Выберите', buttons: [] } as any, creds)
     expectBearerOnly()
     expect(JSON.parse(String(calls[0].init.body)).recipient).toEqual({ id: 'u1' })
+  })
+
+  it('sendPrivateReply', async () => {
+    await sendPrivateReply('c1', 'ссылка', creds)
+    expectBearerOnly()
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ recipient: { comment_id: 'c1' }, message: { text: 'ссылка' } })
+  })
+
+  it('replyToComment', async () => {
+    await replyToComment('c1', 'спасибо', { accessToken: TOKEN })
+    expect(calls).toHaveLength(1)
+    const { url, init } = calls[0]
+    expect(url).toBe('https://graph.instagram.com/v21.0/c1/replies')
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`)
+    expect(url).not.toContain(TOKEN)
+    expect(String(init.body)).not.toContain(TOKEN)
+    expect(JSON.parse(String(init.body))).toEqual({ message: 'спасибо' })
   })
 
   it('ошибка Meta не раскрывает токен', async () => {
