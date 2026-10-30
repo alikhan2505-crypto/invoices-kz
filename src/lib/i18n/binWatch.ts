@@ -17,6 +17,7 @@ export type SignalLabelKey = ChangeKey | keyof WatchSignals
 
 export interface BinWatchTexts {
   // кнопка
+  cardTitle: string
   button: string
   buttonAdding: string
   buttonAdded: string
@@ -65,12 +66,13 @@ export interface BinWatchTexts {
 
 export const binWatchDict: Record<BinWatchLang, BinWatchTexts> = {
   ru: {
+    cardTitle: 'Узнать первым, если с этой компанией что-то случится',
     button: 'Следить за этим БИН',
     buttonAdding: 'Добавляем…',
     buttonAdded: 'БИН на слежении',
     buttonAlready: 'Этот БИН уже на слежении',
     buttonHint: 'Проверим его раз в сутки и напишем на почту, если появится новый признак риска.',
-    buttonSignInHint: 'Нужен вход: после него БИН сам добавится в список слежения.',
+    buttonSignInHint: 'Проверим раз в сутки и напишем на почту, если появится новый признак риска. Нужен вход: БИН добавится сам.',
     openList: 'Открыть список слежения',
     limitReached: limit => `В списке уже ${limit} БИН: это предел вашего тарифа. Удалите ненужный или перейдите на тариф Про.`,
     errNotReady: 'Слежение ещё настраивается, попробуйте позже.',
@@ -120,12 +122,13 @@ export const binWatchDict: Record<BinWatchLang, BinWatchTexts> = {
     },
   },
   kk: {
+    cardTitle: 'Осы компаниямен бірдеңе болса, бірінші болып біліңіз',
     button: 'Осы БСН-ді бақылау',
     buttonAdding: 'Қосып жатырмыз…',
     buttonAdded: 'БСН бақылауда',
     buttonAlready: 'Бұл БСН бұрыннан бақылауда',
     buttonHint: 'Оны тәулігіне бір рет тексереміз, жаңа тәуекел белгісі пайда болса, поштаға хабарлаймыз.',
-    buttonSignInHint: 'Кіру қажет: кіргеннен кейін БСН бақылау тізіміне өзі қосылады.',
+    buttonSignInHint: 'Тәулігіне бір рет тексереміз, жаңа тәуекел белгісі пайда болса, поштаға хабарлаймыз. Кіру қажет: БСН өзі қосылады.',
     openList: 'Бақылау тізімін ашу',
     limitReached: limit => `Тізімде ${limit} БСН бар: бұл тарифіңіздің шегі. Керек емесін жойыңыз немесе Про тарифіне өтіңіз.`,
     errNotReady: 'Бақылау әлі бапталып жатыр, кейінірек қайталап көріңіз.',
@@ -175,12 +178,13 @@ export const binWatchDict: Record<BinWatchLang, BinWatchTexts> = {
     },
   },
   en: {
+    cardTitle: 'Be the first to know if something happens to this company',
     button: 'Watch this BIN',
     buttonAdding: 'Adding…',
     buttonAdded: 'BIN is being watched',
     buttonAlready: 'This BIN is already on the watch list',
     buttonHint: 'We re-check it once a day and email you if a new risk sign appears.',
-    buttonSignInHint: 'Sign-in needed: after it the BIN is added to your watch list automatically.',
+    buttonSignInHint: 'We re-check it once a day and email you if a new risk sign appears. Sign-in needed: the BIN is added automatically.',
     openList: 'Open the watch list',
     limitReached: limit => `Your list already has ${limit} BINs, the limit of your plan. Remove one or move to the Pro plan.`,
     errNotReady: 'Watching is still being set up, please try again later.',

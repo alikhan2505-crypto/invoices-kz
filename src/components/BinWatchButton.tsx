@@ -105,6 +105,12 @@ export default function BinWatchButton({ bin, lang, onSignInClick, className }: 
   const done = phase.kind === 'added' || phase.kind === 'already'
   return (
     <div className={className} data-bin-watch>
+     {/* Карточка с заголовком-обещанием (30.10.2026, решение основателя): повод
+         зарегистрироваться после проверки, а не серая кнопка без причины. */}
+     <div className="rounded-xl p-4" style={{ background: 'var(--nav-accent-soft)', border: '1px solid var(--nav-border)' }}>
+      {!done && (
+        <div className="text-[13px] font-semibold mb-2.5" style={{ color: 'var(--nav-text-primary)' }}>{t.cardTitle}</div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {done ? (
           <>
@@ -120,15 +126,15 @@ export default function BinWatchButton({ bin, lang, onSignInClick, className }: 
             type="button"
             onClick={viewer.signedIn ? add : signIn}
             disabled={phase.kind === 'adding'}
-            className="nav-glass rounded-xl px-4 py-2.5 text-[13px] font-semibold min-h-11 transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-60"
-            style={{ color: 'var(--nav-accent)', border: '1px solid var(--nav-border)' }}
+            className="rounded-xl px-4 py-2.5 text-[13px] font-semibold min-h-11 transition-colors disabled:opacity-60"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
           >
             {phase.kind === 'adding' ? t.buttonAdding : t.button}
           </button>
         )}
       </div>
       {!done && (
-        <div className="text-[12px] mt-1.5" style={{ color: 'var(--nav-text-muted)' }}>
+        <div className="text-[12px] mt-2" style={{ color: 'var(--nav-text-secondary)' }}>
           {viewer.signedIn ? t.buttonHint : t.buttonSignInHint}
         </div>
       )}
@@ -137,6 +143,7 @@ export default function BinWatchButton({ bin, lang, onSignInClick, className }: 
           <div className="text-[12px] mt-1.5" style={{ color: 'var(--nav-critical)' }} role="alert">{phase.message}</div>
         )}
       </div>
+     </div>
     </div>
   )
 }
