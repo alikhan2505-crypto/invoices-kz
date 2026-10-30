@@ -44,8 +44,9 @@ export function parseToolEventPayload(raw: unknown): ToolEventRow | null {
   if (!isToolEventName(b.event)) return null
   const tool: ToolEventToolOrNone | null = isToolEventTool(b.tool) ? b.tool : b.tool === 'none' ? 'none' : null
   if (!tool) return null
-  // 'none' допустим только у регистрации: просмотр «никакого» инструмента — мусор.
-  if (tool === 'none' && b.event !== 'signup') return null
+  // 'none' допустим только у регистрации и шагов страницы входа (login_*): просмотр
+  // «никакого» инструмента — мусор.
+  if (tool === 'none' && b.event !== 'signup' && !b.event.startsWith('login_')) return null
 
   const lang = typeof b.lang === 'string' && (TOOL_EVENT_LANGS as readonly string[]).includes(b.lang) ? (b.lang as ToolEventLang) : null
   const visitor = typeof b.visitor === 'string' && VISITOR_ID_RE.test(b.visitor) ? b.visitor : null

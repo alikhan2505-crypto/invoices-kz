@@ -35,9 +35,15 @@ describe('parseToolEventPayload', () => {
     expect(parseToolEventPayload('view')).toBeNull()
   })
 
-  it("allows tool 'none' only for signup", () => {
+  it("allows tool 'none' only for signup and the login steps", () => {
     expect(parseToolEventPayload({ event: 'signup', tool: 'none' })?.tool).toBe('none')
     expect(parseToolEventPayload({ event: 'view', tool: 'none' })).toBeNull()
+    expect(parseToolEventPayload({ event: 'tool_watch_click', tool: 'none' })).toBeNull()
+    for (const e of ['login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent', 'login_send_error', 'login_google', 'login_facebook', 'login_passkey']) {
+      expect(parseToolEventPayload({ event: e, tool: 'none' })?.event).toBe(e)
+    }
+    expect(parseToolEventPayload({ event: 'login_unknown', tool: 'none' })).toBeNull()
+    expect(parseToolEventPayload({ event: 'tool_watch_click', tool: 'kontragent' })?.tool).toBe('kontragent')
   })
 
   it('drops invalid optional fields instead of the whole event', () => {

@@ -11,9 +11,17 @@
 // 29.10.2026: три события формы (автоподстановка по БИН, раскрытие «Дополнительно»,
 // подстановка запомненных реквизитов) - чтобы мерить конверсию view -> doc.
 // Без supabase/migrations/tool_events_form.sql строки с ними не пишутся (204, сбой в логе).
+//
+// 30.10.2026: шаги страницы входа (login_*, tool 'none') и клик «Следить за БИН»
+// (tool_watch_click) - чтобы увидеть, где теряются люди между «нажал регистрацию»
+// и «получил письмо». Без supabase/migrations/tool_events_login.sql такие строки
+// тоже не пишутся (204, сбой в логе).
 export const TOOL_EVENT_NAMES = [
   'view', 'doc', 'cta', 'limit', 'lead', 'signup',
   'tool_form_autofill_bin', 'tool_form_more_open', 'tool_form_saved_applied',
+  'tool_watch_click',
+  'login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent',
+  'login_send_error', 'login_google', 'login_facebook', 'login_passkey',
 ] as const
 export type ToolEventName = (typeof TOOL_EVENT_NAMES)[number]
 

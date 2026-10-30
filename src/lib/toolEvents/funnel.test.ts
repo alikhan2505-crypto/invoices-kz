@@ -48,6 +48,17 @@ describe('aggregateToolFunnel', () => {
     expect(f.totals).toMatchObject({ visitors: 2, views: 4 })
   })
 
+  it('ignores login steps and watch clicks (read by SQL, not part of the funnel)', () => {
+    const f = run([
+      ev('view', 'kontragent', 'v1'),
+      ev('login_open', 'none', 'v1'), ev('login_link_sent', 'none', 'v1'),
+      ev('tool_watch_click', 'kontragent', 'v1'), ev('tool_form_more_open', 'kp', 'v1'),
+    ])
+    expect(f.rowsConsidered).toBe(1)
+    expect(f.totals).toMatchObject({ visitors: 1, views: 1, cta: 0 })
+    expect(f.unattributedSignups).toBe(0)
+  })
+
   it('treats each view without a visitor id as its own visitor', () => {
     const f = run([ev('view', 'kp', null), ev('view', 'kp', null)])
     expect(tool(f, 'kp').visitors).toBe(2)

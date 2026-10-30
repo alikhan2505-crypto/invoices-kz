@@ -424,7 +424,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                   bin={c.bin}
                   lang={lang}
                   className="mt-3"
-                  onSignInClick={() => { setLang(lang); track('tool_kontragent_watch_click', { lang }) }}
+                  onSignInClick={() => { setLang(lang); track('tool_kontragent_watch_click', { lang }); logToolEvent('tool_watch_click', 'kontragent', { lang }) }}
                 />
 
                 {c.hasFullCard && (

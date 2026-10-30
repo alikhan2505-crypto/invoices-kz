@@ -12,6 +12,7 @@ import { SIGNED_OUT_PARAM } from '@/lib/signOut'
 import { useAppDialog } from '@/components/AppDialog'
 import { rawFreshFirstSource } from '@/lib/visits/client'
 import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 
 // Капча входа включается, когда задан публичный ключ Turnstile (и в Supabase
 // включена Captcha protection): без ключа поведение прежнее.
@@ -61,6 +62,14 @@ export default function Login() {
   // the passkey button). A session check that finishes after the timeout
   // below must not yank them away mid-typing.
   const formTouched = useRef(false)
+  // Шаги входа пишем в свою аналитику (tool_events, login_*, 30.10.2026): с 25.10 по
+  // ссылкам из директа кнопку регистрации нажали 5 человек, письмо не запросил никто.
+  const openLogged = useRef(false)
+  useEffect(() => {
+    if (checkingSession || openLogged.current) return
+    openLogged.current = true
+    logToolEvent('login_open', 'none', { lang })
+  }, [checkingSession, lang])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -113,6 +122,7 @@ export default function Login() {
 
   async function loginWithPasskey() {
     formTouched.current = true
+    logToolEvent('login_passkey', 'none', { lang })
     setPasskeyLoading(true)
     try {
       const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' })
@@ -149,7 +159,8 @@ export default function Login() {
   async function sendLink({ again = false }: { again?: boolean } = {}) {
     if (!email) { alert(t.emailRequiredError); return }
     if (!email.includes('@')) { alert(t.invalidEmailError); return }
-    if (TURNSTILE_SITE_KEY && !captchaToken) { alert(t.captchaRequiredError); return }
+    logToolEvent('login_email_press', 'none', { lang })
+    if (TURNSTILE_SITE_KEY && !captchaToken) { logToolEvent('login_captcha_missing', 'none', { lang }); alert(t.captchaRequiredError); return }
     setLoading(true)
 
     // Asked before sending, because the send itself gives no sign of
@@ -165,6 +176,7 @@ export default function Login() {
       })
       const { verdict } = await res.json()
       if (verdict === 'undeliverable') {
+        logToolEvent('login_send_error', 'none', { lang })
         alert(t.undeliverableEmailAlert)
         setLoading(false)
         return
@@ -195,8 +207,10 @@ export default function Login() {
     // Токен капчи одноразовый: следующая отправка (в т.ч. «Отправить ещё раз») берёт новый.
     if (TURNSTILE_SITE_KEY) captchaRef.current?.reset()
     if (error) {
+      logToolEvent('login_send_error', 'none', { lang })
       alert(t.errorPrefix(error.message === 'Invalid email' ? t.invalidEmailMessage : error.message))
     } else {
+      logToolEvent('login_link_sent', 'none', { lang })
       setSent(true)
       if (again) setResent(true)
     }
@@ -204,6 +218,7 @@ export default function Login() {
   }
 
   async function signInWithGoogle() {
+    logToolEvent('login_google', 'none', { lang })
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: 'https://invoices.kz/auth/callback' }
@@ -211,6 +226,7 @@ export default function Login() {
   }
 
   async function signInWithFacebook() {
+    logToolEvent('login_facebook', 'none', { lang })
     await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: { redirectTo: 'https://invoices.kz/auth/callback' }

@@ -200,8 +200,10 @@ export function aggregateToolFunnel(
   let anon = 0
 
   for (const r of rows) {
-    // События формы (tool_form_*, 29.10.2026) в воронку не входят: их читают SQL-запросом.
-    if (String(r.event).startsWith('tool_form_')) continue
+    // События формы (tool_form_*, 29.10.2026), шаги входа (login_*) и клик «Следить»
+    // (tool_watch_*, 30.10.2026) в воронку не входят: их читают SQL-запросом.
+    const ev = String(r.event)
+    if (ev.startsWith('tool_form_') || ev.startsWith('login_') || ev.startsWith('tool_watch_')) continue
     const at = Date.parse(r.created_at)
     if (!Number.isFinite(at) || at < sinceMs) continue
     if (!opts.includeInternal && (r.internal || (r.visitor && internalVisitors.has(r.visitor)))) continue
