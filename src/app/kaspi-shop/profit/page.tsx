@@ -64,6 +64,15 @@ type ProfitSummary = {
   sessionExpired: boolean
 }
 
+/** «1 товар», «2 товара», «5 товаров», «33 товара». */
+function goodsWord(n: number): string {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return 'товар'
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'товара'
+  return 'товаров'
+}
+
 export default function KaspiShopProfit() {
   // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
   usePageDocumentTitle('Прибыль')
@@ -258,7 +267,7 @@ export default function KaspiShopProfit() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-            {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль</span>
+            {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль{!!summary && summary.productsWithoutCogsCount > 0 ? ' (предварительно)' : ''}</span>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
@@ -315,7 +324,7 @@ export default function KaspiShopProfit() {
 
           {!!summary && summary.productsWithoutCogsCount > 0 && (
             <div className="text-[11px] mt-4 flex items-center gap-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
-              <WarnIcon /> {summary.productsWithoutCogsCount} {summary.productsWithoutCogsCount === 1 ? 'товар' : 'товаров'} без себестоимости — прибыль может быть занижена.
+              <WarnIcon /> {summary.productsWithoutCogsCount} {goodsWord(summary.productsWithoutCogsCount)} без себестоимости — прибыль завышена: пока она считается без закупочной цены этих товаров.
             </div>
           )}
           {summary?.truncated && (
