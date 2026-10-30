@@ -6,14 +6,17 @@ import { personRequestText as T } from './requestText'
 describe('requestText: без лишних обещаний', () => {
   const all = JSON.stringify(T)
 
-  it('ссылка на услугу ведёт на проверенную страницу gov.kz, а не на неподтверждённый адрес формы', () => {
-    expect(T.serviceHref).toBe('https://www.gov.kz/services/3934')
-    expect(all).not.toContain('SR.11')
+  it('ссылка заказа ведёт на рабочую страницу P10.01, а не на мёртвый адрес SR.11', () => {
+    expect(T.serviceHref).toBe('https://egov.kz/ru/services/presale/P1001')
+    expect(T.serviceHref).not.toContain('SR.11')
+    expect(T.infoHref).toBe('https://www.gov.kz/services/3934')
+    expect(T.infoNote).toMatch(/404/)
   })
 
   it('окно ответа человека 2 часа, как на странице услуги', () => {
     expect(T.windowMs).toBe(2 * 3_600_000)
     expect(T.steps.map(s => s.text).join(' ')).toContain('2 часов')
+    expect(T.steps.map(s => s.title).join(' ')).toContain('Справка о несудимости')
   })
 
   it('мы ничего не получаем и не храним: сказано прямо', () => {

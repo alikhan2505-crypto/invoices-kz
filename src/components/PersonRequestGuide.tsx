@@ -99,6 +99,12 @@ export default function PersonRequestGuide({ iin, valid }: { iin: string; valid:
         </span>
       </div>
 
+      <p className="text-[12px] mt-3" style={secondary}>{T.otherNote}</p>
+      <p className="text-[12px] mt-1.5" style={muted}>
+        <a href={T.infoHref} target="_blank" rel="noopener noreferrer" className="font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>{T.infoLink}</a>
+        {'. '}{T.infoNote}
+      </p>
+
       <div className="mt-4 rounded-xl p-3.5" style={{ border: '1px dashed var(--nav-border)' }}>
         {sentAt === null ? (
           <div className="flex flex-wrap items-center gap-3">
