@@ -15,6 +15,9 @@ import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 import { readMarginPrefill } from '@/lib/kaspiShop/source1688'
+import TopSellersPicker from '@/components/kaspiShop/TopSellersPicker'
+import Source1688Panel from '@/components/kaspiShop/Source1688Panel'
+import type { Source1688Product } from '@/components/kaspiShop/source1688Client'
 
 // Same house conventions as the rest of Kaspi Shop (page.tsx, niches/page.tsx) --
 // kept byte-identical rather than inventing new ones for this page.
@@ -83,6 +86,8 @@ export default function KaspiShopMargin() {
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  // Товар, выбранный из «Топ продаж»: даёт бренд, категорию и фото для «Найти на 1688» (пока название не правили).
+  const [picked, setPicked] = useState<(Source1688Product & { sku: string }) | null>(null)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -90,10 +95,13 @@ export default function KaspiShopMargin() {
 
   // Ссылка из «Ниш» (кнопка «Найти на 1688» -> «Посчитать маржу») несёт название, цену Kaspi и оценку веса.
   useEffect(() => {
+    // Однократное чтение адреса при открытии страницы: данных для начального состояния до монтирования нет (SSR).
     const pre = readMarginPrefill(window.location.search)
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (pre.name) setProductName(pre.name)
     if (pre.price) setKaspiPrice(pre.price)
     if (pre.weight) setWeightGrams(pre.weight)
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
   // Auto-fill the delivery estimate from weight -- but only until the
@@ -258,6 +266,10 @@ export default function KaspiShopMargin() {
         <div className="grid grid-cols-1 gap-4 min-[1700px]:grid-cols-[minmax(0,1fr)_420px] min-[1700px]:items-start">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 min-w-0">
+          <TopSellersPicker
+            selectedSku={picked && picked.name === productName ? picked.sku : null}
+            onPick={p => { setPicked(p); setProductName(p.name); setKaspiPrice(String(Math.round(p.price))) }}
+          />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Input form */}
             <div className="flex flex-col gap-3">
@@ -457,6 +469,16 @@ export default function KaspiShopMargin() {
               </button>
             </div>
           </div>
+          <Source1688Panel
+            product={productName.trim().length >= 3 ? {
+              name: productName.trim(),
+              price: Number(kaspiPrice) || 0,
+              brand: picked && picked.name === productName ? picked.brand : null,
+              category: picked && picked.name === productName ? picked.category : null,
+              imageUrl: picked && picked.name === productName ? picked.imageUrl : null,
+            } : null}
+            onApplyWeight={g => setWeightGrams(String(g))}
+          />
         </motion.div>
 
         {/* Saved evaluations */}
