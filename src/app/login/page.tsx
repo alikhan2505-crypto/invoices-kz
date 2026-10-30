@@ -19,14 +19,12 @@ import { peekPendingBinWatch } from '@/lib/binWatch/pendingIntent'
 // включена Captcha protection): без ключа поведение прежнее.
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''
 
-// Вход через Facebook выключен (30.10.2026): за всё время ни одной учётки через него
-// (auth.identities: facebook 0). Supabase шлёт в Facebook scope=email, а Meta-приложение
-// 1763701871429757 (то же, что Instagram/WhatsApp) относится к типу Business: сценария
-// «Вход через Facebook» для обычных пользователей в нём нет, разрешение email не выдано,
-// адреса возврата Supabase (/auth/v1/callback) в списке нет. Человек уходит на Facebook и
-// не возвращается. Включать обратно только после отдельного Consumer-приложения Meta с
-// входом через Facebook и его ключей в Supabase (Auth → Providers → Facebook).
-const FACEBOOK_LOGIN_ENABLED = false
+// Вход через Facebook (30.10.2026): работает через ОТДЕЛЬНОЕ Meta-приложение 1756376895782349
+// (рабочий режим, расширенный доступ к email и public_profile, ключи в Supabase → Providers →
+// Facebook). Первое приложение (1763701871429757, Instagram и WhatsApp) типа Business, входа
+// через Facebook для обычных людей в нём нет: оттуда ни одной учётки не было. Выключатель на
+// случай отказа Meta: false скрывает кнопку на странице входа.
+const FACEBOOK_LOGIN_ENABLED = true
 
 // The signed-in user's enabled_products (for homeFor) and tour state (a
 // newcomer goes to the dashboard tour first) -- see postLoginDestination.ts.
