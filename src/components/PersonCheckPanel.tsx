@@ -5,6 +5,7 @@ import { onlyBinDigits } from '@/lib/tools-i18n/binAutofill'
 import { isPersonIin } from '@/lib/personCheck/iin'
 import type { PersonCheckResult } from '@/lib/personCheck/run'
 import { buildPersonGroups, countPersonRows, personText, type PersonRow, type PersonTone } from '@/lib/personCheck/rows'
+import PersonRequestGuide from '@/components/PersonRequestGuide'
 
 // Вкладка «Физлицо · СБ» на /tools/kontragent (макет 30.10.2026). Только русский и
 // только админу, пока включён гейт (src/lib/personCheck/config.ts). Результат строит
@@ -25,7 +26,25 @@ const TONE_COLOR: Record<PersonTone, string> = {
   unknown: 'var(--nav-text-muted)',
   manual: 'var(--nav-text-muted)',
 }
-const TONE_ICON: Record<PersonTone, string> = { ok: '✓', bad: '!', info: 'i', unknown: '?', manual: '↗' }
+const TONE_ICON: Record<PersonTone, string> = { ok: '✓', bad: '!', info: 'i', unknown: '?', manual: '' }
+
+/** «1 замечание», «2 замечания», «5 замечаний». */
+function remarksWord(n: number): string {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return 'замечание'
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'замечания'
+  return 'замечаний'
+}
+
+/** Стрелка «проверить вручную»: рисуем сами, символ ↗ в Safari превращается в цветной эмодзи. */
+function ManualArrow() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 7.5 7.5 2.5M3.5 2.5h4v4" />
+    </svg>
+  )
+}
 
 function Row({ row }: { row: PersonRow }) {
   const outlined = row.tone === 'manual'
@@ -38,7 +57,7 @@ function Row({ row }: { row: PersonRow }) {
           : { background: TONE_COLOR[row.tone], color: row.tone === 'info' ? 'var(--nav-accent-ink)' : '#fff' }}
         aria-hidden="true"
       >
-        {TONE_ICON[row.tone]}
+        {row.tone === 'manual' ? <ManualArrow /> : TONE_ICON[row.tone]}
       </span>
       <div className="min-w-0">
         <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>{row.label}</div>
@@ -140,7 +159,7 @@ export default function PersonCheckPanel() {
             <div className="text-base font-bold" style={{ color: 'var(--nav-text-primary)' }}>ИИН {outcome.result.iin}</div>
             {/* Красную и зелёную плашки показываем, только когда есть что сказать: «0 замечаний» над строками «не удалось проверить» читалось бы как «чисто». */}
             <div className="flex gap-2 flex-wrap mt-3 mb-1">
-              {counts.bad > 0 && <Chip tone="bad">{counts.bad} замечаний</Chip>}
+              {counts.bad > 0 && <Chip tone="bad">{counts.bad} {remarksWord(counts.bad)}</Chip>}
               {counts.ok > 0 && <Chip tone="ok">{counts.ok} без замечаний</Chip>}
               {counts.info > 0 && <Chip tone="info">{counts.info} справочно</Chip>}
               <Chip tone="other">{counts.other} вручную или не проверено</Chip>
@@ -167,6 +186,8 @@ export default function PersonCheckPanel() {
           </motion.div>
         )}
       </div>
+
+      <PersonRequestGuide iin={iin} valid={valid} />
     </>
   )
 }
