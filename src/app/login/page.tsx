@@ -13,6 +13,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import { rawFreshFirstSource } from '@/lib/visits/client'
 import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { peekPendingBinWatch } from '@/lib/binWatch/pendingIntent'
 
 // Капча входа включается, когда задан публичный ключ Turnstile (и в Supabase
 // включена Captcha protection): без ключа поведение прежнее.
@@ -205,6 +206,10 @@ export default function Login() {
     const otpData: Record<string, string> = {}
     if (refCode) otpData.referral_code = refCode
     if (firstSource) otpData.first_source = firstSource
+    // БИН, который человек поставил на слежение до входа: письмо часто открывают в другом
+    // браузере (из встроенного браузера Instagram в почтовое приложение), где localStorage пуст.
+    const pendingBin = peekPendingBinWatch()
+    if (pendingBin) otpData.pending_bin_watch = pendingBin
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {

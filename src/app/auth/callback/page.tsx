@@ -8,6 +8,8 @@ import { choosePostLoginDestination, readPostLoginIntents } from '@/lib/postLogi
 import { selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
 import { logToolEvent, readFirstTouch } from '@/lib/tools-i18n/toolEvents'
 import { readSignupSource } from '@/lib/visits/client'
+import { addPendingBinWatchInBackground } from '@/lib/binWatch/applyPending'
+import { BIN_WATCH_PAGE_PATH } from '@/lib/binWatch/pendingIntent'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -124,9 +126,15 @@ export default function AuthCallback() {
         // homeFor) lives in src/lib/postLoginDestination.ts, shared with
         // /login. replace, not push: /login and this page should not stay in
         // history behind the destination.
-        const goToDestination = () => {
+        const goToDestination = (isNewAccount = false) => {
           // Newcomer (tour not done; no profile row = brand new too) -> dashboard tour first.
-          router.replace(choosePostLoginDestination(intents, enabledProducts, profile ? !!profile.tour_completed_at : false))
+          const destination = choosePostLoginDestination(intents, enabledProducts, profile ? !!profile.tour_completed_at : false)
+          // БИН, поставленный на слежение до входа: сам список его заберёт, только если
+          // человек туда идёт; новичок идёт на тур, поэтому добавляем здесь, в фоне.
+          if (destination !== BIN_WATCH_PAGE_PATH) {
+            addPendingBinWatchInBackground(session.access_token, session.user.user_metadata?.pending_bin_watch, isNewAccount)
+          }
+          router.replace(destination)
         }
 
         const needsBootstrap =
@@ -154,7 +162,7 @@ export default function AuthCallback() {
             // even when it matches zero rows -- so continuing here would hand the user
             // a dashboard and a 200 response for a trial that was never granted.
             console.error('signup bootstrap: profile row not created', profileError.message)
-            goToDestination()
+            goToDestination(true)
             return
           }
 
@@ -278,7 +286,7 @@ export default function AuthCallback() {
             }).catch(() => {})
           } catch {}
 
-          goToDestination()
+          goToDestination(true)
         } else {
           goToDestination()
         }

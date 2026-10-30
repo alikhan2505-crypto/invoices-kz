@@ -43,3 +43,28 @@ export function consumePendingBinWatch(now: number = Date.now()): string | null 
     return null
   }
 }
+
+/** Прочитать намерение, НЕ удаляя его: /login кладёт БИН в метаданные письма (ссылку из письма часто открывают в другом браузере). */
+export function peekPendingBinWatch(now: number = Date.now()): string | null {
+  try {
+    const raw = localStorage.getItem(PENDING_BIN_WATCH_KEY)
+    if (!raw) return null
+    const entry = parseIntentJson(raw)
+    if (!entry || !isFreshIntent(entry.at, now)) return null
+    return typeof entry.bin === 'string' && BIN_RE.test(entry.bin) ? entry.bin : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Какой БИН добавить сразу после входа (30.10.2026). Сначала сохранённый в этом браузере; если пусто,
+ * то БИН из метаданных письма, но ТОЛЬКО для нового аккаунта: у старого метаданные остались бы навсегда,
+ * и удалённый из списка БИН возвращался бы при каждом входе. Всё, что не 12 цифр, отбрасывается.
+ */
+export function pickPendingBin(local: string | null, meta: unknown, isNewAccount: boolean): string | null {
+  if (local && BIN_RE.test(local)) return local
+  if (isNewAccount && typeof meta === 'string' && BIN_RE.test(meta)) return meta
+  return null
+}
+

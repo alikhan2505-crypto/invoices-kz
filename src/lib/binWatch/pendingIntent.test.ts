@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { consumePendingBinWatch, setPendingBinWatch, PENDING_BIN_WATCH_KEY, BIN_WATCH_PAGE_PATH } from './pendingIntent'
+import { consumePendingBinWatch, peekPendingBinWatch, pickPendingBin, setPendingBinWatch, PENDING_BIN_WATCH_KEY, BIN_WATCH_PAGE_PATH } from './pendingIntent'
 import { ALLOWED_POST_LOGIN_REDIRECTS, consumePostLoginRedirect, setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { STORED_INTENT_TTL_MS } from '@/lib/storedIntent'
 
@@ -57,3 +57,29 @@ describe('возврат после входа', () => {
     expect(consumePostLoginRedirect()).toBe('/profile/bin-watch')
   })
 })
+
+describe('БИН для добавления сразу после входа (30.10.2026)', () => {
+  const T0 = 1_000_000_000_000
+
+  it('peek читает намерение и НЕ удаляет его', () => {
+    setPendingBinWatch('123456789012', T0)
+    expect(peekPendingBinWatch(T0 + 1000)).toBe('123456789012')
+    expect(peekPendingBinWatch(T0 + 2000)).toBe('123456789012')
+    expect(store.has(PENDING_BIN_WATCH_KEY)).toBe(true)
+    expect(peekPendingBinWatch(T0 + STORED_INTENT_TTL_MS + 1)).toBeNull()
+  })
+
+  it('локальный БИН главнее, метаданные письма только у нового аккаунта', () => {
+    expect(pickPendingBin('123456789012', '999999999999', true)).toBe('123456789012')
+    expect(pickPendingBin(null, '999999999999', true)).toBe('999999999999')
+    expect(pickPendingBin(null, '999999999999', false)).toBeNull()
+  })
+
+  it('мусор вместо БИН отбрасывается', () => {
+    expect(pickPendingBin('abc', '<script>', true)).toBeNull()
+    expect(pickPendingBin(null, 123456789012, true)).toBeNull()
+    expect(pickPendingBin(null, undefined, true)).toBeNull()
+    expect(pickPendingBin('12345678901', '1234567890123', true)).toBeNull()
+  })
+})
+
