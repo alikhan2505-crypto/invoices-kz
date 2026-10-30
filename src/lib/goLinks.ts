@@ -91,6 +91,13 @@ export const GO_LINKS: readonly GoLink[] = [
   link('dm-akt', '/tools/avr', 'dm', 'outreach', 'avr_oct', 'личные сообщения: ответ на слово АКТ'),
   link('dm-tovar', '/tools/nakladnaya', 'dm', 'outreach', 'nakladnaya_oct', 'личные сообщения: ответ на слово ТОВАР'),
   link('dm-zarplata', '/tools/zarplata', 'dm', 'outreach', 'zarplata_oct', 'личные сообщения: ответ на слово ЗАРПЛАТА'),
+  // «Страница со ссылками» в профиле Instagram (Meta One, 30.10.2026): отдельная метка bio_link,
+  // чтобы заходы из шапки профиля не смешивались с Stories (ig-*) и личными сообщениями (dm-*).
+  link('bio-kontragent', '/tools/kontragent', 'ig', 'bio_link', 'kontragent_bio', 'профиль Instagram, страница со ссылками: проверка контрагента по БИН'),
+  link('bio-schet', '/tools/schet', 'ig', 'bio_link', 'schet_bio', 'профиль Instagram, страница со ссылками: счёт на оплату'),
+  link('bio-nalogi', '/tools/nalogi', 'ig', 'bio_link', 'nalogi_bio', 'профиль Instagram, страница со ссылками: налоги ИП'),
+  link('bio-akt', '/tools/avr', 'ig', 'bio_link', 'avr_bio', 'профиль Instagram, страница со ссылками: акт выполненных работ'),
+  link('bio-kp', '/tools/kp', 'ig', 'bio_link', 'kp_bio', 'профиль Instagram, страница со ссылками: коммерческое предложение'),
   hostLink('dm-agent', 'agent.invoices.kz', '/lp/agent', 'dm', 'outreach', 'agent_oct', 'личные сообщения: ответ на слово АГЕНТ (лендинг ИИ-агента)'),
   hostLink('dm-bot', 'kaspi.invoices.kz', '/lp/kaspi', 'dm', 'outreach', 'kaspi_bot_oct', 'личные сообщения: ответ на слово БОТ (лендинг Kaspi Bot, тариф Про)'),
 ]
