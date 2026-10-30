@@ -50,6 +50,21 @@ export const REMINDER_AFTER_MS = 2 * 3600_000
 /** Позже этого срока от последнего входящего не шлём (окно Instagram -- 24 часа, 2 часа запаса). */
 export const REMINDER_WINDOW_MAX_MS = 22 * 3600_000
 /** Не больше напоминаний за 24 часа на агента (защита от лавины при баге). */
+/**
+ * Тихие часы по Алматы (UTC+5 круглый год): с 22:00 до 08:00 напоминание не отправляется,
+ * ждёт утра (29-30.10.2026 первое живое напоминание человеку ушло в 03:00 ночи). Окно Instagram
+ * (22 часа от последнего входящего) при этом не страдает: сообщение, написанное в 00:51, получит
+ * напоминание в 08:00, через 7 часов.
+ */
+export const REMINDER_QUIET_FROM_HOUR = 22
+export const REMINDER_QUIET_TO_HOUR = 8
+const ALMATY_OFFSET_MS = 5 * 3600_000
+
+export function isQuietHoursAlmaty(nowMs: number): boolean {
+  const h = new Date(nowMs + ALMATY_OFFSET_MS).getUTCHours()
+  return h >= REMINDER_QUIET_FROM_HOUR || h < REMINDER_QUIET_TO_HOUR
+}
+
 export const REMINDER_DAILY_LIMIT = 50
 /** Не больше отправок за один запуск крона (без массовости). */
 export const REMINDER_PER_RUN_LIMIT = 20
@@ -159,6 +174,7 @@ export function decideReminder(i: DecideInput): ReminderDecision {
   if (i.now - baseline >= REMINDER_WINDOW_MAX_MS) return { action: 'skip', reason: 'expired' }
   if (i.visited) return { action: 'skip', reason: 'visited' }
   if (i.now - sent < REMINDER_AFTER_MS) return { action: 'wait' }
+  if (isQuietHoursAlmaty(i.now)) return { action: 'wait' }
   return { action: 'send' }
 }
 

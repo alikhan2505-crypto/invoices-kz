@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import {
   DEFAULT_REMINDER_TEXT, REMINDER_AFTER_MS, REMINDER_DAILY_LIMIT, REMINDER_PER_RUN_LIMIT, REMINDER_STUCK_AFTER_MS, REMINDER_WINDOW_MAX_MS,
-  attributionReady, confirmReminderLinkSent, decideReminder, failureReason, hasTrackedLink, newReminderToken,
+  attributionReady, confirmReminderLinkSent, decideReminder, failureReason, hasTrackedLink, isQuietHoursAlmaty, newReminderToken,
   prepareReminderTracking, reminderConfigFromRows, replyHasTrackedLink, resetAttributionCache, runDmReminders,
   withReminderToken, withTokenInReply,
   type ReminderConfig, type ReminderConversation, type ReminderDeps, type ReminderRow, type ReminderStore,
@@ -113,6 +113,25 @@ describe('decideReminder: кого выбираем', () => {
   })
   it('мусорные даты -- не отправляем', () => {
     expect(decideReminder({ ...base, linkSentAt: 'x' })).toEqual({ action: 'skip', reason: 'expired' })
+  })
+  it('тихие часы по Алматы (UTC+5): с 22:00 до 08:00 ждём утра, окно не теряется', () => {
+    // 21:59 Алматы (16:59 UTC): ещё можно; 22:00 (17:00 UTC) и ночью нельзя; 08:00 (03:00 UTC) можно.
+    const at = (h: number, m = 0) => Date.UTC(2026, 9, 29, h, m)
+    expect(isQuietHoursAlmaty(at(16, 59))).toBe(false)
+    expect(isQuietHoursAlmaty(at(17, 0))).toBe(true)
+    expect(isQuietHoursAlmaty(at(22, 0))).toBe(true) // 03:00 по Алматы
+    expect(isQuietHoursAlmaty(at(2, 59))).toBe(true)
+    expect(isQuietHoursAlmaty(at(3, 0))).toBe(false)
+    // Прошло 2 часа, но сейчас 03:00 Алматы (22:00 UTC): ждём, а не отправляем и не пропускаем.
+    const night = at(22, 0)
+    const sentNight = iso(night - 2 * H - 60_000)
+    const baseNight = { ...base, now: night, baselineInboundAt: sentNight, latestInboundAt: sentNight, linkSentAt: sentNight }
+    expect(decideReminder(baseNight)).toEqual({ action: 'wait' })
+    // Утром (08:00 Алматы = 03:00 UTC), через 8 часов после ночного входящего, всё ещё внутри окна: отправляем.
+    const sentAt = iso(night - 2 * H - 60_000)
+    const morning = Date.parse(sentAt) + 8 * H
+    expect(isQuietHoursAlmaty(morning)).toBe(false)
+    expect(decideReminder({ ...base, now: morning, baselineInboundAt: sentAt, latestInboundAt: sentAt, linkSentAt: sentAt })).toEqual({ action: 'send' })
   })
   it('REMINDER_AFTER_MS = 2 часа', () => {
     expect(REMINDER_AFTER_MS).toBe(2 * H)
