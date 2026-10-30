@@ -35,7 +35,7 @@ interface AVRData {
 }
 
 import { resizeToFit } from './imageResize'
-import { docFitScript } from './docFit'
+import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 import { amountInWordsKzt } from './amountWords'
@@ -140,8 +140,9 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
         <!-- Кнопки слева: на телефоне документ не масштабируется, и правый
              край панели (где были «Печать» и «Скачать PDF») уходил за экран. -->
         <button onclick="window.close()" style="background:#f3f4f6; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
+        <button class="ikz-print" onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
         <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
+        ${docShareButtonHtml(data.showWatermark)}
         <span style="margin-left:auto; white-space:nowrap; font-size:12px; color:#6b7280; font-weight:600;">АВР №${number}</span>
       </div>
       <div style="height:50px;"></div>
@@ -381,6 +382,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
         }
       <\/script>
     ${docFitScript(1123)}
+    ${docShareScript(data.showWatermark, { filename: 'АВР-' + String(data.number ?? '') + '.pdf', orientation: 'landscape', text: 'Акт сформирован на invoices.kz: https://invoices.kz/tools/avr?utm_source=share&utm_medium=doc&utm_campaign=avr_share' })}
     </body>
     </html>
   `

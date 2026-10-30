@@ -44,7 +44,7 @@ export interface KPData {
 }
 
 import { resizeToFit } from './imageResize'
-import { docFitScript } from './docFit'
+import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 import { kpStrings, kpUnitLabel, kpFileName, isKpLang, type KpLang } from './kpI18n'
@@ -346,8 +346,9 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         <!-- Кнопки слева: на телефоне документ не масштабируется, и правый
              край панели (где были «Печать» и «Скачать PDF») уходил за экран. -->
         <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.back}</button>
-        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.print}</button>
+        <button class="ikz-print" onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.print}</button>
         <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.downloadPdf}</button>
+        ${docShareButtonHtml(data.showWatermark)}
         <span style="margin-left:auto; white-space:nowrap; font-size:12px; color:#6b7280; font-weight:600;">${L.toolbarNo}${kpNumber}</span>
       </div>
       <div style="height:55px;"></div>
@@ -533,6 +534,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         }
       <\/script>
     ${docFitScript(794)}
+    ${docShareScript(data.showWatermark, { filename: kpFileName(lang, data.number), orientation: 'portrait', text: 'Коммерческое предложение сформировано на invoices.kz: https://invoices.kz/tools/kp?utm_source=share&utm_medium=doc&utm_campaign=kp_share' })}
     </body>
     </html>
   `

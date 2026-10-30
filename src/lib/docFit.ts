@@ -64,3 +64,77 @@ export function docFitScript(docWidthPx: number): string {
 })();
 <\/script>`
 }
+
+// «Отправить» на документах бесплатного тарифа (30.10.2026, решение основателя): на телефоне
+// PDF уходит клиенту через системное окно «Поделиться» (WhatsApp, Telegram, почта), без
+// скачивания и поиска файла в загрузках. Кнопка показывается только там, где браузер умеет
+// делиться ФАЙЛАМИ (navigator.canShare({files})): на компьютере её нет, а «Скачать PDF» и
+// «Печать» остаются как были. Снимок листа тот же, что у «Скачать PDF» (те же шаги с
+// __ikzUnfit/__ikzFit, панель прячется на время снимка), только PDF не сохраняется, а
+// собирается в файл для окна «Поделиться». Платные документы без водяного знака не затронуты.
+export function docShareButtonHtml(on: boolean | undefined): string {
+  if (!on) return ''
+  return `<button id="shBtn" onclick="ikzShare()" style="display:none; background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap;">📤 Отправить</button>`
+}
+
+export function docShareScript(
+  on: boolean | undefined,
+  opts: { filename: string; orientation: 'portrait' | 'landscape'; text: string },
+): string {
+  if (!on) return ''
+  return `
+<script>
+(function () {
+  var FILE = ${JSON.stringify(opts.filename)};
+  var ORIENT = ${JSON.stringify(opts.orientation)};
+  var TEXT = ${JSON.stringify(opts.text)};
+  function canShareFiles() {
+    try {
+      if (!navigator.canShare || !navigator.share) return false;
+      return navigator.canShare({ files: [new File(['x'], 'x.pdf', { type: 'application/pdf' })] });
+    } catch (e) { return false; }
+  }
+  var btn = document.getElementById('shBtn');
+  if (btn && canShareFiles()) {
+    btn.style.display = '';
+    // На узком экране кнопки не помещаются в строку: печать с телефона нужна редко, её убираем.
+    if (window.matchMedia && window.matchMedia('(max-width: 479px)').matches) {
+      var pr = document.querySelector('.ikz-print');
+      if (pr) pr.style.display = 'none';
+    }
+  }
+  window.ikzShare = async function () {
+    var b = document.getElementById('shBtn');
+    if (!b || b.disabled) return;
+    var label = b.textContent;
+    b.textContent = '⏳ ...';
+    b.disabled = true;
+    if (window.__ikzUnfit) window.__ikzUnfit();
+    var toolbar = document.querySelector('.toolbar');
+    var spacer = toolbar && toolbar.nextElementSibling;
+    if (toolbar) toolbar.style.display = 'none';
+    if (spacer) spacer.style.display = 'none';
+    var blob = null;
+    try {
+      blob = await html2pdf().set({
+        margin: 0,
+        filename: FILE,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: ORIENT }
+      }).from(document.body).outputPdf('blob');
+    } catch (e) { blob = null; }
+    if (window.__ikzFit) window.__ikzFit();
+    if (toolbar) toolbar.style.display = 'flex';
+    if (spacer) spacer.style.display = 'block';
+    b.textContent = label;
+    b.disabled = false;
+    if (!blob) return;
+    try {
+      await navigator.share({ files: [new File([blob], FILE, { type: 'application/pdf' })], title: FILE, text: TEXT });
+    } catch (e) { /* человек закрыл окно «Поделиться» */ }
+  };
+})();
+<\/script>`
+}
+
