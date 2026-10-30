@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   // extras: категории неблагонадёжных, налоговый режим и реестр должников Минюста
   // (25.10.2026). Все три независимы: сбой даёт null в своём поле, не 503.
-  const result = await performBinLookup(supabase, bin, { extras: true })
+  const result = await performBinLookup(supabase, bin, { extras: true, rnu: true })
 
   // Оба реестра не ответили (сеть, таймаут, не 2xx): это не «не найдено», и
   // попытку из квартального лимита мы НЕ тратим. Счётчик не трогаем вообще.
@@ -108,6 +108,9 @@ export async function POST(req: NextRequest) {
       // undefined (таблицы нет, фича спит) в JSON пропадает: клиент не рисует строку.
       // null = «не удалось проверить» и остаётся null, не «чисто».
       rehabilitation: publicRehabilitation(c.rehabilitation),
+      // РНУ госзакупок (30.10.2026): только факт и число записей, без имён и номеров решений.
+      // undefined (не запрашивалась) в JSON пропадает; null = «не удалось проверить».
+      rnu: c.rnu === undefined ? undefined : c.rnu ? { found: c.rnu.found, count: c.rnu.count } : null,
       hasFullCard: Boolean(c.address || c.director || c.activity),
     },
   })

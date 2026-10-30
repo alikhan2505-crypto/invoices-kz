@@ -7,6 +7,7 @@
 import { kontragentDict } from '@/app/tools/kontragent/dict'
 import { AISOIP_DATASET_URL, AISOIP_MANUAL_URL } from '@/lib/aisoip'
 import { taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
+import { rnuSourceUrl, type RnuResult } from '@/lib/goszakupRnu'
 import { formatIsoDate, formatTenge } from '@/lib/tools-i18n'
 import type { PersonCheckResult, PublicEntrepreneur } from './run'
 
@@ -24,7 +25,7 @@ export interface PersonRow {
 }
 
 export interface PersonGroup {
-  id: 'debts' | 'entrepreneur' | 'manual'
+  id: 'debts' | 'entrepreneur' | 'procurement' | 'manual'
   title: string
   rows: PersonRow[]
 }
@@ -32,7 +33,13 @@ export interface PersonGroup {
 export interface PersonCounts { bad: number; ok: number; info: number; other: number }
 
 export const personText = {
-  groups: { debts: 'Долги и ограничения', entrepreneur: 'Предпринимательство', manual: 'Проверьте вручную' },
+  groups: { debts: 'Долги и ограничения', entrepreneur: 'Предпринимательство', procurement: 'Госзакупки', manual: 'Проверьте вручную' },
+  related: {
+    label: 'Учредитель или руководитель недобросовестных участников',
+    ok: 'Не указан учредителем или руководителем в реестре недобросовестных участников госзакупок',
+    bad: (records: string) => `Указан учредителем или руководителем в реестре недобросовестных участников госзакупок (записей: ${records})`,
+    note: 'Поиск по БИН/ИИН учредителя и руководителя в реестре портала госзакупок. Совпадение по номеру, это не вывод о человеке',
+  },
   entrepreneur: {
     label: 'Статус ИП',
     none: 'По открытым данным КГД ИП по этому ИИН не найдено',
@@ -60,6 +67,18 @@ export const personText = {
   },
   legal: 'Проверяйте человека, только если есть основание: договор, сделка, наём. Мы показываем записи из открытых реестров. Это справка, а не вердикт о человеке.',
 } as const
+
+function rnuRow(id: 'rnu' | 'rnuRelated', r: RnuResult | null, iin: string): PersonRow {
+  const related = id === 'rnuRelated'
+  const label = related ? personText.related.label : t.rnu.label
+  const link = {
+    href: rnuSourceUrl(iin, related ? 'head_biin' : 'biin'),
+    label: `${t.rnu.sourcePrefix}${t.rnu.sourceLink}`,
+  }
+  if (!r) return { id, tone: 'unknown', label, text: t.rnu.unknown, details: [], link }
+  const text = r.found ? (related ? personText.related.bad(String(r.count)) : t.rnu.bad(String(r.count))) : (related ? personText.related.ok : t.rnu.ok)
+  return { id, tone: r.found ? 'bad' : 'ok', label, text, details: [related ? personText.related.note : t.rnu.note], link }
+}
 
 function enforcementRow(r: PersonCheckResult): PersonRow {
   const e = r.enforcement
@@ -161,6 +180,7 @@ export function buildPersonGroups(r: PersonCheckResult): PersonGroup[] {
   return [
     { id: 'debts', title: personText.groups.debts, rows: [enforcementRow(r)] },
     { id: 'entrepreneur', title: personText.groups.entrepreneur, rows: entrepreneurRows(r) },
+    { id: 'procurement', title: personText.groups.procurement, rows: [rnuRow('rnu', r.rnu.supplier, r.iin), rnuRow('rnuRelated', r.rnu.related, r.iin)] },
     {
       id: 'manual',
       title: personText.groups.manual,

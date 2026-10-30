@@ -79,6 +79,16 @@ export interface KontragentDict {
     /** Ссылка на ручную проверку, когда сервис не ответил (БИН подставить нельзя: reCAPTCHA). */
     manualLink: string
   }
+  /** Реестр недобросовестных участников госзакупок (goszakup.gov.kz), 30.10.2026. */
+  rnu: {
+    label: string
+    ok: string
+    bad: (records: string) => string
+    unknown: string
+    note: string
+    sourcePrefix: string
+    sourceLink: string
+  }
   /**
    * Реабилитационная процедура (список должников КГД, суточная выгрузка). Строка
    * показывается, только когда проверка включена (в ответе есть поле rehabilitation).
@@ -223,6 +233,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourcePrefix: 'Источник: ',
       sourceLink: 'открытые данные Минюста РК, data.egov.kz',
       manualLink: 'Проверить вручную на aisoip.adilet.gov.kz (нужна капча)',
+    },
+    rnu: {
+      label: 'Реестр недобросовестных участников госзакупок',
+      ok: 'В реестре недобросовестных участников государственных закупок не числится',
+      bad: records => `Числится в реестре недобросовестных участников госзакупок (записей: ${records})`,
+      unknown: 'Не удалось проверить. Это не значит, что в реестре нет',
+      note: 'Реестр портала госзакупок (Минфин РК): включение по решению суда или уполномоченного органа, это не справка',
+      sourcePrefix: 'Источник: ',
+      sourceLink: 'реестр на портале госзакупок goszakup.gov.kz',
     },
     rehabilitation: {
       label: 'Реабилитационная процедура',
@@ -388,6 +407,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourceLink: 'ҚР Әділет министрлігінің ашық деректері, data.egov.kz',
       manualLink: 'aisoip.adilet.gov.kz сайтында қолмен тексеру (капча керек)',
     },
+    rnu: {
+      label: 'Мемлекеттік сатып алудың жосықсыз қатысушылары тізілімі',
+      ok: 'Мемлекеттік сатып алудың жосықсыз қатысушылары тізімінде тұрмайды',
+      bad: records => `Мемлекеттік сатып алудың жосықсыз қатысушылары тізімінде тұр (жазба саны: ${records})`,
+      unknown: 'Тексеру мүмкін болмады. Бұл тізімде жоқ дегенді білдірмейді',
+      note: 'Мемлекеттік сатып алу порталының тізілімі (ҚР Қаржы министрлігі): сот немесе уәкілетті орган шешімі бойынша енгізіледі, бұл анықтама емес',
+      sourcePrefix: 'Дереккөз: ',
+      sourceLink: 'goszakup.gov.kz мемлекеттік сатып алу порталындағы тізілім',
+    },
     rehabilitation: {
       label: 'Оңалту рәсімі',
       ok: 'МКК тізімінде оңалту рәсімі бойынша тұрмайды',
@@ -551,6 +579,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
       sourcePrefix: 'Source: ',
       sourceLink: 'Ministry of Justice open data, data.egov.kz',
       manualLink: 'Check manually at aisoip.adilet.gov.kz (captcha required)',
+    },
+    rnu: {
+      label: 'Register of unreliable public procurement participants',
+      ok: 'Not in the register of unreliable participants of public procurement',
+      bad: records => `In the register of unreliable public procurement participants (records: ${records})`,
+      unknown: 'Could not be checked. This does not mean it is not listed',
+      note: 'Public procurement portal register (Ministry of Finance): listing follows a court or authority decision, not an official certificate',
+      sourcePrefix: 'Source: ',
+      sourceLink: 'register on the goszakup.gov.kz procurement portal',
     },
     rehabilitation: {
       label: 'Rehabilitation procedure',

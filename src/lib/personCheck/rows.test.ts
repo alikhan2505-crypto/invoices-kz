@@ -3,8 +3,9 @@ import type { PersonCheckResult } from './run'
 import { buildPersonGroups, countPersonRows, personText } from './rows'
 
 const clean = { found: false, count: 0, activeCount: 0, totalAmount: 0, earliestStart: null }
+const cleanRnu = { found: false, count: 0 }
 const base = (over: Partial<PersonCheckResult> = {}): PersonCheckResult => ({
-  iin: '900101300017', entrepreneur: { state: 'none' }, enforcement: clean, ...over,
+  iin: '900101300017', entrepreneur: { state: 'none' }, enforcement: clean, rnu: { supplier: cleanRnu, related: cleanRnu }, ...over,
 })
 const row = (r: PersonCheckResult, id: string) => buildPersonGroups(r).flatMap(g => g.rows).find(x => x.id === id)
 
@@ -84,6 +85,27 @@ describe('ИП', () => {
   })
 })
 
+describe('госзакупки: РНУ', () => {
+  it('чисто: две строки без замечаний, ссылка-источник на реестр', () => {
+    const g = buildPersonGroups(base()).find(x => x.id === 'procurement')!
+    expect(g.rows.map(r => [r.id, r.tone])).toEqual([['rnu', 'ok'], ['rnuRelated', 'ok']])
+    expect(g.rows[0].link?.href).toContain('goszakup.gov.kz')
+    expect(decodeURIComponent(g.rows[1].link?.href ?? '')).toContain('filter[head_biin]=900101300017')
+  })
+  it('участник и учредитель в реестре: замечания с числом записей', () => {
+    const r = base({ rnu: { supplier: { found: true, count: 1 }, related: { found: true, count: 2 } } })
+    expect(row(r, 'rnu')!.tone).toBe('bad')
+    expect(row(r, 'rnuRelated')!.tone).toBe('bad')
+    expect(row(r, 'rnuRelated')!.text).toContain('2')
+  })
+  it('портал не ответил: «не проверено», не «чисто»', () => {
+    const r = base({ rnu: { supplier: null, related: null } })
+    expect(row(r, 'rnu')!.tone).toBe('unknown')
+    expect(row(r, 'rnuRelated')!.tone).toBe('unknown')
+    expect(row(r, 'rnuRelated')!.text).toMatch(/не значит/)
+  })
+})
+
 describe('вручную и счётчики', () => {
   it('суды и розыск всегда ручные', () => {
     const g = buildPersonGroups(base()).find(x => x.id === 'manual')!
@@ -97,6 +119,6 @@ describe('вручную и счётчики', () => {
   })
   it('счётчики: замечание, чисто, справочно, остальное', () => {
     const groups = buildPersonGroups(base({ enforcement: { found: true, count: 1, activeCount: 1, totalAmount: 0, earliestStart: null } }))
-    expect(countPersonRows(groups)).toEqual({ bad: 1, ok: 0, info: 1, other: 2 })
+    expect(countPersonRows(groups)).toEqual({ bad: 1, ok: 2, info: 1, other: 2 })
   })
 })

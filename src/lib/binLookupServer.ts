@@ -20,6 +20,7 @@ import {
 } from '@/lib/kgdTaxpayer'
 import { fetchUnreliableDetail, fetchTaxRegime, fetchEnforcement } from '@/lib/binExtraChecks'
 import { fetchRehabilitation } from '@/lib/kgdRehabilitation'
+import { fetchRnu, rnuDisabled } from '@/lib/goszakupRnu'
 
 // A registry row is re-fetched after this. Companies get renamed, liquidated
 // and registered for VAT, and a stale name printed on an invoice is worse
@@ -172,16 +173,25 @@ export type BinLookupOutcome = { found: false; unavailable?: boolean } | { found
  * должников Минюста. Спрашиваются каждый раз заново, параллельно и независимо:
  * сбой одного даёт null в своём поле и не трогает остальные.
  */
-async function checkExtras(supabase: SupabaseClient, bin: string) {
+async function checkExtras(supabase: SupabaseClient, bin: string, withRnu = false) {
   // Реабилитация (26.10.2026): чтение одной строки суточной выгрузки КГД из нашей
   // базы, без сети. undefined = таблицы нет, фича спит; null = не проверили.
-  const [taxRegimes, enforcement, rehabilitation] = await Promise.all([
+  // РНУ госзакупок (30.10.2026): один GET в чужой публичный реестр, только по просьбе вызывающего
+  // (options.rnu). undefined = не запрашивали или проверка выключена (строки нет); null = не удалось.
+  const [taxRegimes, enforcement, rehabilitation, rnu] = await Promise.all([
     fetchTaxRegime(bin), fetchEnforcement(bin), fetchRehabilitation(supabase, bin),
+    withRnu && !rnuDisabled() ? fetchRnu(bin) : Promise.resolve(undefined),
   ])
-  return { taxRegimes, enforcement, rehabilitation }
+  return { taxRegimes, enforcement, rehabilitation, rnu }
 }
 
 export interface PerformBinLookupOptions {
+  /**
+   * Также спросить реестр недобросовестных участников госзакупок (только вместе с extras).
+   * Нужен лишь там, где результат показывают человеку: публичный /api/tools/kontragent и
+   * проверка физлица. Слежение, /create и прочее чужой портал без нужды не трогают.
+   */
+  rnu?: boolean
   /**
    * Также спросить налоговый режим, реестр должников и категории
    * неблагонадёжных. Нужно только показу рисков: публичному
@@ -277,12 +287,13 @@ export async function performBinLookup(
       // (дозаполнение дыры), категории у него есть.
       const needCategories = company.isUnreliable === true && company.unreliableCategories === undefined
       const [extra, detail] = await Promise.all([
-        checkExtras(supabase, bin),
+        checkExtras(supabase, bin, options.rnu === true),
         needCategories ? fetchUnreliableDetail(bin) : Promise.resolve(undefined),
       ])
       company.taxRegimes = extra.taxRegimes
       company.enforcement = extra.enforcement
       company.rehabilitation = extra.rehabilitation
+      company.rnu = extra.rnu
       if (company.isUnreliable === false) company.unreliableCategories = []
       else if (needCategories) company.unreliableCategories = detail ? detail.categories : null
       else if (company.unreliableCategories === undefined) company.unreliableCategories = null
@@ -308,7 +319,7 @@ export async function performBinLookup(
     checkRisk(bin),
     // Режим и реестр должников не зависят от результата рисков; категории
     // неблагонадёжных уже пришли вместе с рисками, второй раз не спрашиваем.
-    options.extras ? checkExtras(supabase, bin) : Promise.resolve(null),
+    options.extras ? checkExtras(supabase, bin, options.rnu === true) : Promise.resolve(null),
   ])
   if (vat) {
     company.isVatPayer = vat.isVatPayer
@@ -323,6 +334,7 @@ export async function performBinLookup(
     company.taxRegimes = extra.taxRegimes
     company.enforcement = extra.enforcement
     company.rehabilitation = extra.rehabilitation
+    company.rnu = extra.rnu
   }
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({

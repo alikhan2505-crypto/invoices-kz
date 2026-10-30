@@ -9,6 +9,7 @@ import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import type { TaxRegime, UnreliableCategory } from '@/lib/kgdTaxpayer'
 import type { RehabilitationResult } from '@/lib/kgdRehabilitation'
 import { AISOIP_DATASET_URL, AISOIP_MANUAL_URL, isIndividualId, type EnforcementResult } from '@/lib/aisoip'
+import { rnuSourceUrl } from '@/lib/goszakupRnu'
 import { elicenseSearchUrl, taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import { useLanguage } from '@/components/LanguageProvider'
 import { formatIsoDate, formatTenge, toolGuidePath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
@@ -55,6 +56,8 @@ interface PublicCompany {
   enforcement?: EnforcementResult | null
   /** Нет поля = проверка не включена (строку не рисуем). null = не удалось проверить. */
   rehabilitation?: RehabilitationResult | null
+  /** РНУ госзакупок (30.10.2026). Нет поля = не запрашивалась (строку не рисуем). null = не удалось проверить. */
+  rnu?: { found: boolean; count: number } | null
   hasFullCard: boolean
 }
 
@@ -432,6 +435,21 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                       )}
                     </Detail>
                   </Verdict>
+                  {c.rnu !== undefined && (
+                    <Verdict
+                      ok={c.rnu ? !c.rnu.found : null}
+                      label={t.rnu.label}
+                      okText={t.rnu.ok}
+                      badText={c.rnu ? t.rnu.bad(String(c.rnu.count)) : ''}
+                      unknownText={t.rnu.unknown}
+                    >
+                      {c.rnu && <Detail>{t.rnu.note}</Detail>}
+                      <Detail>
+                        {t.rnu.sourcePrefix}
+                        <ExternalLink href={rnuSourceUrl(c.bin)}>{t.rnu.sourceLink}</ExternalLink>
+                      </Detail>
+                    </Verdict>
+                  )}
                   <div className="flex items-start gap-2.5 py-2">
                     <span
                       className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5"

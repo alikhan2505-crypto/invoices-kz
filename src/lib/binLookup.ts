@@ -1,5 +1,6 @@
 import { parseVatStatus, KGD_VAT_URL, type TaxRegime, type UnreliableCategory } from './kgdTaxpayer'
 import type { EnforcementResult } from './aisoip'
+import type { RnuResult } from './goszakupRnu'
 import type { RehabilitationResult } from './kgdRehabilitation'
 
 // Looking a counterparty up by БИН, so it does not have to be typed.
@@ -60,6 +61,11 @@ export interface BinLookupResult {
   taxRegimes?: TaxRegime[] | null
   /** Enforcement proceedings, Минюст via data.egov.kz. null = could not check. */
   enforcement?: EnforcementResult | null
+  /**
+   * Реестр недобросовестных участников госзакупок (портал goszakup.gov.kz), 30.10.2026.
+   * undefined = проверка не запрашивалась; null = не удалось проверить: НЕ «чисто».
+   */
+  rnu?: RnuResult | null
   /**
    * Реабилитационная процедура по суточной выгрузке списка КГД (26.10.2026).
    * undefined = проверка не включена (таблицы нет): строку не показываем.

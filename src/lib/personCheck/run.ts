@@ -20,6 +20,7 @@ import { fetchEnforcement } from '@/lib/binExtraChecks'
 import type { EnforcementResult } from '@/lib/aisoip'
 import { publicRehabilitation, type RehabilitationResult } from '@/lib/kgdRehabilitation'
 import type { TaxRegime, UnreliableCategory } from '@/lib/kgdTaxpayer'
+import { fetchRnu, type RnuMode, type RnuResult } from '@/lib/goszakupRnu'
 import { isPersonIin } from './iin'
 
 export { isPersonIin }
@@ -49,16 +50,24 @@ export interface PersonCheckResult {
   entrepreneur: EntrepreneurState
   /** null = не удалось проверить. */
   enforcement: EnforcementResult | null
+  /**
+   * Реестр недобросовестных участников госзакупок (30.10.2026): supplier - сам человек (ИП) как
+   * участник, related - он же как учредитель или руководитель недобросовестного участника.
+   * null = не удалось проверить.
+   */
+  rnu: { supplier: RnuResult | null; related: RnuResult | null }
 }
 
 export interface PersonCheckDeps {
   lookup: (supabase: SupabaseClient, bin: string) => Promise<BinLookupOutcome>
   enforcement: (bin: string) => Promise<EnforcementResult | null>
+  rnu: (id: string, mode: RnuMode) => Promise<RnuResult | null>
 }
 
 const defaultDeps: PersonCheckDeps = {
-  lookup: (supabase, bin) => performBinLookup(supabase, bin, { extras: true }),
+  lookup: (supabase, bin) => performBinLookup(supabase, bin, { extras: true, rnu: true }),
   enforcement: fetchEnforcement,
+  rnu: fetchRnu,
 }
 
 /** Срез записи ИП, который уходит наружу: только перечисленные поля, без адреса, руководителя и ОКЭД. */
@@ -84,6 +93,8 @@ export async function runPersonCheck(
   iin: string,
   deps: PersonCheckDeps = defaultDeps,
 ): Promise<PersonCheckResult> {
+  // Связь с недобросовестными участниками не зависит от остальных проверок: спрашиваем сразу.
+  const relatedPromise = deps.rnu(iin, 'head_biin')
   const outcome = await deps.lookup(supabase, iin)
   if (outcome.found) {
     const c = outcome.company
@@ -94,15 +105,17 @@ export async function runPersonCheck(
       enforcement: e
         ? { found: e.found, count: e.count, activeCount: e.activeCount, totalAmount: e.totalAmount, earliestStart: e.earliestStart }
         : null,
+      rnu: { supplier: c.rnu ?? null, related: await relatedPromise },
     }
   }
-  // Не ИП (или реестры не ответили): реестр должников спрашиваем отдельно, он не зависит от КГД.
-  const enforcement = await deps.enforcement(iin)
+  // Не ИП (или реестры не ответили): реестр должников и РНУ спрашиваем отдельно, они не зависят от КГД.
+  const [enforcement, supplier, related] = await Promise.all([deps.enforcement(iin), deps.rnu(iin, 'biin'), relatedPromise])
   return {
     iin,
     entrepreneur: outcome.unavailable ? { state: 'unknown' } : { state: 'none' },
     enforcement: enforcement
       ? { found: enforcement.found, count: enforcement.count, activeCount: enforcement.activeCount, totalAmount: enforcement.totalAmount, earliestStart: enforcement.earliestStart }
       : null,
+    rnu: { supplier, related },
   }
 }

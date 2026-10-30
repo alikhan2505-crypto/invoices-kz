@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { performBinLookup } from './binLookupServer'
 import { resetEnforcementState } from './binExtraChecks'
+import { resetRnuState } from './goszakupRnu'
 
 // performBinLookup с extras: проверяем изоляцию (сбой одной проверки не ломает
 // остальные), что null остаётся null, и что без extras новые запросы не уходят.
@@ -33,7 +34,11 @@ const SOAP_EMPTY =
 
 type Handler = (url: string, init?: RequestInit) => Response | Promise<Response>
 let calls: string[]
-let handlers: { unreliable: Handler; snr: Handler; soap: Handler }
+let handlers: { unreliable: Handler; snr: Handler; soap: Handler; rnu: Handler }
+
+const RNU_CLEAN = '<strong>Показано c 1 по 0 из 0 записей</strong><table id="search-result"></table>'
+const RNU_LISTED =
+  `<strong>Показано c 1 по 1 из 1 записей</strong><table id="search-result"><tr><th>№</th><th>Н</th><th>БИН/ИИН</th><th>И</th></tr><tr><td>1-1</td><td>ТОО Ромашка</td><td>${BIN}</td><td></td></tr></table>`
 
 const ok = (b: unknown) => new Response(JSON.stringify(b), { status: 200 })
 
@@ -43,12 +48,14 @@ beforeEach(() => {
     unreliable: () => ok([]),
     snr: () => ok({ status: 'SUCCESS', stmList: [{ type: 'SNR_GENERAL_ORDER', typeNameRu: 'Общеустановленный порядок' }] }),
     soap: () => new Response(SOAP_EMPTY, { status: 200 }),
+    rnu: () => new Response(RNU_CLEAN, { status: 200 }),
   }
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.includes('snr-search')) { calls.push('snr'); return handlers.snr(url, init) }
     if (url.includes('ODWebServiceImpl')) { calls.push('soap'); return handlers.soap(url, init) }
     if (url.includes('taxpayer-data/search')) { calls.push('unreliable'); return handlers.unreliable(url, init) }
+    if (url.includes('goszakup')) { calls.push('rnu'); return handlers.rnu(url, init) }
     if (url.includes('gbd_ul')) {
       return ok([{ bin: BIN, nameru: 'ТОО Ромашка', statusru: 'Зарегистрирован', datereg: '2020-01-01+06:00' }])
     }
@@ -63,6 +70,7 @@ beforeEach(() => {
   delete process.env.AISOIP_CHECK_DISABLED
   process.env.AISOIP_RETRY_DELAY_MS = '0'
   resetEnforcementState()
+  resetRnuState()
 })
 afterEach(() => {
   delete process.env.AISOIP_RETRY_DELAY_MS
@@ -175,5 +183,62 @@ describe('performBinLookup, cache hit with extras', () => {
     const { client } = fakeSupabase(cachedRow())
     await performBinLookup(client, BIN)
     expect(calls).toEqual([])
+  })
+})
+
+describe('РНУ госзакупок в performBinLookup (30.10.2026)', () => {
+  it('в реестре: rnu {found:true, count:1}', async () => {
+    handlers.rnu = () => new Response(RNU_LISTED, { status: 200 })
+    const out = await performBinLookup(fakeSupabase(null).client, BIN, { extras: true, rnu: true })
+    if (!out.found) throw new Error('expected found')
+    expect(out.company.rnu).toEqual({ found: true, count: 1 })
+  })
+
+  it('чисто: rnu {found:false}', async () => {
+    const out = await performBinLookup(fakeSupabase(null).client, BIN, { extras: true, rnu: true })
+    if (!out.found) throw new Error('expected found')
+    expect(out.company.rnu).toEqual({ found: false, count: 0 })
+  })
+
+  it('портал не ответил: rnu null, остальные проверки целы', async () => {
+    handlers.rnu = () => new Response('down', { status: 503 })
+    handlers.unreliable = () => ok([{ taxpayerDataList: [{ unreliableTaxpayerDataCategory: 'INACTIVE_LIST' }] }])
+    const out = await performBinLookup(fakeSupabase(null).client, BIN, { extras: true, rnu: true })
+    if (!out.found) throw new Error('expected found')
+    expect(out.company.rnu).toBeNull()
+    expect(out.company.unreliableCategories).toEqual(['inactive'])
+  })
+
+  it('свежая строка кэша: РНУ всё равно спрашивается заново (в кэше его нет)', async () => {
+    handlers.rnu = () => new Response(RNU_LISTED, { status: 200 })
+    const out = await performBinLookup(fakeSupabase(cachedRow()).client, BIN, { extras: true, rnu: true })
+    if (!out.found) throw new Error('expected found')
+    expect(out.company.rnu).toEqual({ found: true, count: 1 })
+  })
+
+  it('extras без rnu (слежение, /create): в портал госзакупок не ходим, поля нет', async () => {
+    const out = await performBinLookup(fakeSupabase(null).client, BIN, { extras: true })
+    if (!out.found) throw new Error('expected found')
+    expect(calls).not.toContain('rnu')
+    expect(out.company.rnu).toBeUndefined()
+  })
+
+  it('выключатель RNU_CHECK_DISABLED=1: не ходим и поле undefined (строка не показывается), а не null', async () => {
+    process.env.RNU_CHECK_DISABLED = '1'
+    try {
+      const out = await performBinLookup(fakeSupabase(null).client, BIN, { extras: true, rnu: true })
+      if (!out.found) throw new Error('expected found')
+      expect(calls).not.toContain('rnu')
+      expect(out.company.rnu).toBeUndefined()
+    } finally {
+      delete process.env.RNU_CHECK_DISABLED
+    }
+  })
+
+  it('без extras в портал госзакупок не ходим и поле не заполняется', async () => {
+    const out = await performBinLookup(fakeSupabase(null).client, BIN)
+    if (!out.found) throw new Error('expected found')
+    expect(calls).not.toContain('rnu')
+    expect(out.company.rnu).toBeUndefined()
   })
 })

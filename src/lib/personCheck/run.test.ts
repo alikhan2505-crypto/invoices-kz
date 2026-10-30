@@ -22,6 +22,7 @@ function company(over: Partial<BinLookupResult> = {}): BinLookupResult {
 const deps = (over: Partial<PersonCheckDeps> = {}): PersonCheckDeps => ({
   lookup: vi.fn(async () => ({ found: false as const })),
   enforcement: vi.fn(async () => null),
+  rnu: vi.fn(async () => null),
   ...over,
 })
 
@@ -99,6 +100,38 @@ describe('runPersonCheck', () => {
   it('ИП нашёлся, но реестр должников не ответил: enforcement null', async () => {
     const r = await runPersonCheck(sb, IIN, deps({ lookup: vi.fn(async () => ({ found: true as const, company: company({ enforcement: null }) })) }))
     expect(r.enforcement).toBeNull()
+  })
+})
+
+describe('РНУ госзакупок', () => {
+  const LISTED = { found: true, count: 1 }
+  const CLEAN = { found: false, count: 0 }
+
+  it('не ИП: человек как участник и как учредитель спрашиваются отдельно', async () => {
+    const rnu = vi.fn(async (_id: string, mode: string) => (mode === 'biin' ? CLEAN : LISTED))
+    const r = await runPersonCheck(sb, IIN, deps({ rnu }))
+    expect(r.rnu).toEqual({ supplier: CLEAN, related: LISTED })
+    expect(rnu).toHaveBeenCalledWith(IIN, 'biin')
+    expect(rnu).toHaveBeenCalledWith(IIN, 'head_biin')
+  })
+
+  it('сбой портала даёт null, а не «чисто»', async () => {
+    const r = await runPersonCheck(sb, IIN, deps())
+    expect(r.rnu).toEqual({ supplier: null, related: null })
+  })
+
+  it('у ИП «как участник» берётся из ответа lookup, «как учредитель» спрашивается отдельно', async () => {
+    const rnu = vi.fn(async () => CLEAN)
+    const d = deps({ rnu, lookup: vi.fn(async () => ({ found: true as const, company: company({ rnu: LISTED }) })) })
+    const r = await runPersonCheck(sb, IIN, d)
+    expect(r.rnu).toEqual({ supplier: LISTED, related: CLEAN })
+    expect(rnu).toHaveBeenCalledTimes(1)
+    expect(rnu).toHaveBeenCalledWith(IIN, 'head_biin')
+  })
+
+  it('ИП, но lookup не принёс rnu: supplier null, а не «чисто»', async () => {
+    const r = await runPersonCheck(sb, IIN, deps({ lookup: vi.fn(async () => ({ found: true as const, company: company() })) }))
+    expect(r.rnu.supplier).toBeNull()
   })
 })
 
