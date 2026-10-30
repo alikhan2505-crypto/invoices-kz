@@ -1,21 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { personRequestText as T, REQUESTABLE_CERTIFICATES, OTHER_LISTED_CERTIFICATES } from './requestText'
+import { personRequestText as T, REQUESTABLE_CERTIFICATES, buildPersonMessage } from './requestText'
 
-// Тексты блока «Запросить справки» не должны обещать того, чего источники не
-// подтверждают: см. комментарий в начале requestText.ts.
+// Тексты блока «Справки о человеке» не должны обещать того, чего источники не
+// подтверждают: см. комментарий в начале requestText.ts. Главный урок 30.10.2026: форма
+// egov «Справка о несудимости» не даёт заказать справку на другого человека (только «на себя»,
+// «на ребёнка», «на опекаемого»), и текст этого не обещает.
 describe('requestText: без лишних обещаний', () => {
   const all = JSON.stringify(T)
 
-  it('ссылка заказа ведёт на рабочую страницу P10.01, а не на мёртвый адрес SR.11', () => {
-    expect(T.serviceHref).toBe('https://egov.kz/ru/services/presale/P1001')
-    expect(T.serviceHref).not.toContain('SR.11')
-    expect(T.infoHref).toBe('https://www.gov.kz/services/3934')
-    expect(T.infoNote).toMatch(/404/)
-  })
-
-  it('окно ответа человека 2 часа, как на странице услуги', () => {
-    expect(T.windowMs).toBe(2 * 3_600_000)
-    expect(T.steps.map(s => s.text).join(' ')).toContain('2 часов')
+  it('не обещает заказ на другого человека через egov и мёртвый адрес SR.11', () => {
+    expect(T.lead).toMatch(/не может/)
+    expect(all).not.toMatch(/выберите другого человека/i)
+    expect(all).not.toContain('SR.11')
+    expect(T.thirdParty.text).toMatch(/404/)
+    expect(T.thirdParty.href).toBe('https://www.gov.kz/services/3934')
   })
 
   it('мы ничего не получаем и не храним: сказано прямо', () => {
@@ -32,24 +30,35 @@ describe('requestText: без лишних обещаний', () => {
     expect(T.exitBan.text).toMatch(/не подтверждают/)
   })
 
-  it('таймер показывает время в Алматы и минуты', () => {
-    expect(T.timerLeft('14:30', 90)).toBe('Человек должен ответить до 14:30 (Алматы), осталось 90 мин')
-  })
-
-  it('справки с проверенным заказом: рабочие адреса страниц egov и уникальные коды', () => {
+  it('справки: рабочие адреса страниц egov и уникальные коды', () => {
     expect(REQUESTABLE_CERTIFICATES.length).toBeGreaterThanOrEqual(4)
     for (const c of REQUESTABLE_CERTIFICATES) {
       expect(c.href).toMatch(/^https:\/\/egov\.kz\/ru\/services\/presale\/[A-Za-z0-9]+$/)
-      expect(c.href).not.toContain('SR.11')
     }
     expect(new Set(REQUESTABLE_CERTIFICATES.map(c => c.id)).size).toBe(REQUESTABLE_CERTIFICATES.length)
     expect(new Set(REQUESTABLE_CERTIFICATES.map(c => c.code)).size).toBe(REQUESTABLE_CERTIFICATES.length)
-    expect(T.serviceHref).toBe(REQUESTABLE_CERTIFICATES[0].href) // по умолчанию открывается несудимость
   })
 
-  it('справки без проверенного заказа не получают ссылку и не выдаются за проверенные', () => {
-    expect(OTHER_LISTED_CERTIFICATES.length).toBeGreaterThan(10)
-    expect(JSON.stringify(OTHER_LISTED_CERTIFICATES)).not.toContain('http')
-    expect(T.certsOtherLead).toMatch(/не проверял/)
+  it('юридическая оговорка про лишние документы на месте', () => {
+    expect(T.legal).toMatch(/не вправе требовать лишние документы/)
+  })
+})
+
+describe('buildPersonMessage', () => {
+  const conviction = REQUESTABLE_CERTIFICATES[0]
+  const clinics = REQUESTABLE_CERTIFICATES[1]
+
+  it('содержит ссылку и инструкцию «На себя», не содержит ИИН', () => {
+    const m = buildPersonMessage([conviction])
+    expect(m).toContain(conviction.href)
+    expect(m).toContain('«На себя»')
+    expect(m).toContain('бесплатно')
+    expect(m).not.toMatch(/\d{12}/)
+  })
+
+  it('несколько справок идут списком, по одной ссылке на каждую', () => {
+    const m = buildPersonMessage([conviction, clinics])
+    expect(m).toContain(`• ${conviction.title}: ${conviction.href}`)
+    expect(m).toContain(`• ${clinics.title}: ${clinics.href}`)
   })
 })

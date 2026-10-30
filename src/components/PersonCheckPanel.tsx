@@ -187,7 +187,7 @@ export default function PersonCheckPanel() {
         )}
       </div>
 
-      <PersonRequestGuide iin={iin} valid={valid} />
+      <PersonRequestGuide />
     </>
   )
 }
