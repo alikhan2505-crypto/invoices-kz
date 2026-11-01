@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SOURCE_1688_ADMIN_ONLY, build1688SearchUrl, cacheKey, canUseSource1688, encodeGbkQuery, marginHref,
-  parseSuggestion, readMarginPrefill, risksFor,
+  imageSearchLinks, parseSuggestion, readMarginPrefill, risksFor,
 } from './source1688'
 
 // Все названия и ответы вымышленные. Кодировку GBK проверяем круговым преобразованием через
@@ -122,4 +122,22 @@ describe('служебное', () => {
     expect(canUseSource1688(null)).toBe(false)
     expect(canUseSource1688(undefined)).toBe(false)
   })
+})
+
+describe('imageSearchLinks', () => {
+  const img = 'https://resources.cdn-kaspi.kz/img/m/p/p4a/p2d/197296435.bin?format=preview-medium'
+  it('три ссылки, адрес фото закодирован и подставлен', () => {
+    const links = imageSearchLinks(img)
+    expect(links.map(l => l.key)).toEqual(['lens', 'yandex', 'alibaba1688'])
+    for (const l of links) {
+      expect(l.href.startsWith('https://')).toBe(true)
+      expect(l.href).toContain(encodeURIComponent(img))
+      expect(l.href).not.toContain(img) // «?format=» внутри ссылки должен быть закодирован
+    }
+    expect(links[0].href.startsWith('https://lens.google.com/uploadbyurl?url=')).toBe(true)
+    expect(links[1].href).toContain('rpt=imageview')
+    expect(links[2].href).toContain('s.1688.com')
+  })
+  it.each([[null], [undefined], [''], ['http://insecure.example/x.jpg'], ['javascript:alert(1)'], ['https://x.kz/' + 'a'.repeat(1000)]])(
+    'не https или пусто или слишком длинно (%s): ссылок нет', v => { expect(imageSearchLinks(v)).toEqual([]) })
 })

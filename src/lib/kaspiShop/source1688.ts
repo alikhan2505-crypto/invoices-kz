@@ -179,3 +179,30 @@ export function readMarginPrefill(search: string): { name: string; price: string
 export function cacheKey(name: string): string {
   return name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().slice(0, 160)
 }
+
+// ---- поиск по фото ----
+
+export interface ImageSearchLink {
+  key: 'lens' | 'yandex' | 'alibaba1688'
+  label: string
+  hint: string
+  href: string
+}
+
+/**
+ * Ссылки «найти похожее по фото» (этап 0): открываются в браузере человека, ничего с наших серверов
+ * не отправляют. Фото берётся с публичного CDN Kaspi, который видят и поисковики. Это обычные
+ * ссылки на поиск по картинке по адресу; результат (какие товары покажутся) решает сам поисковик.
+ * 1688 при открытии часто просит передвинуть ползунок «проверка»: это защита сайта, её проходит человек.
+ * Работу Google Lens и Яндекса по ссылке мы не проверяли автоматически (доступ закрыт), а у 1688
+ * проверили только то, что ссылка открывается и просит ползунок.
+ */
+export function imageSearchLinks(imageUrl: string | null | undefined): ImageSearchLink[] {
+  if (!imageUrl || !/^https:\/\//i.test(imageUrl) || imageUrl.length > 1000) return []
+  const u = encodeURIComponent(imageUrl)
+  return [
+    { key: 'lens', label: 'Google Lens', hint: 'находит похожие товары по всему интернету, в том числе у китайских продавцов', href: `https://lens.google.com/uploadbyurl?url=${u}` },
+    { key: 'yandex', label: 'Яндекс Картинки', hint: 'похожие картинки, часто попадаются AliExpress, Taobao, 1688', href: `https://yandex.com/images/search?rpt=imageview&url=${u}` },
+    { key: 'alibaba1688', label: '1688 по фото', hint: 'поиск по фото на самом 1688, может попросить передвинуть ползунок проверки', href: `https://s.1688.com/youyuan/index.htm?tab=imageSearch&imageAddress=${u}` },
+  ]
+}

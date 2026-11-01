@@ -1,5 +1,6 @@
 'use client'
 import type { Source1688Data } from './source1688Client'
+import { imageSearchLinks } from '@/lib/kaspiShop/source1688'
 
 // Результат подбора для 1688: китайские запросы со ссылками на поиск, поиск по фото, оценка веса,
 // плашки рисков. Общий для окна на карточке ниши и для панели в калькуляторе маржи.
@@ -10,6 +11,7 @@ export default function Source1688Result({ data, imageUrl, onApplyWeight }: {
   /** Подставить оценку веса в форму (есть только в калькуляторе). */
   onApplyWeight?: (grams: number) => void
 }) {
+  const imageLinks = imageSearchLinks(imageUrl)
   const muted = { color: 'var(--nav-text-muted)' } as const
   const secondary = { color: 'var(--nav-text-secondary)' } as const
   return (
@@ -28,16 +30,23 @@ export default function Source1688Result({ data, imageUrl, onApplyWeight }: {
         ))}
       </ul>
 
-      {imageUrl && (
+      {imageLinks.length > 0 && (
         <div className="mb-4">
           <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={muted}>Поиск по фото</div>
           <p className="text-[12px] mb-1" style={secondary}>
-            Часто точнее слов: на 1688 (сайт или приложение) нажмите значок камеры и загрузите фото товара.
+            Часто точнее слов: откройте поиск по фото товара. Что именно найдётся, решает сам поисковик, смотрите похожие товары и цены.
           </p>
-          <a href={imageUrl} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center min-h-11 text-[13px] font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
-            Открыть фото товара ↗
-          </a>
+          <ul className="space-y-1">
+            {imageLinks.map(l => (
+              <li key={l.key}>
+                <a href={l.href} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center min-h-11 text-[13px] font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
+                  {l.label} ↗
+                </a>
+                <span className="text-[12px] ml-2" style={secondary}>{l.hint}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
