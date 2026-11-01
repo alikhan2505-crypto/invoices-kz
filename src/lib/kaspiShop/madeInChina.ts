@@ -237,6 +237,10 @@ export function resetMicState(): void {
   cache.clear()
 }
 
+function safeHost(u: string): string {
+  try { return new URL(u).hostname } catch { return '?' }
+}
+
 export function micDisabled(): boolean {
   return process.env.MIC_SEARCH_DISABLED === '1'
 }
@@ -290,11 +294,20 @@ export async function fetchMic(query: string): Promise<MicResult | null> {
       redirect: 'follow',
     })
     // После редиректа остаёмся на том же сайте: иначе чужую страницу не разбираем.
-    if (res.status !== 200 || (res.url && new URL(res.url).hostname !== 'www.made-in-china.com')) { record(false); return unavailable }
+    if (res.status !== 200 || (res.url && new URL(res.url).hostname !== 'www.made-in-china.com')) {
+      console.error(`made-in-china: unexpected response status=${res.status} host=${safeHost(res.url)}`)
+      record(false)
+      return unavailable
+    }
     const html = await res.text()
-    if (html.length > MAX_BYTES) { record(false); return unavailable }
+    if (html.length > MAX_BYTES) { console.error(`made-in-china: page too large (${html.length})`); record(false); return unavailable }
     const items = parseMicSearch(html, searchUrl)
-    if (!items) { record(false); return unavailable }
+    if (!items) {
+      // Только размер и признаки формы, без содержимого страницы.
+      console.error(`made-in-china: unknown page form length=${html.length} ldjson=${/application\/ld\+json/.test(html)} itemlist=${/"ItemList"/.test(html)} captcha=${/captcha|punish|verify/i.test(html)}`)
+      record(false)
+      return unavailable
+    }
     record(true)
     const value: MicResult = { status: 'ok', searchUrl, items }
     if (cache.size >= RESULT_CACHE_MAX) cache.clear()
