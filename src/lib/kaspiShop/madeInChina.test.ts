@@ -177,7 +177,7 @@ describe('fetchMic', () => {
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
     vi.stubEnv('MIC_MIN_INTERVAL_MS', '0')
-    vi.stubEnv('MIC_SEARCH_DISABLED', '')
+    vi.stubEnv('MIC_SEARCH_ENABLED', '1')
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
@@ -196,9 +196,11 @@ describe('fetchMic', () => {
     await fetchMic('Wet  Wipes')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
-  it('непригодный запрос и выключатель: null, сети нет', async () => {
+  it('непригодный запрос и выключенный по умолчанию поиск: null, сети нет', async () => {
     expect(await fetchMic('湿巾')).toBeNull()
-    vi.stubEnv('MIC_SEARCH_DISABLED', '1')
+    vi.stubEnv('MIC_SEARCH_ENABLED', '')
+    expect(await fetchMic('wet wipes')).toBeNull()
+    vi.stubEnv('MIC_SEARCH_ENABLED', '0')
     expect(await fetchMic('wet wipes')).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
   })

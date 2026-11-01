@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "invoices.kz: помощник поиска на 1688",
+  "short_name": "invoices.kz 1688",
+  "version": "0.1.0",
+  "description": "По просьбе страницы invoices.kz открывает поиск 1688 в вашем браузере, читает результаты и отдаёт их странице. Данные остаются в вашем браузере.",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "alarms"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://invoices.kz/kaspi-shop/*", "https://kaspi.invoices.kz/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://s.1688.com/selloffer/*"],
+      "js": ["scrape-core.js", "scrape.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

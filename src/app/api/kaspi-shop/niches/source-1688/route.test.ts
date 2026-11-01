@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   llm: vi.fn(),
   mic: vi.fn(),
   rate: vi.fn(),
+  cny: vi.fn(),
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -37,7 +38,7 @@ vi.mock('@/lib/kaspiShop/madeInChina', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/kaspiShop/madeInChina')>()),
   fetchMic: h.mic,
 }))
-vi.mock('@/lib/kaspiShop/usdRate', () => ({ getUsdKzt: h.rate }))
+vi.mock('@/lib/kaspiShop/usdRate', () => ({ getUsdKzt: h.rate, getCnyKzt: h.cny }))
 
 import { POST } from './route'
 import { resetSource1688State, LIMIT_PER_HOUR } from '@/lib/kaspiShop/source1688Guard'
@@ -68,6 +69,8 @@ beforeEach(() => {
   h.mic.mockResolvedValue(MIC_OK)
   h.rate.mockReset()
   h.rate.mockResolvedValue(500)
+  h.cny.mockReset()
+  h.cny.mockResolvedValue(65)
   resetSource1688State()
 })
 
@@ -141,6 +144,15 @@ describe('товары Made-in-China', () => {
     expect(h.mic).toHaveBeenCalledWith('wet wipes')
     expect(j.suppliers).toMatchObject({ source: 'made-in-china', query: 'wet wipes', status: 'ok', usdKzt: 500, searchUrl: MIC_URL })
     expect(j.suppliers.items[0]).toMatchObject({ name: 'Baby Wipes', lowKzt: 50, highKzt: 250 })
+  })
+  it('курс юаня отдаётся странице для цен 1688; нет курса: null, ответ цел', async () => {
+    expect((await run()).cnyKzt).toBe(65)
+    h.cny.mockResolvedValue(null)
+    expect((await run()).cnyKzt).toBeNull()
+    h.cny.mockRejectedValue(new Error('down'))
+    const r = await POST(post('tok-admin', { name: 'Детские влажные салфетки 80 шт', price: 1500 }))
+    expect(r.status).toBe(200)
+    expect((await r.json()).cnyKzt).toBeNull()
   })
   it('нет курса: тенге null, товары всё равно есть', async () => {
     h.rate.mockResolvedValue(null)

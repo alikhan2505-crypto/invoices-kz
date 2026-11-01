@@ -287,7 +287,7 @@ export default function KaspiShopMargin() {
                 </label>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена у поставщика, ₸</span>
-                  <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+                  <input id="margin-sourcing-price" className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                     value={sourcingPrice} onChange={e => setSourcingPrice(e.target.value)} />
                 </label>
               </div>

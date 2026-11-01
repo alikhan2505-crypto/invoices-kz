@@ -7,7 +7,7 @@ import {
 } from '@/lib/kaspiShop/source1688'
 import { getCached, overLimit, putCached } from '@/lib/kaspiShop/source1688Guard'
 import { fetchMic, presentSuppliers, type SuppliersPayload } from '@/lib/kaspiShop/madeInChina'
-import { getUsdKzt } from '@/lib/kaspiShop/usdRate'
+import { getCnyKzt, getUsdKzt } from '@/lib/kaspiShop/usdRate'
 
 // Модель плюс страница Made-in-China (до 8 с в очереди и на запрос).
 export const maxDuration = 30
@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
 
   // Товары с Made-in-China.com по английскому запросу. Сбой этого шага не ломает ответ:
   // запросы и плашки для 1688 уже готовы, секция просто покажет «не удалось загрузить».
+  // Курс юаня нужен странице для цен 1688, которые читает расширение Chrome (ext1688.ts).
+  const cnyKzt = getCnyKzt().catch(() => null)
   let suppliers: SuppliersPayload | null = null
   try {
     const rate = getUsdKzt()
@@ -103,5 +105,6 @@ export async function POST(req: NextRequest) {
     risks: risksFor(name, brand || null),
     marginHref: marginHref({ name, price, weightGrams }),
     suppliers,
+    cnyKzt: await cnyKzt,
   }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

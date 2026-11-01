@@ -22,6 +22,8 @@ export interface Source1688Data {
   marginHref: string
   /** Товары Made-in-China.com; null/нет = секцию не показываем. */
   suppliers?: SuppliersPayload | null
+  /** Курс Нацбанка, ₸ за 1 ¥ (для цен 1688 из расширения); null = нет курса. */
+  cnyKzt?: number | null
 }
 
 export type Source1688Phase =

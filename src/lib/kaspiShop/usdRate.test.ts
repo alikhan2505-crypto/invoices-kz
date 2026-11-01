@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getUsdKzt, nbrkDate, parseNbrkUsd, resetUsdRateState } from './usdRate'
+import { getCnyKzt, getUsdKzt, nbrkDate, parseNbrkRate, parseNbrkUsd, resetUsdRateState } from './usdRate'
 
 // Форма ленты взята из живого ответа nationalbank.kz 31.10.2026; числа вымышленные.
 const item = (code: string, rate: string, quant = '1') =>
@@ -15,6 +15,14 @@ describe('parseNbrkUsd', () => {
   })
   it.each([[undefined], [''], ['<rates></rates>'], [feed(item('EUR', '560'))], [feed(item('USD', 'abc'))], [feed(item('USD', '5'))], [feed(item('USD', '99999'))]])(
     'нет или неправдоподобно (%j): null', v => { expect(parseNbrkUsd(v)).toBeNull() })
+})
+
+describe('юань', () => {
+  it('курс CNY из той же ленты, свой диапазон правдоподобия', () => {
+    expect(parseNbrkRate(feed(item('USD', '505.5'), item('CNY', '70.1')), 'CNY')).toBe(70.1)
+    expect(parseNbrkRate(feed(item('CNY', '5000')), 'CNY')).toBeNull()
+    expect(parseNbrkRate(feed(item('CNY', '70.1')), 'USD')).toBeNull()
+  })
 })
 
 describe('nbrkDate', () => {
@@ -36,6 +44,17 @@ describe('getUsdKzt', () => {
     expect(await getUsdKzt()).toBe(505.5)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(String(fetchMock.mock.calls[0][0])).toMatch(/^https:\/\/nationalbank\.kz\/rss\/get_rates\.cfm\?fdate=\d{2}\.\d{2}\.\d{4}$/)
+  })
+  it('доллар и юань берутся одним запросом, даже если вызваны одновременно', async () => {
+    fetchMock.mockImplementation(async () => new Response(feed(item('USD', '505.5'), item('CNY', '70.1')), { status: 200 }))
+    const [usd, cny] = await Promise.all([getUsdKzt(), getCnyKzt()])
+    expect([usd, cny]).toEqual([505.5, 70.1])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('в ленте нет юаня: null для юаня, доллар цел', async () => {
+    fetchMock.mockImplementation(async () => new Response(feed(item('USD', '505.5')), { status: 200 }))
+    expect(await getCnyKzt()).toBeNull()
+    expect(await getUsdKzt()).toBe(505.5)
   })
   it('сбой: null, и минуту не долбим ленту повторно', async () => {
     fetchMock.mockImplementation(async () => new Response('x', { status: 500 }))

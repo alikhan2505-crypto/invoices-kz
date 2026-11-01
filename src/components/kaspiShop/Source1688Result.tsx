@@ -2,6 +2,7 @@
 import type { Source1688Data } from './source1688Client'
 import { imageSearchLinks } from '@/lib/kaspiShop/source1688'
 import MicSuppliers, { type AppliedSupplier } from './MicSuppliers'
+import Ext1688Suppliers from './Ext1688Suppliers'
 
 // Результат подбора для 1688: китайские запросы со ссылками на поиск, поиск по фото, оценка веса,
 // плашки рисков. Общий для окна на карточке ниши и для панели в калькуляторе маржи.
@@ -41,6 +42,8 @@ export default function Source1688Result({ data, imageUrl, onApplyWeight, onAppl
           </li>
         ))}
       </ul>
+
+      <Ext1688Suppliers queries={data.queries} cnyKzt={data.cnyKzt} onApply={onApplySupplier} />
 
       {data.suppliers && <MicSuppliers data={data.suppliers} onApply={onApplySupplier} />}
 

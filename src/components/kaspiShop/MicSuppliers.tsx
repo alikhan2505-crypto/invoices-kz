@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
 import type { SuppliersPayload, SupplierCard } from '@/lib/kaspiShop/madeInChina'
 import { isSellableUnit, moqText } from '@/lib/kaspiShop/micUnits'
+import SupplierPhoto from './SupplierPhoto'
 
 // Товары у поставщиков Made-in-China.com внутри «Найти на 1688» (31.10.2026): фото, цена в долларах
 // и тенге, минимальная партия, поставщик, ссылка на карточку. Цены экспортные и без доставки,
@@ -9,6 +9,8 @@ import { isSellableUnit, moqText } from '@/lib/kaspiShop/micUnits'
 // запрещают использовать его данные (см. madeInChina.ts).
 
 export interface AppliedSupplier {
+  /** Откуда карточка: Made-in-China или 1688 (через расширение). */
+  source: 'mic' | '1688'
   priceKzt: number
   url: string
   /** «500 шт» или null, если партию не знаем. */
@@ -27,24 +29,6 @@ function priceKzt(i: SupplierCard): string | null {
   if (i.lowKzt === null || i.highKzt === null) return null
   if (!i.rangeVerified) return `≈ до ${kzt(i.highKzt)} ₸`
   return i.lowKzt === i.highKzt ? `≈ ${kzt(i.lowKzt)} ₸` : `≈ ${kzt(i.lowKzt)}–${kzt(i.highKzt)} ₸`
-}
-
-/** Фото с запасным блоком: CDN поставщика может не отвечать, пустой белый квадрат ничего не говорит. */
-function Photo({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) {
-    return (
-      <div className="w-full aspect-square rounded-lg mb-2 flex items-center justify-center text-[11px]"
-        style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', border: '1px solid var(--nav-border)' }}>
-        Нет фото
-      </div>
-    )
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)}
-      className="w-full aspect-square object-contain rounded-lg mb-2" style={{ background: '#fff' }} />
-  )
 }
 
 export default function MicSuppliers({ data, onApply }: {
@@ -91,7 +75,7 @@ export default function MicSuppliers({ data, onApply }: {
               const canApply = !!onApply && i.exact && i.highKzt !== null && sellable
               return (
                 <li key={i.url + i.name} className="rounded-xl p-2 flex flex-col" style={{ border: '1px solid var(--nav-border)' }}>
-                  <Photo src={i.imageUrl} />
+                  <SupplierPhoto src={i.imageUrl} />
                   <span className="block text-[12px] font-medium line-clamp-2" style={{ color: 'var(--nav-text-primary)' }} title={i.name}>{i.name}</span>
                   <span className="block text-[13px] font-mono tabular-nums font-semibold mt-1" style={{ color: 'var(--nav-text-primary)' }}>{priceUsd(i)}</span>
                   {k && <span className="block text-[12px] font-mono tabular-nums" style={secondary}>{k}</span>}
@@ -101,7 +85,7 @@ export default function MicSuppliers({ data, onApply }: {
                     {i.exact ? 'Открыть товар ↗' : 'Открыть выдачу ↗'}
                   </a>
                   {canApply && (
-                    <button type="button" onClick={() => onApply({ priceKzt: i.highKzt as number, url: i.url, moq })}
+                    <button type="button" onClick={() => onApply({ source: 'mic', priceKzt: i.highKzt as number, url: i.url, moq })}
                       className="inline-flex items-center min-h-11 text-left text-[12px] font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
                       В калькулятор: {kzt(i.highKzt as number)} ₸
                     </button>

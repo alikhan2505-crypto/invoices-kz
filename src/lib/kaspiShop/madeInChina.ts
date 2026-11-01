@@ -18,7 +18,7 @@
 //
 // Вежливость: запросы не чаще раза в 2 секунды с экземпляра (очередь), честный User-Agent,
 // ответ живёт 6 часов в памяти, после серии сбоев пауза. Любой сбой или незнакомая форма даёт
-// status:'unavailable', а не «ничего не нашлось». Выключатель без деплоя: MIC_SEARCH_DISABLED=1.
+// status:'unavailable', а не «ничего не нашлось». Включатель без деплоя: MIC_SEARCH_ENABLED=1 (по умолчанию выключено, см. micDisabled).
 
 export interface MicItem {
   name: string
@@ -241,8 +241,13 @@ function safeHost(u: string): string {
   try { return new URL(u).hostname } catch { return '?' }
 }
 
+/**
+ * Включается переменной MIC_SEARCH_ENABLED=1. По умолчанию выключен: 01.11.2026 Made-in-China отвечает
+ * серверам Vercel кодом 403 (с домашнего адреса страница открывается), поэтому в проде секция бесполезна,
+ * а поиск по 1688 идёт через расширение Chrome. Обходить отказ сайта (прокси, подмена браузера) нельзя.
+ */
 export function micDisabled(): boolean {
-  return process.env.MIC_SEARCH_DISABLED === '1'
+  return process.env.MIC_SEARCH_ENABLED !== '1'
 }
 
 function minInterval(): number {

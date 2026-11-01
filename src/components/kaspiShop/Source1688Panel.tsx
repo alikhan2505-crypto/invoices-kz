@@ -38,10 +38,17 @@ export default function Source1688Panel({ product, onApplyWeight, onApplySupplie
 
   const apply = (p: AppliedSupplier) => {
     onApplySupplier(p)
+    // Поля калькулятора выше панели: подводим человека к цене, чтобы он увидел, что подставилось.
+    const field = document.getElementById('margin-sourcing-price')
+    field?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    field?.focus({ preventScroll: true })
     setApplied({
       name,
-      text: `Подставлено в «Цена у поставщика»: ${p.priceKzt.toLocaleString('ru-KZ')} ₸ за единицу (верхняя граница, экспортная цена без доставки, пошлины и НДС)`
-        + `${p.moq ? `, минимальная партия ${p.moq}` : ''}. Ссылка на товар записана в поле ниже. Поля вверху страницы можно поправить.`,
+      text: p.source === '1688'
+        ? `Подставлено в «Цена у поставщика»: ${p.priceKzt.toLocaleString('ru-KZ')} ₸ за единицу (цена 1688 при заказе от минимальной партии, без доставки, пошлины и НДС). `
+          + 'Проверьте партию и цену в карточке товара. Ссылка на товар записана в поле «Ссылка на товар у поставщика» выше, оба поля можно поправить.'
+        : `Подставлено в «Цена у поставщика»: ${p.priceKzt.toLocaleString('ru-KZ')} ₸ за единицу (верхняя граница, экспортная цена без доставки, пошлины и НДС)`
+          + `${p.moq ? `, минимальная партия ${p.moq}` : ''}. Ссылка на товар записана в поле «Ссылка на товар у поставщика» выше, оба поля можно поправить.`,
     })
   }
 
@@ -59,7 +66,7 @@ export default function Source1688Panel({ product, onApplyWeight, onApplySupplie
       {!ready && <span className="ml-3 text-[12px]" style={{ color: 'var(--nav-text-muted)' }}>Сначала выберите товар или введите название</span>}
       {phase.kind === 'loading' && <span className="ml-3 text-[12px]" style={{ color: 'var(--nav-text-muted)' }}>Это занимает до 15 секунд</span>}
 
-      <div className="mt-4" aria-live="polite">
+      <div className="mt-4">
         {phase.kind === 'error' && <p className="text-sm" style={{ color: 'var(--nav-critical)' }} role="alert">{phase.message}</p>}
         {applied && applied.name === name && (
           <p className="text-[12px] rounded-lg px-3 py-2 mb-3" role="status"
