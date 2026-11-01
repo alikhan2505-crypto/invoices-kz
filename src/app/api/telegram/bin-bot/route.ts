@@ -7,6 +7,7 @@ import {
   BOT_FREE_PER_QUARTER, BOT_TOOL_LINK, BUSY_TEXT, HELP_TEXT, NOT_A_BIN_TEXT, NOT_FOUND_TEXT, START_TEXT,
   UNAVAILABLE_TEXT, formatCheckReply, limitText, parseBotInput,
 } from '@/lib/binBot/format'
+import { parseStartSource } from '@/lib/binBot/links'
 
 // Telegram-бот «Проверка БИН» (30.10.2026): присылаешь 12 цифр, получаешь короткий результат из
 // открытых реестров, как на /tools/kontragent. Нужны два секрета в окружении (Vercel):
@@ -58,9 +59,22 @@ async function logCheck(): Promise<void> {
   if (error) console.error('bin-bot: tool_events insert failed:', error.message)
 }
 
+// Откуда пришёл человек (метка из t.me/<бот>?start=<метка>): место показа бота для отчёта.
+async function logStart(source: string): Promise<void> {
+  const { error } = await supabase.from('tool_events').insert({
+    event: 'view', tool: 'kontragent', lang: 'ru', internal: false,
+    utm_source: 'tg_bot', utm_medium: 'start', utm_campaign: source, device: 'mobile',
+  })
+  if (error) console.error('bin-bot: tool_events start insert failed:', error.message)
+}
+
 async function handle(token: string, chatId: number, fromId: number, text: unknown): Promise<void> {
   const input = parseBotInput(text)
-  if (input.kind === 'start') return send(token, chatId, START_TEXT)
+  if (input.kind === 'start') {
+    const source = parseStartSource(text)
+    if (source) await logStart(source)
+    return send(token, chatId, START_TEXT)
+  }
   if (input.kind === 'help') return send(token, chatId, HELP_TEXT)
   if (input.kind === 'other') return send(token, chatId, NOT_A_BIN_TEXT)
 

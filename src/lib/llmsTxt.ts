@@ -34,7 +34,7 @@ const HEAD = `# invoices.kz
 - [Коммерческое предложение](https://invoices.kz/tools/kp)
 - [Калькулятор налогов ИП 2026](https://invoices.kz/tools/nalogi): упрощёнка 4% и взносы за себя
 - [Расчёт зарплаты 2026](https://invoices.kz/tools/zarplata): зарплата на руки и обратно, налоги и взносы работника и работодателя
-- [Проверка контрагента по БИН](https://invoices.kz/tools/kontragent): реестры КГД и ГБД ЮЛ
+- [Проверка контрагента по БИН](https://invoices.kz/tools/kontragent): реестры КГД и ГБД ЮЛ; то же в Telegram: бот [@invoices_bin_bot](https://t.me/invoices_bin_bot), присылаете 12 цифр БИН, 3 проверки в квартал бесплатно
 - [Калькулятор маржи Kaspi](https://invoices.kz/tools/margin): комиссия Kaspi Магазина по категориям
 - [Печать накладных Kaspi одним PDF](https://invoices.kz/tools/waybills)
 

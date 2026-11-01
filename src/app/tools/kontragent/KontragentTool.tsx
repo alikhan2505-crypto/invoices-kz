@@ -21,6 +21,7 @@ import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import type { ToolEventMedium } from '@/lib/toolEvents/schema'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinWatchButton from '@/components/BinWatchButton'
+import TelegramBotCta from '@/components/TelegramBotCta'
 import PersonCheckPanel from '@/components/PersonCheckPanel'
 import { usePersonCheckAccess } from '@/components/usePersonCheckAccess'
 import { kontragentDict } from './dict'
@@ -264,6 +265,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
               {t.remaining(remaining)}
             </div>
           )}
+          <TelegramBotCta lang={lang} source="site_kontragent" className="mt-3 pt-3" />
         </div>
 
         <div aria-live="polite">
