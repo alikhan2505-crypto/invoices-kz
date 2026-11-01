@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
+import ToolFaqJsonLd from '@/lib/tools-i18n/ToolFaqJsonLd'
 import KpTool from '../../kp/KpTool'
 import KpSample, { KpSampleLink } from '../../kp/KpSample'
 import { kpDict } from '../../kp/dict'
@@ -17,6 +18,7 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="kp" lang={LANG} name={t.h1} description={t.seo.description} />
+      <ToolFaqJsonLd slug="kp" lang={LANG} items={t.faq} />
       <KpSampleLink lang={LANG} />
       <KpTool lang={LANG}>
         <KpSample lang={LANG} />
