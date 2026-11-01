@@ -40,7 +40,7 @@ function Dialog({ product, onClose }: { product: Source1688Product; onClose: () 
         </div>
         <p className="text-[13px] mb-4 line-clamp-2" style={{ color: 'var(--nav-text-secondary)' }}>{product.name} · {product.price.toLocaleString('ru-KZ')} ₸ на Kaspi</p>
 
-        {phase.kind === 'loading' && <p className="text-sm py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }} role="status">Подбираю запросы на китайском…</p>}
+        {phase.kind === 'loading' && <p className="text-sm py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }} role="status">Подбираю запросы и ищу товары у поставщиков, до 15 секунд…</p>}
         {phase.kind === 'error' && <p className="text-sm py-3" style={{ color: 'var(--nav-critical)' }} role="alert">{phase.message}</p>}
         {phase.kind === 'done' && (
           <>

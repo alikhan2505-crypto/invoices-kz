@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({
   dbError: false,
   notPro: false,
   llm: vi.fn(),
+  mic: vi.fn(),
+  rate: vi.fn(),
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -31,11 +33,22 @@ vi.mock('@/lib/kaspiShop/planGate', () => ({
   kaspiShopPlanGate: async () => (h.notPro ? NextResponse.json({ errorCode: 'not_pro' }, { status: 403 }) : null),
 }))
 vi.mock('@/lib/kaspiShop/source1688Llm', () => ({ suggest1688Queries: h.llm }))
+vi.mock('@/lib/kaspiShop/madeInChina', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/kaspiShop/madeInChina')>()),
+  fetchMic: h.mic,
+}))
+vi.mock('@/lib/kaspiShop/usdRate', () => ({ getUsdKzt: h.rate }))
 
 import { POST } from './route'
 import { resetSource1688State, LIMIT_PER_HOUR } from '@/lib/kaspiShop/source1688Guard'
 
-const SUGGESTION = { queries: [{ zh: '婴儿湿巾', ru: 'детские влажные салфетки' }], weightGrams: 350 }
+const SUGGESTION = { queries: [{ zh: '婴儿湿巾', ru: 'детские влажные салфетки' }], enQueries: ['wet wipes'], weightGrams: 350 }
+const MIC_URL = 'https://www.made-in-china.com/products-search/hot-china-products/Wet_Wipes.html'
+const MIC_OK = {
+  status: 'ok',
+  searchUrl: MIC_URL,
+  items: [{ name: 'Baby Wipes', imageUrl: 'https://image.made-in-china.com/a.jpg', supplier: 'S', category: 'Baby', lowUsd: 0.1, highUsd: 0.5, url: MIC_URL, exact: false }],
+}
 
 const post = (token: string | null, body: unknown) =>
   new NextRequest('http://localhost/api/kaspi-shop/niches/source-1688', {
@@ -51,6 +64,10 @@ beforeEach(() => {
   h.notPro = false
   h.llm.mockReset()
   h.llm.mockResolvedValue(SUGGESTION)
+  h.mic.mockReset()
+  h.mic.mockResolvedValue(MIC_OK)
+  h.rate.mockReset()
+  h.rate.mockResolvedValue(500)
   resetSource1688State()
 })
 
@@ -113,6 +130,70 @@ describe('запрос', () => {
     }
     expect((await POST(post('tok-admin', { name: 'Совсем новый товар' }))).status).toBe(429)
     expect((await POST(post('tok-admin', { name: 'Товар номер 3' }))).status).toBe(200) // из кэша
+  })
+})
+
+describe('товары Made-in-China', () => {
+  const run = async () => (await POST(post('tok-admin', { name: 'Детские влажные салфетки 80 шт', price: 1500 }))).json()
+
+  it('успех: товары с ценой в тенге по курсу, запрос идёт по первому английскому', async () => {
+    const j = await run()
+    expect(h.mic).toHaveBeenCalledWith('wet wipes')
+    expect(j.suppliers).toMatchObject({ source: 'made-in-china', query: 'wet wipes', status: 'ok', usdKzt: 500, searchUrl: MIC_URL })
+    expect(j.suppliers.items[0]).toMatchObject({ name: 'Baby Wipes', lowKzt: 50, highKzt: 250 })
+  })
+  it('нет курса: тенге null, товары всё равно есть', async () => {
+    h.rate.mockResolvedValue(null)
+    const j = await run()
+    expect(j.suppliers.items[0]).toMatchObject({ lowKzt: null, highKzt: null })
+    expect(j.suppliers.usdKzt).toBeNull()
+  })
+  it('источник недоступен: статус unavailable и пустой список, остальной ответ цел', async () => {
+    h.mic.mockResolvedValue({ status: 'unavailable', searchUrl: MIC_URL })
+    const j = await run()
+    expect(j.suppliers).toMatchObject({ status: 'unavailable', items: [] })
+    expect(j.queries).toHaveLength(1)
+    expect(j.risks.length).toBeGreaterThan(0)
+  })
+  it('выключатель (fetchMic вернул null) или нет английских запросов: suppliers null', async () => {
+    h.mic.mockResolvedValue(null)
+    expect((await run()).suppliers).toBeNull()
+    h.llm.mockResolvedValue({ ...SUGGESTION, enQueries: [] })
+    const j = await POST(post('tok-admin', { name: 'Другой товар без английского' }))
+    expect((await j.json()).suppliers).toBeNull()
+    h.llm.mockResolvedValue({ queries: SUGGESTION.queries, weightGrams: 1 }) // старый кэш без поля
+    expect((await (await POST(post('tok-admin', { name: 'Ещё один товар' }))).json()).suppliers).toBeNull()
+  })
+  it('исключение внутри поиска не ломает ответ', async () => {
+    h.mic.mockRejectedValue(new Error('boom'))
+    const r = await POST(post('tok-admin', { name: 'Детские влажные салфетки 80 шт', price: 1500 }))
+    expect(r.status).toBe(200)
+    expect((await r.json()).suppliers).toBeNull()
+  })
+  it('первый запрос честно пуст: пробуем второй; сбой источника второй не вызывает', async () => {
+    h.llm.mockResolvedValue({ ...SUGGESTION, enQueries: ['wet wipes', 'baby wipes'] })
+    h.mic.mockResolvedValueOnce({ status: 'ok', searchUrl: MIC_URL, items: [] }).mockResolvedValueOnce(MIC_OK)
+    const j = await run()
+    expect(h.mic.mock.calls.map(c => c[0])).toEqual(['wet wipes', 'baby wipes'])
+    expect(j.suppliers).toMatchObject({ query: 'baby wipes', status: 'ok' })
+    expect(j.suppliers.items).toHaveLength(1)
+
+    h.mic.mockReset()
+    h.mic.mockResolvedValue({ status: 'unavailable', searchUrl: MIC_URL })
+    const j2 = await POST(post('tok-admin', { name: 'Совсем другой товар для проверки сбоя' }))
+    expect(h.mic).toHaveBeenCalledTimes(1)
+    expect((await j2.json()).suppliers.status).toBe('unavailable')
+  })
+  it('бренд и категория входят в ключ кэша: другая категория вызывает модель заново', async () => {
+    await POST(post('tok-admin', { name: 'Одинаковое название товара', brand: 'A', category: 'X' }))
+    await POST(post('tok-admin', { name: 'Одинаковое название товара', brand: 'A', category: 'X' }))
+    expect(h.llm).toHaveBeenCalledTimes(1)
+    await POST(post('tok-admin', { name: 'Одинаковое название товара', brand: 'B', category: 'X' }))
+    expect(h.llm).toHaveBeenCalledTimes(2)
+  })
+  it('не админ: поиск не вызывается', async () => {
+    await POST(post('tok-user', { name: 'Влажные салфетки' }))
+    expect(h.mic).not.toHaveBeenCalled()
   })
 })
 

@@ -78,6 +78,8 @@ export interface Source1688Query {
 
 export interface Source1688Suggestion {
   queries: Source1688Query[]
+  /** Английские запросы (до двух) для Made-in-China.com. Пусто, если модель их не дала. */
+  enQueries: string[]
   /** Оценка веса одной единицы в граммах: НЕ факт, продавец поправляет. null = модель не взялась. */
   weightGrams: number | null
 }
@@ -97,7 +99,7 @@ export function parseSuggestion(raw: unknown): Source1688Suggestion | null {
   let data: unknown
   try { data = JSON.parse(raw.slice(start, end + 1)) } catch { return null }
   if (!data || typeof data !== 'object') return null
-  const d = data as { queries?: unknown; weightGrams?: unknown }
+  const d = data as { queries?: unknown; enQueries?: unknown; weightGrams?: unknown }
   if (!Array.isArray(d.queries)) return null
 
   const seen = new Set<string>()
@@ -109,14 +111,29 @@ export function parseSuggestion(raw: unknown): Source1688Suggestion | null {
     const z = zh.trim()
     if (!z || z.length > 40 || !HAN.test(z) || seen.has(z)) continue
     seen.add(z)
-    queries.push({ zh: z, ru: typeof ru === 'string' ? ru.trim().slice(0, 120) : '' })
+    // Перевод идёт на экран продавцу: ссылки, адреса и упоминания в нём не нужны (текст приходит от модели).
+    const r = typeof ru === 'string' && !/https?:|www\.|@|t\.me|\.(com|kz|ru|net)(?![a-z])/i.test(ru) ? ru.trim().slice(0, 120) : ''
+    queries.push({ zh: z, ru: r })
     if (queries.length === 3) break
   }
   if (queries.length === 0) return null
 
+  // Английские запросы: только латиница, цифры, пробел и дефис, 2-40 знаков, без дублей.
+  const enSeen = new Set<string>()
+  const enQueries: string[] = []
+  for (const q of Array.isArray(d.enQueries) ? d.enQueries : []) {
+    if (typeof q !== 'string') continue
+    // Апострофы убираем, «&», «/», «.» и «,» заменяем пробелом: «women's dress», «3.5mm jack» не должны пропадать целиком.
+    const t = q.replace(/['’`]/g, '').replace(/[&/.,]/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!/^[A-Za-z0-9][A-Za-z0-9 -]{1,39}$/.test(t) || enSeen.has(t.toLowerCase())) continue
+    enSeen.add(t.toLowerCase())
+    enQueries.push(t)
+    if (enQueries.length === 2) break
+  }
+
   const w = Number(d.weightGrams)
   const weightGrams = Number.isFinite(w) && w >= 1 && w <= 50_000 ? Math.round(w) : null
-  return { queries, weightGrams }
+  return { queries, enQueries, weightGrams }
 }
 
 // ---- плашки рисков ----

@@ -286,7 +286,7 @@ export default function KaspiShopMargin() {
                     value={kaspiPrice} onChange={e => setKaspiPrice(e.target.value)} />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена 1688, ₸</span>
+                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена у поставщика, ₸</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                     value={sourcingPrice} onChange={e => setSourcingPrice(e.target.value)} />
                 </label>
@@ -344,7 +344,7 @@ export default function KaspiShopMargin() {
               )}
 
               <label className="block">
-                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка на 1688 (необязательно)</span>
+                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка на товар у поставщика (необязательно)</span>
                 <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                   placeholder="https://detail.1688.com/..." value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} />
               </label>
@@ -384,7 +384,7 @@ export default function KaspiShopMargin() {
                     <span className="font-mono tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>−{fmt(result.cogs)} ₸</span>
                   </div>
                   <div className="pl-3 space-y-1 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-                    <div className="flex items-center justify-between"><span>1688</span><span className="font-mono">{fmt(baseInputs.sourcingPrice)} ₸</span></div>
+                    <div className="flex items-center justify-between"><span>Закупка</span><span className="font-mono">{fmt(baseInputs.sourcingPrice)} ₸</span></div>
                     <div className="flex items-center justify-between"><span>Карго ({(baseInputs.weightGrams / 1000).toFixed(2)} кг × {fmt(baseInputs.cargoRatePerKgTenge)})</span><span className="font-mono">{fmt(result.cargoCost)} ₸</span></div>
                     <div className="flex items-center justify-between"><span>Упаковка</span><span className="font-mono">{fmt(baseInputs.packagingCost)} ₸</span></div>
                   </div>
@@ -478,6 +478,7 @@ export default function KaspiShopMargin() {
               imageUrl: picked && picked.name === productName ? picked.imageUrl : null,
             } : null}
             onApplyWeight={g => setWeightGrams(String(g))}
+            onApplySupplier={s => { setSourcingPrice(String(s.priceKzt)); setSourceUrl(s.url) }}
           />
         </motion.div>
 
@@ -500,7 +501,7 @@ export default function KaspiShopMargin() {
                     <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{ev.product_name}</div>
                     <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                       {fmt(ev.kaspi_price)} ₸ · {ev.category_label || 'без категории'} · {new Date(ev.created_at).toLocaleDateString('ru-KZ')}
-                      {ev.source_url && <> · <a href={ev.source_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">1688 ↗</a></>}
+                      {/^https?:\/\//i.test(ev.source_url ?? '') && <> · <a href={ev.source_url as string} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{/made-in-china\.com/i.test(ev.source_url as string) ? 'Made-in-China' : '1688'} ↗</a></>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">

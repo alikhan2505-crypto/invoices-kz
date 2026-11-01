@@ -64,6 +64,24 @@ describe('parseSuggestion', () => {
     expect(s?.weightGrams).toBeNull()
     expect(s?.queries).toHaveLength(1)
   })
+  it('перевод со ссылкой, адресом или упоминанием отбрасывается (текст приходит от модели), запрос остаётся', () => {
+    const q = (ru: string) => parseSuggestion(JSON.stringify({ queries: [{ zh: '湿巾', ru }] }))?.queries[0]
+    expect(q('салфетки')?.ru).toBe('салфетки')
+    for (const bad of ['пишите @shop', 'see https://x.example', 'www.evil.com', 'купи на t.me/x', 'сайт evil.kz']) {
+      expect(q(bad)).toEqual({ zh: '湿巾', ru: '' })
+    }
+  })
+  it('английские запросы: только латиница, без дублей и мусора, максимум два; нет поля = пусто', () => {
+    const zh = [{ zh: '湿巾', ru: 'x' }]
+    const en = (v: unknown) => parseSuggestion(JSON.stringify({ queries: zh, enQueries: v }))?.enQueries
+    expect(en(['wet wipes', 'Wet  Wipes', 'baby wipes', 'third one'])).toEqual(['wet wipes', 'baby wipes'])
+    expect(en(['湿巾', '', 'a', '-bad', 'x'.repeat(41), 5, null, 'ok-1 2'])).toEqual(['ok-1 2'])
+    expect(en(["women's dress", '3.5mm jack'])).toEqual(['womens dress', '3 5mm jack'])
+    expect(en(['salt & pepper mill'])).toEqual(['salt pepper mill'])
+    expect(en('wet wipes')).toEqual([])
+    expect(en(undefined)).toEqual([])
+    expect(parseSuggestion(good)?.enQueries).toEqual([])
+  })
   it.each([[undefined], [''], ['не JSON'], ['{"queries":"нет"}'], ['{"queries":[]}'], ['{"queries":[{"zh":"abc"}]}']])(
     'мусор %j даёт null', raw => { expect(parseSuggestion(raw)).toBeNull() })
 })

@@ -1,15 +1,18 @@
 'use client'
 import type { Source1688Data } from './source1688Client'
 import { imageSearchLinks } from '@/lib/kaspiShop/source1688'
+import MicSuppliers, { type AppliedSupplier } from './MicSuppliers'
 
 // Результат подбора для 1688: китайские запросы со ссылками на поиск, поиск по фото, оценка веса,
 // плашки рисков. Общий для окна на карточке ниши и для панели в калькуляторе маржи.
 
-export default function Source1688Result({ data, imageUrl, onApplyWeight }: {
+export default function Source1688Result({ data, imageUrl, onApplyWeight, onApplySupplier }: {
   data: Source1688Data
   imageUrl?: string | null
   /** Подставить оценку веса в форму (есть только в калькуляторе). */
   onApplyWeight?: (grams: number) => void
+  /** Подставить цену и ссылку поставщика в форму (есть только в калькуляторе). */
+  onApplySupplier?: (p: AppliedSupplier) => void
 }) {
   const imageLinks = imageSearchLinks(imageUrl)
   const muted = { color: 'var(--nav-text-muted)' } as const
@@ -29,6 +32,17 @@ export default function Source1688Result({ data, imageUrl, onApplyWeight }: {
           </li>
         ))}
       </ul>
+
+      <ul className="space-y-1.5 mb-4">
+        {data.risks.map(r => (
+          <li key={r.key} className="text-[12px] rounded-lg px-3 py-2"
+            style={{ background: 'color-mix(in srgb, var(--nav-warning) 12%, transparent)', color: 'var(--nav-text-secondary)' }}>
+            {r.text}
+          </li>
+        ))}
+      </ul>
+
+      {data.suppliers && <MicSuppliers data={data.suppliers} onApply={onApplySupplier} />}
 
       {imageLinks.length > 0 && (
         <div className="mb-4">
@@ -61,15 +75,6 @@ export default function Source1688Result({ data, imageUrl, onApplyWeight }: {
           )}
         </div>
       )}
-
-      <ul className="space-y-1.5">
-        {data.risks.map(r => (
-          <li key={r.key} className="text-[12px] rounded-lg px-3 py-2"
-            style={{ background: 'color-mix(in srgb, var(--nav-warning) 12%, transparent)', color: 'var(--nav-text-secondary)' }}>
-            {r.text}
-          </li>
-        ))}
-      </ul>
     </>
   )
 }

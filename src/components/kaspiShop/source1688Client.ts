@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { canUseSource1688 } from '@/lib/kaspiShop/source1688'
+import type { SuppliersPayload } from '@/lib/kaspiShop/madeInChina'
 
 // Общее для кнопки на карточках ниш, панели в калькуляторе маржи и выбора из топа продаж
 // (этап 0, 30.10.2026): запрос к /api/kaspi-shop/niches/source-1688 и проверка админ-гейта.
@@ -19,6 +20,8 @@ export interface Source1688Data {
   weightGrams: number | null
   risks: { key: string; text: string }[]
   marginHref: string
+  /** Товары Made-in-China.com; null/нет = секцию не показываем. */
+  suppliers?: SuppliersPayload | null
 }
 
 export type Source1688Phase =
