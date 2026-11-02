@@ -90,7 +90,11 @@ export interface LoginStepRow { event: LoginStepEvent; events: number; visitors:
 // По источнику (utm_source): сколько разных людей открыли форму, нажали «получить ссылку»,
 // получили письмо и нажали Google.
 export interface LoginSourceRow { source: string | null; open: number; press: number; sent: number; google: number }
-export interface LoginFunnel { steps: LoginStepRow[]; bySource: LoginSourceRow[] }
+// repeat: браузеры, открывшие /login три и более раза за один день по Алматы (ночные волны
+// 01.11.2026: 10 браузеров по 3-13 открытий и до 5 нажатий Google за минуты, ни одного
+// просмотра инструмента). В шаги и разрез по источникам не входят, показаны отдельной строкой.
+export interface LoginFunnel { steps: LoginStepRow[]; bySource: LoginSourceRow[]; repeat: { browsers: number; events: number } }
+export const LOGIN_REPEAT_OPENS_PER_DAY = 3
 
 export interface ToolFunnel {
   days: number
@@ -219,6 +223,20 @@ export function aggregateToolFunnel(
   )
   const loginBySource = new Map<string, { source: string | null; sets: Record<'open' | 'press' | 'sent' | 'google', Set<string>> }>()
 
+  // Предпроход: кто открывал /login три и более раза за один день (учитываем только строки периода).
+  const opensPerDay = new Map<string, number>()
+  for (const r of rows) {
+    if (r.event !== 'login_open' || !r.visitor) continue
+    if (!opts.includeInternal && (r.internal || internalVisitors.has(r.visitor))) continue
+    const at = Date.parse(r.created_at)
+    if (!Number.isFinite(at) || at < sinceMs) continue
+    const k = `${r.visitor}|${almatyDay(at)}`
+    opensPerDay.set(k, (opensPerDay.get(k) ?? 0) + 1)
+  }
+  const repeatKeys = new Set([...opensPerDay].filter(([, n]) => n >= LOGIN_REPEAT_OPENS_PER_DAY).map(([k]) => k))
+  const repeatBrowsers = new Set<string>()
+  let repeatEvents = 0
+
   for (const r of rows) {
     // События формы (tool_form_*, 29.10.2026) в воронку по инструментам не входят: их читают SQL-запросом.
     const ev = String(r.event)
@@ -228,6 +246,11 @@ export function aggregateToolFunnel(
     if (!opts.includeInternal && (r.internal || (r.visitor && internalVisitors.has(r.visitor)))) continue
     // Шаги входа и клик «Следить» (30.10.2026): отдельный блок, в общие счётчики не попадают.
     if ((LOGIN_STEP_EVENTS as readonly string[]).includes(ev)) {
+      if (r.visitor && repeatKeys.has(`${r.visitor}|${almatyDay(at)}`)) {
+        repeatBrowsers.add(r.visitor)
+        repeatEvents++
+        continue
+      }
       const step = loginSteps.get(ev as LoginStepEvent)!
       const who = r.visitor || `anon:${anon++}`
       step.events++
@@ -310,6 +333,7 @@ export function aggregateToolFunnel(
       bySource: [...loginBySource.values()]
         .map(x => ({ source: x.source, open: x.sets.open.size, press: x.sets.press.size, sent: x.sets.sent.size, google: x.sets.google.size }))
         .sort((a, c) => c.open - a.open || c.press - a.press),
+      repeat: { browsers: repeatBrowsers.size, events: repeatEvents },
     },
   }
 }

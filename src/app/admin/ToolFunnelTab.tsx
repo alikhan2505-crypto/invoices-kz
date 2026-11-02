@@ -319,6 +319,11 @@ function LoginBlock({ login }: { login: LoginFunnel | undefined }) {
         <div className="font-medium text-sm">Вход и регистрация (страница /login)</div>
         <div className="text-[11px] text-gray-500 mt-0.5">Где теряются люди между «нажал регистрацию» и «получил письмо». Люди = разные браузеры. Данные пишутся с 30.10.2026.</div>
       </div>
+      {login.repeat.browsers > 0 && (
+        <div className="px-4 py-2 text-[11px] text-amber-300/90 border-t border-gray-700">
+          Не включены в цифры ниже: {login.repeat.browsers} браузеров открыли /login три и более раза за день по Алматы ({login.repeat.events} событий). Похоже на автоматические волны.
+        </div>
+      )}
       {total === 0 ? (
         <div className="px-4 py-3 text-sm text-gray-500 border-t border-gray-700">За период шагов входа нет.</div>
       ) : (

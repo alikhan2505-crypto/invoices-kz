@@ -79,6 +79,30 @@ describe('aggregateToolFunnel', () => {
     expect(f.rowsConsidered).toBe(0)
   })
 
+  it('moves browsers with 3+ /login opens in one Almaty day out of the login steps into a separate count', () => {
+    const wave = [
+      ev('login_open', 'none', 'bot'), ev('login_open', 'none', 'bot'), ev('login_open', 'none', 'bot'),
+      ev('login_google', 'none', 'bot'), ev('login_google', 'none', 'bot'),
+      ev('login_open', 'none', 'human'), ev('login_open', 'none', 'human'), ev('login_google', 'none', 'human'),
+    ]
+    const f = run(wave)
+    const step = (e: string) => f.login.steps.find(x => x.event === e)!
+    expect(step('login_open')).toMatchObject({ events: 2, visitors: 1 })
+    expect(step('login_google')).toMatchObject({ events: 1, visitors: 1 })
+    expect(f.login.repeat).toEqual({ browsers: 1, events: 5 })
+    expect(f.login.bySource).toEqual([{ source: null, open: 1, press: 0, sent: 0, google: 1 }])
+  })
+
+  it('counts opens on different Almaty days separately for the repeat rule', () => {
+    const day2 = '2026-10-14T06:00:00Z'
+    const f = run([
+      ev('login_open', 'none', 'v1'), ev('login_open', 'none', 'v1'),
+      ev('login_open', 'none', 'v1', { created_at: day2 }),
+    ])
+    expect(f.login.repeat).toEqual({ browsers: 0, events: 0 })
+    expect(f.login.steps.find(x => x.event === 'login_open')).toMatchObject({ events: 3, visitors: 1 })
+  })
+
   it('treats each view without a visitor id as its own visitor', () => {
     const f = run([ev('view', 'kp', null), ev('view', 'kp', null)])
     expect(tool(f, 'kp').visitors).toBe(2)
