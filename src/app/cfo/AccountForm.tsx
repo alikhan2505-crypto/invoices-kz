@@ -27,18 +27,20 @@ export default function AccountForm({ initial, accounts, operations, submitLabel
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [kind, setKind] = useState<AccountKind>(initial?.kind ?? 'bank')
-  const [balance, setBalance] = useState(initial ? String(tiynToNumber(initial.openingBalance)) : '0')
+  // Новый счёт: поле пустое с подсказкой «0». Стартовый «0» в самом поле на телефоне не стирался
+  // (курсор в конце, набираешь 200000 и получаешь 0200000); пустое поле при сохранении значит 0.
+  const [balance, setBalance] = useState(initial ? String(tiynToNumber(initial.openingBalance)) : '')
   const [date, setDate] = useState(initial?.openingDate ?? `${todayIso().slice(0, 7)}-01`)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const parsed = parseAmountInput(balance, { allowNegative: true })
+  const parsed = balance.trim() === '' ? 0 : parseAmountInput(balance, { allowNegative: true })
   const negativeWarning = kind !== 'loan' && parsed !== null && parsed < 0
   const kinds = initial && !SELECTABLE_ACCOUNT_KINDS.includes(initial.kind) ? [...SELECTABLE_ACCOUNT_KINDS, initial.kind] : SELECTABLE_ACCOUNT_KINDS
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const amount = parseAmountInput(balance, { allowNegative: true })
+    const amount = balance.trim() === '' ? 0 : parseAmountInput(balance, { allowNegative: true })
     if (!name.trim()) { setError('Укажите название'); return }
     if (amount === null) { setError('Остаток — число, например 150000 или 1 250,50'); return }
     const draft = { id: initial?.id, name: name.trim(), kind, openingBalance: amount, openingDate: date }
@@ -67,7 +69,7 @@ export default function AccountForm({ initial, accounts, operations, submitLabel
       </Field>
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label={kind === 'loan' ? 'Остаток долга, ₸ (со знаком минус)' : 'Остаток, ₸'} hint={kind === 'loan' ? 'Например, −12 000 000' : 'Может быть отрицательным (овердрафт)'}>
-          <input className={inputClass} style={inputStyle} inputMode="decimal" aria-describedby={negativeWarning ? 'account-negative-warning' : undefined} value={balance} onChange={(e) => setBalance(e.target.value)} />
+          <input className={inputClass} style={inputStyle} inputMode="decimal" placeholder="0" onFocus={(e) => e.currentTarget.select()} aria-describedby={negativeWarning ? 'account-negative-warning' : undefined} value={balance} onChange={(e) => setBalance(e.target.value)} />
         </Field>
         <Field label="На дату (начало учёта)">
           <input type="date" className={inputClass} style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} />

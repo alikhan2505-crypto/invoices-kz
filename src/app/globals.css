@@ -1271,3 +1271,33 @@ body.product-shell-active [data-tour="wallet"] > button:first-child { display: n
 
 /* CFO: пока внизу висит плашка «Это пример», конец страницы не прячется под ней. */
 body[data-cfo-demo] .cfo-page-content { padding-bottom: 7rem; }
+
+/* iOS Safari: поля даты и времени игнорируют width:100% из-за встроенной минимальной ширины и вылезают
+   за край карточки (основатель, CFO на iPhone, 02.11.2026). min-width:0 и max-width:100% безвредны везде;
+   остальное только для iOS (@supports с -webkit-touch-callout), на компьютере поля остаются родными.
+   Высоту держим: у пустого поля при appearance:none она иначе схлопывается. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"] {
+  min-width: 0;
+  max-width: 100%;
+}
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 2.75rem;
+    text-align: left;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="month"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-width: 0;
+  }
+}
