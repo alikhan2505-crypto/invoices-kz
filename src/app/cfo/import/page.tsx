@@ -144,8 +144,8 @@ export default function CfoImport() {
         <Card className="max-w-xl">
           <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
             {family
-              ? 'Загрузка выписки Kaspi или другого банка из Excel доступна на тарифе Про: траты сами ложатся в журнал, а категории подставляются по магазину и описанию.'
-              : 'Загрузка банковской выписки из Excel доступна на тарифе Про: операции сами ложатся в журнал, статьи подставляются по контрагенту и назначению платежа.'}
+              ? 'Загрузка выписки Kaspi или другого банка из PDF или Excel доступна на тарифе Про: траты сами ложатся в журнал, а категории подставляются по магазину и описанию.'
+              : 'Загрузка банковской выписки из PDF или Excel доступна на тарифе Про: операции сами ложатся в журнал, статьи подставляются по контрагенту и назначению платежа.'}
           </p>
           <a href="/upgrade" className="inline-flex items-center min-h-[44px] mt-4 rounded-xl px-4 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Перейти на Про</a>
         </Card>
@@ -161,7 +161,7 @@ export default function CfoImport() {
     <CfoPage title="Импорт выписки" actions={<GhostButton type="button" onClick={() => router.push('/cfo/operations')}>К операциям</GhostButton>}>
       <Card>
         <p className="text-sm mb-4 max-w-[75ch]" style={{ color: 'var(--nav-text-secondary)' }}>
-          Выгрузите выписку из {family ? 'приложения банка' : 'интернет-банка'} в Excel и загрузите сюда. Файл читается прямо в браузере и никуда не отправляется — в журнал попадут только строки, которые вы подтвердите.
+          Скачайте выписку из {family ? 'приложения банка' : 'интернет-банка'} (PDF или Excel) и загрузите сюда. Файл читается прямо в браузере и никуда не отправляется — в журнал попадут только строки, которые вы подтвердите.
           Повторная загрузка той же выписки не задвоит операции: совпадения по дате и сумме отмечаются как «уже есть».
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -170,8 +170,8 @@ export default function CfoImport() {
               {liveAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </Field>
-          <Field label="Файл выписки (.xlsx, .xls, .csv)" hint={fileName || undefined}>
-            <input type="file" accept=".xlsx,.xls,.csv" className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-1 file:text-sm`} style={inputStyle} onChange={(e) => void onFile(e.target.files?.[0])} />
+          <Field label="Файл выписки (.pdf, .xlsx, .xls, .csv)" hint={fileName || undefined}>
+            <input type="file" accept=".pdf,.xlsx,.xls,.csv,application/pdf" className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-1 file:text-sm`} style={inputStyle} onChange={(e) => void onFile(e.target.files?.[0])} />
           </Field>
         </div>
         <div className="mt-3"><ErrorText>{!grid ? error : null}</ErrorText></div>

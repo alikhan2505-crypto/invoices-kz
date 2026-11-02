@@ -1,11 +1,16 @@
-// Файл выписки → сетка ячеек. Только в браузере: файл никуда не отправляется.
+// Файл выписки (Excel, CSV или PDF) → сетка ячеек. Только в браузере: файл никуда не отправляется.
 import * as XLSX from 'xlsx'
 import type { Grid } from './statementImport'
 
 const MAX_BYTES = 5 * 1024 * 1024
 
 export async function readStatementGrid(file: File): Promise<Grid> {
-  if (!/\.(xlsx|xls|csv)$/i.test(file.name)) throw new Error('Нужен файл Excel (.xlsx, .xls) или .csv — выгрузите выписку из интернет-банка в Excel')
+  if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+    // PDF читается отдельным модулем (pdf.js грузится только когда он нужен).
+    const { readPdfGrid } = await import('./pdfStatement')
+    return readPdfGrid(await file.arrayBuffer())
+  }
+  if (!/\.(xlsx|xls|csv)$/i.test(file.name)) throw new Error('Нужен файл выписки: PDF, Excel (.xlsx, .xls) или .csv. Скачайте выписку в интернет-банке или приложении банка')
   if (file.size > MAX_BYTES) throw new Error('Файл больше 5 МБ — выгрузите выписку за период покороче')
   const buffer = await file.arrayBuffer()
   let wb: XLSX.WorkBook
