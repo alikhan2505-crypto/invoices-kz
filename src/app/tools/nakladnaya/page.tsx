@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
+import ToolFaqJsonLd from '@/lib/tools-i18n/ToolFaqJsonLd'
 import NakladnayaTool from './NakladnayaTool'
 import NakladnayaSample, { NakladnayaSampleLink } from './NakladnayaSample'
 import { nakladnayaDict } from './dict'
@@ -17,6 +18,7 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="nakladnaya" lang={LANG} name={t.h1} description={t.seo.description} />
+      <ToolFaqJsonLd slug="nakladnaya" lang={LANG} items={t.faq} />
       <NakladnayaSampleLink lang={LANG} />
       <NakladnayaTool lang={LANG}>
         <NakladnayaSample lang={LANG} />
