@@ -26,6 +26,7 @@ import { taxRegimesText, unreliableCategoriesText } from '@/lib/binRiskText'
 import PageHeader from '@/components/PageHeader'
 import BinWatchButton from '@/components/BinWatchButton'
 import PageContainer from '@/components/PageContainer'
+import DecimalField from '@/components/DecimalField'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -441,7 +442,8 @@ export default function CreateInvoicePage() {
   }), [clientName, clientBin, clientEmail, clientAddress, clientPhone,
        contractNumber, contractDate, noContract, dueDate, clientKnp, note, services])
 
-  const total = services.reduce((s, i) => s + i.qty * i.price, 0)
+  // До тиына: 10.1 * 3 в JS даёт 30.299999999999997, и такая сумма уходила в счёт, запрос Kaspi и сверку с выпиской.
+  const total = Math.round(services.reduce((s, i) => s + i.qty * i.price, 0) * 100) / 100
   const vatType = profile?.vat_type || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
@@ -1627,31 +1629,33 @@ export default function CreateInvoicePage() {
                       <button onClick={() => removeService(idx)} className="mt-1 transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)]" aria-label={deleteLabel(lang)}><XIcon /></button>
                     )}
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div>
+                  {/* На телефоне (390px) четыре поля в ряд давали цене ~50px: «1500000» не было видно целиком.
+                      До 640px: количество и единица в первом ряду, цена и код на всю ширину ниже. */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="col-span-2 sm:col-span-1 order-4 sm:order-1 min-w-0">
                       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.codeLabel}</label>
                       <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         placeholder={t.codePlaceholder} value={svc.code || ''}
                         onChange={e => updateService(idx, 'code', e.target.value)} />
                     </div>
-                    <div>
+                    <div className="order-1 sm:order-2 min-w-0">
                       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.qtyLabel}</label>
-                      <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                        type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
-                        onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
+                      <DecimalField className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                        placeholder={t.qtyPlaceholder} value={svc.qty}
+                        onValue={n => updateService(idx, 'qty', n)} />
                     </div>
-                    <div>
+                    <div className="order-2 sm:order-3 min-w-0">
                       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.unitLabel}</label>
                       <select className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
                         {UNIT_OPTIONS.map(u => <option key={u} value={u}>{unitLabel(u, lang)}</option>)}
                       </select>
                     </div>
-                    <div>
+                    <div className="col-span-2 sm:col-span-1 order-3 sm:order-4 min-w-0">
                       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.priceLabel}</label>
-                      <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                        type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
-                        onChange={e => updateService(idx, 'price', Number(e.target.value))} />
+                      <DecimalField className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                        placeholder={t.pricePlaceholder} value={svc.price}
+                        onValue={n => updateService(idx, 'price', n)} />
                     </div>
                   </div>
                   {svc.name && svc.price > 0 && (

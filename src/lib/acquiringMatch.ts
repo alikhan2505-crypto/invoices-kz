@@ -28,7 +28,8 @@ export function findMatches(rows: StatementRow[], invoices: OpenInvoice[]): Acqu
     for (const invoice of invoices) {
       if (!invoice.client_bin) continue
       if (normalizeBin(invoice.client_bin) !== normalizeBin(row.bin)) continue
-      if (Number(invoice.amount) !== Number(row.amount)) continue
+      // Сравниваем в тиынах: сумма счёта могла сохраниться с хвостом float (30.299999999999997).
+      if (Math.round(Number(invoice.amount) * 100) !== Math.round(Number(row.amount) * 100)) continue
       matches.push({ invoice, row })
     }
   }

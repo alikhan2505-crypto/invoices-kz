@@ -27,9 +27,9 @@ export default function AccountForm({ initial, accounts, operations, submitLabel
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [kind, setKind] = useState<AccountKind>(initial?.kind ?? 'bank')
-  // Новый счёт: поле пустое с подсказкой «0». Стартовый «0» в самом поле на телефоне не стирался
-  // (курсор в конце, набираешь 200000 и получаешь 0200000); пустое поле при сохранении значит 0.
-  const [balance, setBalance] = useState(initial ? String(tiynToNumber(initial.openingBalance)) : '')
+  // Новый счёт и счёт с нулевым остатком: поле пустое с подсказкой «0». Стартовый «0» в самом поле на телефоне
+  // не стирался (курсор в конце, набираешь 200000 и получаешь 0200000); пустое поле при сохранении значит 0.
+  const [balance, setBalance] = useState(initial && initial.openingBalance !== 0 ? String(tiynToNumber(initial.openingBalance)) : '')
   const [date, setDate] = useState(initial?.openingDate ?? `${todayIso().slice(0, 7)}-01`)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)

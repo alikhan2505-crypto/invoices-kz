@@ -393,9 +393,14 @@ export default function PublicInvoice() {
     // write access to invoices any more (and never really did -- the old
     // anon UPDATE was silently refused by RLS, so this button used to do
     // nothing at all for the recipient).
-    await fetch(`/api/public/invoice/${encodeURIComponent(token)}/paid`, { method: 'POST' }).catch(() => {})
-    setMarked(true)
+    // Раньше ответ не смотрели: при ошибке клиент видел «подтверждено», а продавец ничего не получал.
+    const res = await fetch(`/api/public/invoice/${encodeURIComponent(token)}/paid`, { method: 'POST' }).catch(() => null)
     setMarking(false)
+    if (!res || !res.ok) {
+      await alert(t.paymentMarkFailed)
+      return
+    }
+    setMarked(true)
     // Best-effort — the client's "paid" confirmation shouldn't block on this.
     fetch('/api/notify-paid', {
       method: 'POST',

@@ -236,7 +236,7 @@ describe('POST /api/payment/create: rejected amounts touch nothing', () => {
 
 describe('POST /api/payment/create: retries and double clicks', () => {
   it('an older pending row is closed with its wallet hold deferred when a wallet part is chosen', async () => {
-    h.pending = [{ id: 'old', user_id: 'u1', plan: 'pro', amount: 5990, qr_operation_id: 'old-op', created_at: 'x', billing_period: 'monthly' }]
+    h.pending = [{ id: 'old', user_id: 'u1', plan: 'pro', amount: 5990, qr_operation_id: 'old-op', created_at: 'x', billing_period: 'monthly', wallet_amount: 300 }]
     await POST(req({ walletAmount: 500 }))
     expect(vi.mocked(checkAndSettlePlanPayment).mock.calls[0][1]).toEqual({ force: true, deferWalletRefund: true })
     // Новое удержание забрало старое себе: возвращать в finally нечего.
@@ -244,10 +244,20 @@ describe('POST /api/payment/create: retries and double clicks', () => {
   })
 
   it('with walletAmount 0 the old hold is refunded immediately (no deferral)', async () => {
-    h.pending = [{ id: 'old', user_id: 'u1' }]
+    h.pending = [{ id: 'old', user_id: 'u1', wallet_amount: 300 }]
     await POST(req({ walletAmount: 0 }))
     expect(vi.mocked(checkAndSettlePlanPayment).mock.calls[0][1]).toEqual({ force: true, deferWalletRefund: false })
     expect(vi.mocked(refundDeadPlanWalletHolds)).not.toHaveBeenCalled()
+  })
+
+  it('строка без удержания с кошелька (в т.ч. push-запрос на телефон) не закрывается принудительно: оплата в приложении потом засчитается', async () => {
+    h.pending = [{ id: 'push', user_id: 'u1', plan: 'pro', amount: 5990, qr_operation_id: 'push-op', created_at: 'x', billing_period: 'monthly' }]
+    await POST(req({ walletAmount: 0 }))
+    expect(vi.mocked(checkAndSettlePlanPayment).mock.calls[0][1]).toEqual({ force: false, deferWalletRefund: false })
+    h.pending = [{ id: 'push2', user_id: 'u1', wallet_amount: 0 }, { id: 'push3', user_id: 'u1', wallet_amount: null }]
+    vi.mocked(checkAndSettlePlanPayment).mockClear()
+    await POST(req({ walletAmount: 0 }))
+    expect(vi.mocked(checkAndSettlePlanPayment).mock.calls.map((c) => c[1]?.force)).toEqual([false, false])
   })
 
   it('a rejected retry returns the deferred hold of the old row instead of leaving it locked', async () => {

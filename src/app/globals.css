@@ -684,16 +684,17 @@ html {
    ~90%-opaque layers would compound to ~99% opaque and hide the aurora
    again, so it goes fully transparent here and lets the shell's layer be
    the only one doing the work. */
+/* Без backdrop-filter на самом <main> (аудит 02.11.2026): любой backdrop-filter делает элемент
+   «содержащим блоком» для position:fixed внутри него. Окна «fixed inset-0» лежат внутри этого <main>,
+   поэтому на телефоне они растягивались на всю высоту страницы (измерено в WebKit и Chromium: на странице
+   в 3000px окно имело top −1500 и высоту 3000) и «Отправить по почте», «Изменить остатки» и другие окна
+   открывались ниже видимой области. Фон и так почти непрозрачный (~90%), размытие под ним почти не видно. */
 .page-surface-in-shell {
   background: var(--nav-surface-elevated);
-  backdrop-filter: blur(28px) saturate(120%);
-  -webkit-backdrop-filter: blur(28px) saturate(120%);
 }
 @media (min-width: 1024px) {
   .page-surface-in-shell {
     background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 }
 

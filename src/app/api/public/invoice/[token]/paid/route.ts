@@ -20,12 +20,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ to
 
   // Only ever moves an unpaid invoice to paid. Without the status guard a
   // replayed request could walk a cancelled or already-settled invoice back
-  // into 'paid'.
+  // into 'paid'. 'draft' входит в список: владелец мог скопировать ссылку и отправить её сам, не нажимая
+  // «Отправить», и тогда счёт так и остаётся черновиком (аудит 02.11.2026).
   const { data, error } = await supabase
     .from('invoices')
     .update({ status: 'paid' })
     .eq('public_token', token)
-    .in('status', ['sent', 'viewed', 'overdue'])
+    .in('status', ['draft', 'sent', 'viewed', 'overdue'])
     .select('id')
     .maybeSingle()
   if (error) {

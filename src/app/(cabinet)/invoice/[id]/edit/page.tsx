@@ -13,6 +13,7 @@ import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import DecimalField from '@/components/DecimalField'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -59,7 +60,8 @@ export default function EditInvoice() {
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('')
 
-  const total = services.reduce((s, i) => s + i.qty * i.price, 0)
+  // До тиына: 10.1 * 3 в JS даёт 30.299999999999997, и такая сумма уходила в счёт, запрос Kaspi и сверку с выпиской.
+  const total = Math.round(services.reduce((s, i) => s + i.qty * i.price, 0) * 100) / 100
   const vatType = profile?.vat_type || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
@@ -292,20 +294,21 @@ export default function EditInvoice() {
                     <button onClick={() => removeService(idx)} className="mt-1.5 transition-colors" style={{ color: 'var(--nav-text-muted)' }} aria-label={deleteLabel(lang)}><XIcon /></button>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
+                {/* До 640px: количество и единица в первом ряду, цена и код на всю ширину (иначе цене ~50px). */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="col-span-2 sm:col-span-1 order-4 sm:order-1 min-w-0">
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.codeLabel}</label>
                     <input className={inputClass.replace('px-3', 'px-2')} style={{ color: 'var(--nav-text-primary)' }}
                       placeholder={t.codePlaceholder} value={svc.code || ''}
                       onChange={e => updateService(idx, 'code', e.target.value)} />
                   </div>
-                  <div>
+                  <div className="order-1 sm:order-2 min-w-0">
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.qtyLabel}</label>
-                    <input className={inputClass.replace('px-3', 'px-2')} style={{ color: 'var(--nav-text-primary)' }}
-                      type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
-                      onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
+                    <DecimalField className={inputClass.replace('px-3', 'px-2')} style={{ color: 'var(--nav-text-primary)' }}
+                      placeholder={t.qtyPlaceholder} value={svc.qty}
+                      onValue={n => updateService(idx, 'qty', n)} />
                   </div>
-                  <div>
+                  <div className="order-2 sm:order-3 min-w-0">
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.unitLabel}</label>
                     <select className={`${inputClass.replace('px-3', 'px-2')} bg-transparent`} style={{ color: 'var(--nav-text-primary)' }}
                       value={svc.unit || 'шт'}
@@ -313,11 +316,11 @@ export default function EditInvoice() {
                       {UNIT_OPTIONS.map(u => <option key={u} value={u}>{unitLabel(u, lang)}</option>)}
                     </select>
                   </div>
-                  <div>
+                  <div className="col-span-2 sm:col-span-1 order-3 sm:order-4 min-w-0">
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.priceLabel}</label>
-                    <input className={inputClass.replace('px-3', 'px-2')} style={{ color: 'var(--nav-text-primary)' }}
-                      type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
-                      onChange={e => updateService(idx, 'price', Number(e.target.value))} />
+                    <DecimalField className={inputClass.replace('px-3', 'px-2')} style={{ color: 'var(--nav-text-primary)' }}
+                      placeholder={t.pricePlaceholder} value={svc.price}
+                      onValue={n => updateService(idx, 'price', n)} />
                   </div>
                 </div>
                 {svc.name && svc.price > 0 && (

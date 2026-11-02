@@ -39,6 +39,7 @@ export interface HistoryContent {
 
   // public invoice view page
   confirmPaymentConfirm: string
+  paymentMarkFailed: string
   defaultServiceName: string
   invoiceNotFoundLabel: string
   invoiceForPaymentLabel: string
@@ -136,6 +137,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     excelFileName: (date: string) => `Счета_${date}.xlsx`,
 
     confirmPaymentConfirm: 'Подтвердить оплату?',
+    paymentMarkFailed: 'Не удалось отправить отметку об оплате. Попробуйте ещё раз или сообщите продавцу.',
     defaultServiceName: 'Услуга',
     invoiceNotFoundLabel: 'Счёт не найден',
     invoiceForPaymentLabel: 'Счёт на оплату',
@@ -231,6 +233,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     excelFileName: (date: string) => `Шоттар_${date}.xlsx`,
 
     confirmPaymentConfirm: 'Төлемді растайсыз ба?',
+    paymentMarkFailed: 'Төлем туралы белгіні жіберу мүмкін болмады. Қайталап көріңіз немесе сатушыға хабарлаңыз.',
     defaultServiceName: 'Қызмет',
     invoiceNotFoundLabel: 'Шот табылмады',
     invoiceForPaymentLabel: 'Төлеуге арналған шот',
@@ -327,6 +330,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     excelFileName: (date: string) => `Invoices_${date}.xlsx`,
 
     confirmPaymentConfirm: 'Confirm payment?',
+    paymentMarkFailed: 'Could not send the payment note. Please try again or tell the seller.',
     defaultServiceName: 'Service',
     invoiceNotFoundLabel: 'Invoice not found',
     invoiceForPaymentLabel: 'Invoice for payment',

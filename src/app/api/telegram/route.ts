@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { claimWindowSlot, dayBucket, windowKey } from '@/lib/windowLimits'
+
+// Не больше стольких уведомлений «Новый пользователь» в сутки от одного аккаунта: настоящему человеку
+// хватает одного, а аккаунт-спамщик иначе забивал бы личный Telegram основателя (аудит 02.11.2026).
+const SIGNUP_NOTICES_PER_DAY = 3
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -39,10 +44,19 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (body.event === 'signup') {
-      const email = typeof body.email === 'string' ? body.email.slice(0, 200) : ''
+      const supabaseLimits = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const slot = await claimWindowSlot(supabaseLimits, windowKey('tg-signup', user.id, dayBucket()), SIGNUP_NOTICES_PER_DAY)
+      // Лимит исчерпан или счётчик недоступен: защитный лимит отказывает молча, а странице отвечаем «ок»,
+      // чтобы вход человека не ломался из-за уведомления для основателя.
+      if (!slot.ok) return NextResponse.json({ ok: true, skipped: true })
+      // Почту берём у самого аккаунта: присланному в теле не доверяем.
+      const email = user.email ?? ''
       const refCode = typeof body.refCode === 'string' ? body.refCode.slice(0, 100) : ''
       const promoCode = typeof body.promoCode === 'string' ? body.promoCode.slice(0, 100) : ''
-      message = `🆕 <b>Новый пользователь!</b>\n📧 ${escapeHtml(email || user.email || '')}` +
+      message = `🆕 <b>Новый пользователь!</b>\n📧 ${escapeHtml(email)}` +
         (refCode ? `\n🎁 Реферал: ${escapeHtml(refCode)}` : '') +
         (promoCode ? `\n🏷 Промокод: ${escapeHtml(promoCode)}` : '')
     } else if (body.event === 'plan_activated') {

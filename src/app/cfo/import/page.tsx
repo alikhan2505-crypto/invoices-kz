@@ -23,6 +23,29 @@ const decode = (v: string): Choice => (v.startsWith('a:') ? { kind: 'article', a
 const partyKey = (r: ParsedRow) => `${r.direction}|${r.counterparty.trim().toLowerCase()}`
 const colName = (i: number) => (i < 26 ? String.fromCharCode(65 + i) : `#${i + 1}`)
 
+// Номер строки с заголовками. Раньше это был type="number" со значением «из состояния»: поле нельзя было
+// стереть (пустое превращалось обратно в 1, набираешь 3 и получаешь 13). Теперь пустое поле допустимо
+// пока человек набирает, число применяется, когда оно в пределах 1..max.
+function HeaderRowInput({ value, max, onValue }: { value: number; max: number; onValue: (n: number) => void }) {
+  const [text, setText] = useState<string | null>(null)
+  const shown = text ?? String(value)
+  return (
+    <input
+      inputMode="numeric"
+      className={inputClass}
+      style={inputStyle}
+      value={shown}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/\D/g, '').slice(0, 5)
+        setText(raw)
+        const n = Number(raw)
+        if (raw !== '' && n >= 1 && n <= max) onValue(n)
+      }}
+      onBlur={() => setText(null)}
+    />
+  )
+}
+
 export default function CfoImport() {
   const { ws, reload, pro } = useCfo()
   const router = useRouter()
@@ -187,7 +210,7 @@ export default function CfoImport() {
           )}
           <div className="grid sm:grid-cols-3 gap-3">
             <Field label="Строка с заголовками">
-              <input type="number" min={1} max={grid.length} className={inputClass} style={inputStyle} value={headerRow + 1} onChange={(e) => setHeaderRow(Math.max(0, Math.min(grid.length - 1, Number(e.target.value) - 1 || 0)))} />
+              <HeaderRowInput value={headerRow + 1} max={grid.length} onValue={(n) => setHeaderRow(n - 1)} />
             </Field>
             {mapFields.map((f) => (
               <Field key={f.key} label={f.label}>

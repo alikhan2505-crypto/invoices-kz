@@ -95,7 +95,7 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
     // genuinely live payment is still waiting to be paid.
     const { data: pendingRows, error: pendingError } = await supabase
       .from('payment_requests')
-      .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
+      .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period, wallet_amount')
       .eq('user_id', userId)
       .eq('status', 'pending')
     const deferWalletRefund = hasWalletAmount ? walletAmount > 0 : useWallet === true
@@ -104,12 +104,16 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
     else if ((pendingRows?.length ?? 0) > 0) {
       for (const row of pendingRows as PlanPaymentRow[]) {
         try {
-          // force: the caller is asking for a payable QR right now, so any
-          // older one is being abandoned by definition. Refusing instead
-          // (the previous behaviour) left customers staring at "у вас уже
-          // есть неподтверждённый платёж" with no way forward until the
-          // nightly cron cleared it. /kaspi-api has always worked this way.
-          const result = await checkAndSettlePlanPayment(row, { force: true, deferWalletRefund })
+          // force закрывает строку сразу, даже если Kaspi ещё не считает её просроченной.
+          // Так можно закрывать ТОЛЬКО строки с удержанием с кошелька: они всегда от QR
+          // (create-phone кошелёк не трогает), QR живёт минуты, а удержание нужно вернуть
+          // сразу. Строка без удержания может быть push-запросом на телефон: у него нет срока
+          // жизни, человек оплатит его в приложении позже, а закрытая строка ни cron, ни
+          // /api/payment/status больше не проверяют (берут только 'pending'): деньги списаны,
+          // тариф не включён (аудит 02.11.2026). Такие строки оставляем: новый платёж всё равно
+          // создаётся, Kaspi сам скажет «просрочен», а оплаченное cron засчитает.
+          const holdsWallet = Number(row.wallet_amount || 0) > 0
+          const result = await checkAndSettlePlanPayment(row, { force: holdsWallet, deferWalletRefund })
           if (result === 'paid') {
             // Settling just activated the plan from a QR the customer had
             // already paid. Same as create-phone: report it as a successful

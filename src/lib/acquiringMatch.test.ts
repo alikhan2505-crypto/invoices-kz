@@ -28,6 +28,11 @@ describe('findMatches', () => {
     expect(matches).toHaveLength(0)
   })
 
+  it('сумма с хвостом float (30.299999999999997) сходится с выпиской 30.30, а разница в тиын нет', () => {
+    expect(findMatches([row({ amount: 30.3 })], [invoice({ amount: 10.1 * 3 })])).toHaveLength(1)
+    expect(findMatches([row({ amount: 30.31 })], [invoice({ amount: 10.1 * 3 })])).toHaveLength(0)
+  })
+
   it('does not match when amount differs', () => {
     const matches = findMatches([row({ amount: 50000 })], [invoice()])
     expect(matches).toHaveLength(0)
