@@ -64,6 +64,7 @@ export default function Login() {
   // stored postLoginRedirect, so it must run once per mount, not be
   // cancelled-and-repeated (the second run would find the intent gone).
   const sessionCheckStarted = useRef(false)
+  const [linkExpired, setLinkExpired] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const captchaRef = useRef<TurnstileHandle>(null)
   // Set as soon as the visitor touches the form (types an email, presses
@@ -83,6 +84,8 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
     if (ref) localStorage.setItem('referral_code', ref)
+    // Пришли с /auth/callback после просроченной или использованной ссылки из письма.
+    if (params.get('link') === 'expired') setLinkExpired(true)
     const next = postLoginRedirectFromSearch(window.location.search)
     if (next) setPostLoginRedirect(next)
     const pending = pendingUpgradeFromSearch(window.location.search)
@@ -311,6 +314,11 @@ export default function Login() {
               <div className="flex-1 h-px bg-gray-200"></div>
             </div>
 
+            {linkExpired && (
+              <p role="alert" className="text-xs rounded-lg px-3 py-2 mb-3 leading-relaxed" style={{ background: '#FFF7E6', color: '#8A5A00', border: '1px solid #F5D9A6' }}>
+                {t.linkExpiredNotice}
+              </p>
+            )}
             <label className="text-xs text-gray-500 mb-2 block">{t.emailLabel}</label>
             <input
               className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"

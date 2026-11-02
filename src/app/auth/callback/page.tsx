@@ -28,7 +28,10 @@ export default function AuthCallback() {
 
         if (error) {
           console.error('Auth error:', error)
-          router.push('/login')
+          // Просроченную или уже использованную ссылку объясняем на /login: раньше человек просто оказывался
+          // на пустой странице входа и не понимал, почему (аудит 02.11.2026).
+          const code = params.get('error_code') || hashParams.get('error_code')
+          router.push(code === 'otp_expired' ? '/login?link=expired' : '/login')
           return
         }
 
@@ -49,7 +52,7 @@ export default function AuthCallback() {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
           if (exchangeError) {
             console.error('Exchange error:', exchangeError)
-            router.push('/login')
+            router.push('/login?link=expired')
             return
           }
         } else if (accessToken) {
@@ -72,7 +75,7 @@ export default function AuthCallback() {
 
         if (!session) {
           console.error('No session after retries')
-          router.push('/login')
+          router.push('/login?link=expired')
           return
         }
 

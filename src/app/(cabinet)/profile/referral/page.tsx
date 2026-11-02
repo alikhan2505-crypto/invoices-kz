@@ -68,15 +68,21 @@ export default function Referral() {
     load()
   }, [])
 
+  // Пока профиль не загрузился (или кода нет), ссылку не показываем и не копируем: раньше выходило
+  // «login?ref=» с пустым кодом, и человек раздавал нерабочую ссылку (аудит 02.11.2026).
+  const referralCode: string | null = profile?.referral_code ? String(profile.referral_code) : null
+
   async function copyLink() {
-    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
+    if (!referralCode) return
+    const link = `https://invoices.kz/login?ref=${referralCode}`
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   async function shareWhatsApp() {
-    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
+    if (!referralCode) return
+    const link = `https://invoices.kz/login?ref=${referralCode}`
     const text = t.whatsAppShareMessage(link)
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
@@ -147,17 +153,17 @@ export default function Referral() {
           <div className="text-sm font-medium mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.yourReferralLinkLabel}</div>
           <div className="rounded-xl px-3 py-2.5 flex items-center justify-between mb-3" style={{ background: 'var(--nav-bg)' }}>
             <span className="text-xs truncate" style={{ color: 'var(--nav-text-secondary)' }}>
-              invoices.kz/login?ref={profile?.referral_code}
+              {referralCode ? `invoices.kz/login?ref=${referralCode}` : '…'}
             </span>
-            <button onClick={copyLink}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg ml-2 flex-shrink-0 transition-colors"
+            <button onClick={copyLink} disabled={!referralCode}
+              className="disabled:opacity-50 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg ml-2 flex-shrink-0 transition-colors"
               style={{ background: copied ? 'var(--nav-success-solid)' : 'var(--nav-accent)', color: copied ? 'var(--nav-success-ink)' : 'var(--nav-accent-ink)' }}>
               {copied ? <CheckIcon /> : <CopyIcon />}
               {copied ? t.copiedLabel : t.copyLinkButton}
             </button>
           </div>
-          <button onClick={shareWhatsApp}
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-white transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+          <button onClick={shareWhatsApp} disabled={!referralCode}
+            className="disabled:opacity-50 w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-white transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
             // Фирменный #25D366 с белым текстом давал контраст 1.98; этот зелёный даёт ~5:1.
             style={{ background: '#0E8043' }}>
             <WhatsAppIcon />

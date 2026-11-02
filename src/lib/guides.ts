@@ -300,7 +300,7 @@ export const GUIDES: Guide[] = [
   },
   {
     slug: 'penya-za-prosrochku',
-    updated: '2026-10-22',
+    updated: '2026-11-02',
     relatedTools: ['schet', 'kontragent'],
     relatedGuides: ['kak-vystavit-schet-ip', 'proverka-kontragenta'],
     ru: {
