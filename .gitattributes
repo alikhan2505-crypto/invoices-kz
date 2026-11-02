@@ -1,0 +1,2 @@
+# Рабочий скрипт pdf.js копируется из node_modules байт в байт (тест сверяет): без перевода строк при checkout.
+public/pdfjs/*.mjs -text
