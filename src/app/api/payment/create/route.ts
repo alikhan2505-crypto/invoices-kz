@@ -6,6 +6,7 @@ import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
 import { checkAndSettlePlanPayment, refundDeadPlanWalletHolds, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
 import { quoteWalletPlanPayment, startPlanPaymentWithWalletHold } from '@/lib/plans/walletPlanPayment'
 import { resolveWalletPart } from '@/lib/plans/planActivation'
+import { isPlanDowngradeBlockedFor } from '@/lib/plans/downgradeGuard'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,6 +68,11 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
       : { data: { user: null } }
     if (!user || user.id !== userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Базовый поверх действующего Про заменил бы Про и сжёг его оплаченные дни.
+    if (await isPlanDowngradeBlockedFor(userId, plan)) {
+      return NextResponse.json({ error: 'downgrade_blocked' }, { status: 409 })
     }
 
     const { count: recentCount, error: rateError } = await supabase

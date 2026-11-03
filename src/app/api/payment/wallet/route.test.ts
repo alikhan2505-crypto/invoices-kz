@@ -70,6 +70,13 @@ describe('POST /api/payment/wallet: pay the whole price from the wallet', () => 
     expect((await POST(post({ plan: 'pro', period: 'annual', expectedAmount: 59900 }))).status).toBe(200)
   })
 
+  it('Basic over an active Pro is refused by the payment function: 409 downgrade_blocked', async () => {
+    vi.mocked(payPlanFullyFromWallet).mockResolvedValueOnce({ ok: false, error: 'downgrade_blocked' })
+    const res = await POST(post({ plan: 'basic', period: 'monthly' }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'downgrade_blocked' })
+  })
+
   it('malformed expectedAmount: 400, nothing charged', async () => {
     for (const expectedAmount of ['5990', 5990.5, true, {}]) {
       const res = await POST(post({ plan: 'pro', period: 'monthly', expectedAmount }))

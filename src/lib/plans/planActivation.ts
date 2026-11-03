@@ -3,7 +3,7 @@
 // (walletPlanPayment.ts). Вынесено из settlePlanPayment.ts без изменения
 // правил, чтобы оплата с кошелька продлевала тариф ровно так же.
 
-import type { BillingPeriod } from './pricing'
+import { PLAN_PRICES, type BillingPeriod } from './pricing'
 import { parseDbTimestamp } from '@/lib/plan'
 
 export interface PlanProfileState {
@@ -23,11 +23,34 @@ export interface PlanActivation {
   bonusConsumed: boolean
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Переход с Базового на Про: оплаченные, но не использованные дни Базового не сгорают, а
+ * пересчитываются в дни Про по отношению цен (Базовый 2 990 ₸ / Про 5 990 ₸ в месяц, то есть
+ * примерно полдня Про за день Базового). Без этого клиент с 25 днями Базового платил за Про
+ * полную цену, а 25 оплаченных дней пропадали (аудит 02.11.2026, п. 1.3). Округляем до целого
+ * дня; в обратную сторону (Про -> Базовый) пересчёта нет: такая покупка запрещена
+ * (downgradeGuard.ts).
+ */
+export function upgradeCreditDays(
+  profile: PlanProfileState | null | undefined,
+  payment: { plan: string },
+  now: Date = new Date(),
+): number {
+  if (profile?.plan !== 'basic' || payment.plan !== 'pro') return 0
+  const expiry = parseUtc(profile.plan_expires_at)
+  if (!expiry || expiry <= now) return 0
+  const remainingDays = (expiry.getTime() - now.getTime()) / DAY_MS
+  return Math.round(remainingDays * PLAN_PRICES.basic.monthly / PLAN_PRICES.pro.monthly)
+}
+
 /**
  * Правила (как и раньше в settlePlanPayment.ts):
  *  - тот же тариф, ещё действующий — продлеваем от текущей даты окончания;
  *    иначе (другой тариф, истёкший, никакого) — от «сейчас»;
  *  - +365 дней за год, +30 за месяц;
+ *  - Базовый -> Про: остаток дней Базового добавляется в дни Про (upgradeCreditDays);
  *  - оставшиеся бонусные дни добавляются один раз и гасятся.
  */
 export function computePlanActivation(
@@ -38,7 +61,7 @@ export function computePlanActivation(
   const currentExpiry = parseUtc(profile?.plan_expires_at)
   const isSamePlanStillActive = profile?.plan === payment.plan && !!currentExpiry && currentExpiry > now
   const expiresAt = isSamePlanStillActive ? new Date(currentExpiry!) : new Date(now)
-  expiresAt.setDate(expiresAt.getDate() + (payment.billing_period === 'annual' ? 365 : 30))
+  expiresAt.setDate(expiresAt.getDate() + (payment.billing_period === 'annual' ? 365 : 30) + upgradeCreditDays(profile, payment, now))
 
   let bonusConsumed = false
   const bonusEnd = parseUtc(profile?.bonus_expires_at)

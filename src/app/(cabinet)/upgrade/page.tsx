@@ -12,6 +12,7 @@ import { miscDict } from '@/lib/i18n/misc'
 import { supportDict } from '@/lib/i18n/support'
 import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
+import { upgradeCreditDays } from '@/lib/plans/planActivation'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 import { useAppDialog } from '@/components/AppDialog'
 import { homeFor } from '@/lib/products'
@@ -246,7 +247,7 @@ export default function Upgrade() {
   const [plan, setPlan] = useState('free')
   // The whole profile row, for the "you already have it" card at the top
   // (Pro end date, is_admin, enabled_products for «В кабинет»).
-  const [profile, setProfile] = useState<{ is_admin?: boolean | null; plan_expires_at?: string | null; enabled_products?: unknown } | null>(null)
+  const [profile, setProfile] = useState<{ is_admin?: boolean | null; plan?: string | null; plan_expires_at?: string | null; enabled_products?: unknown } | null>(null)
   // Set once loadData() finished (with or without a profile) -- gates the
   // pending-plan scroll below.
   const [profileChecked, setProfileChecked] = useState(false)
@@ -903,6 +904,9 @@ export default function Upgrade() {
     : profile?.is_admin ? { kind: 'admin' }
     : { kind: 'pro', until: profile?.plan_expires_at ? formatDateNumeric(profile.plan_expires_at) : null }
 
+  // Клиент с оплаченным Базовым покупает Про: остаток его дней зачтётся (computePlanActivation).
+  const basicCredit = plan === 'basic' ? upgradeCreditDays(profile, { plan: 'pro' }) : 0
+
   // Только когда оплата с кошелька действительно доступна: обещать «оплатить
   // тариф кошельком» до применения миграции нельзя.
   const walletBalance = walletInfo?.available ? Math.max(0, Math.floor(walletInfo.balance)) : 0
@@ -1087,6 +1091,9 @@ export default function Upgrade() {
               </div>
               <FeatureList items={t.proFeatures} />
               <div className="mt-6">
+                {basicCredit > 0 && (
+                  <p className="text-center text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.basicCreditNote(basicCredit)}</p>
+                )}
                 {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" primary />}
                 {plan === 'pro' && (
                   <div>

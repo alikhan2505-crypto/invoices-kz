@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   walletAvailable: true,
   holdResult: { ok: true, paymentRequestId: 'pr1', balance: 0 } as Record<string, unknown>,
   settleResult: 'closed' as string,
+  downgradeBlocked: false,
 }))
 
 vi.mock('@supabase/supabase-js', () => {
@@ -35,6 +36,7 @@ vi.mock('@supabase/supabase-js', () => {
   return { createClient: () => client }
 })
 
+vi.mock('@/lib/plans/downgradeGuard', () => ({ isPlanDowngradeBlockedFor: vi.fn(async () => h.downgradeBlocked) }))
 vi.mock('@/lib/kaspiPay/connection', () => ({ loadPlatformConnection: async () => ({ id: 'conn' }) }))
 vi.mock('@/lib/kaspiPay/client', () => ({
   createPayment: vi.fn(async () => ({ operationId: 'op-1', paymentLink: 'https://pay.kaspi.kz/qr', expiresAt: '2026-10-25T10:05:00.000Z' })),
@@ -82,6 +84,7 @@ beforeEach(() => {
   h.walletAvailable = true
   h.holdResult = { ok: true, paymentRequestId: 'pr1', balance: 0 }
   h.settleResult = 'closed'
+  h.downgradeBlocked = false
   vi.mocked(createPayment).mockClear()
   vi.mocked(checkAndSettlePlanPayment).mockClear()
   vi.mocked(refundDeadPlanWalletHolds).mockClear()
@@ -90,6 +93,18 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 afterEach(() => { vi.restoreAllMocks() })
+
+describe('POST /api/payment/create: Basic over an active Pro', () => {
+  it('is refused with 409 downgrade_blocked before anything is asked of Kaspi or the wallet', async () => {
+    h.downgradeBlocked = true
+    const res = await POST(req({ plan: 'basic', walletAmount: 500 }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'downgrade_blocked' })
+    expect(vi.mocked(createPayment)).not.toHaveBeenCalled()
+    expect(vi.mocked(startPlanPaymentWithWalletHold)).not.toHaveBeenCalled()
+    expect(h.inserts).toHaveLength(0)
+  })
+})
 
 describe('POST /api/payment/create: chosen wallet amount', () => {
   it('splits the price exactly as the user chose: wallet part held, Kaspi asked for the rest', async () => {

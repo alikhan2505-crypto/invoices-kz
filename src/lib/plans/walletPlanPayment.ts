@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getPlanAmount, type BillingPeriod, type PlanKey } from './pricing'
 import { computePlanActivation, splitPlanPayment, walletChoiceBounds, planPaymentNote, type PlanPaymentSplit } from './planActivation'
 import { notifyPlanPaid, releaseUserPlanWalletHolds } from '@/lib/kaspiPay/settlePlanPayment'
+import { isDowngradeBlocked } from './downgradeGuard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -96,7 +97,7 @@ export async function quoteWalletPlanPayment(userId: string, plan: PlanKey, peri
 
 export type WalletPayResult =
   | { ok: true; balance: number; expiresAt: string }
-  | { ok: false; error: 'unavailable' | 'insufficient_funds' | 'account_deleted' | 'busy' | 'already_paid' | 'server_error' }
+  | { ok: false; error: 'unavailable' | 'insufficient_funds' | 'account_deleted' | 'busy' | 'already_paid' | 'downgrade_blocked' | 'server_error' }
 
 function rpcErrorCode(message: string | undefined): string {
   const m = message || ''
@@ -126,6 +127,8 @@ export async function payPlanFullyFromWallet(
     const profile = await loadWalletProfile(user.id)
     if (!profile) return { ok: false, error: 'account_deleted' }
     if (profile.deleted_at) return { ok: false, error: 'account_deleted' }
+    // Базовый поверх действующего Про заменил бы Про и сжёг его оплаченные дни.
+    if (isDowngradeBlocked(profile, plan)) return { ok: false, error: 'downgrade_blocked' }
     const split = splitPlanPayment(price, profile.kaspi_wallet_balance)
     if (split.mode !== 'wallet_full') return { ok: false, error: 'insufficient_funds' }
 

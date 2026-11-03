@@ -5,6 +5,7 @@ import { createInvoiceByPhone } from '@/lib/kaspiPay/client'
 import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
 import { checkAndSettlePlanPayment, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
 import { claimPhonePushSlots } from '@/lib/kaspiPay/phonePushLimits'
+import { isPlanDowngradeBlockedFor } from '@/lib/plans/downgradeGuard'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,6 +39,11 @@ export async function POST(req: NextRequest) {
       : { data: { user: null } }
     if (!user || user.id !== userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Базовый поверх действующего Про заменил бы Про и сжёг его оплаченные дни.
+    if (await isPlanDowngradeBlockedFor(userId, plan)) {
+      return NextResponse.json({ error: 'downgrade_blocked' }, { status: 409 })
     }
 
     const { count: recentCount, error: rateError } = await supabase

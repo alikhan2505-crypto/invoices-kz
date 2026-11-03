@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computePlanActivation, splitPlanPayment, MIN_KASPI_REMAINDER_TENGE, planPaymentNote } from './planActivation'
+import { computePlanActivation, upgradeCreditDays, splitPlanPayment, MIN_KASPI_REMAINDER_TENGE, planPaymentNote } from './planActivation'
 
 const DAY = 24 * 60 * 60 * 1000
 const now = new Date('2026-10-15T10:00:00.000Z')
@@ -23,7 +23,8 @@ describe('computePlanActivation', () => {
   })
 
   it('does not stack on a different or expired plan', () => {
-    const other = computePlanActivation({ plan: 'basic', plan_expires_at: '2026-10-27T10:00:00' }, { plan: 'pro', billing_period: 'monthly' }, now)
+    // Про после Базового считается от «сейчас» плюс зачёт остатка Базового (отдельный тест ниже).
+    const other = computePlanActivation({ plan: 'free', plan_expires_at: '2026-10-27T10:00:00' }, { plan: 'pro', billing_period: 'monthly' }, now)
     expect(Math.round((other.expiresAt.getTime() - now.getTime()) / DAY)).toBe(30)
     const expired = computePlanActivation({ plan: 'pro', plan_expires_at: '2026-10-01T10:00:00' }, { plan: 'pro', billing_period: 'monthly' }, now)
     expect(Math.round((expired.expiresAt.getTime() - now.getTime()) / DAY)).toBe(30)
@@ -80,5 +81,39 @@ describe('planPaymentNote', () => {
   it('names the plan and period', () => {
     expect(planPaymentNote('pro', 'annual')).toBe('Оплата тарифа Про (год)')
     expect(planPaymentNote('basic', 'monthly')).toBe('Оплата тарифа Базовый (месяц)')
+  })
+})
+
+describe('upgradeCreditDays / Базовый -> Про (аудит 02.11.2026, п. 1.3)', () => {
+  const basicLeft = (days: number) => ({ plan: 'basic', plan_expires_at: new Date(now.getTime() + days * DAY).toISOString().slice(0, 19) })
+
+  it('turns the unused Basic days into Pro days by the price ratio (about half)', () => {
+    expect(upgradeCreditDays(basicLeft(25), { plan: 'pro' }, now)).toBe(12)
+    expect(upgradeCreditDays(basicLeft(12), { plan: 'pro' }, now)).toBe(6)
+    expect(upgradeCreditDays(basicLeft(1), { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays(basicLeft(300), { plan: 'pro' }, now)).toBe(150)
+  })
+
+  it('adds the credit on top of the bought period, counted from now', () => {
+    const month = computePlanActivation(basicLeft(25), { plan: 'pro', billing_period: 'monthly' }, now)
+    expect(Math.round((month.expiresAt.getTime() - now.getTime()) / DAY)).toBe(30 + 12)
+    const year = computePlanActivation(basicLeft(200), { plan: 'pro', billing_period: 'annual' }, now)
+    expect(Math.round((year.expiresAt.getTime() - now.getTime()) / DAY)).toBe(365 + 100)
+  })
+
+  it('gives no credit outside Basic -> Pro: expired Basic, same plan, Pro -> anything, free, no profile', () => {
+    expect(upgradeCreditDays(basicLeft(-3), { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays({ plan: 'basic', plan_expires_at: null }, { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays(basicLeft(25), { plan: 'basic' }, now)).toBe(0)
+    expect(upgradeCreditDays({ plan: 'pro', plan_expires_at: basicLeft(25).plan_expires_at }, { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays({ plan: 'free', plan_expires_at: basicLeft(25).plan_expires_at }, { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays(null, { plan: 'pro' }, now)).toBe(0)
+    expect(upgradeCreditDays(undefined, { plan: 'pro' }, now)).toBe(0)
+  })
+
+  it('stacks with the remaining bonus days', () => {
+    const r = computePlanActivation({ ...basicLeft(20), bonus_expires_at: '2026-10-20T10:00:00' }, { plan: 'pro', billing_period: 'monthly' }, now)
+    expect(Math.round((r.expiresAt.getTime() - now.getTime()) / DAY)).toBe(30 + 10 + 5)
+    expect(r.bonusConsumed).toBe(true)
   })
 })

@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const result = await payPlanFullyFromWallet(user, parsed.plan, parsed.period)
     if (result.ok) return NextResponse.json(result)
     const status = result.error === 'unavailable' ? 503
-      : result.error === 'insufficient_funds' || result.error === 'busy' || result.error === 'already_paid' ? 409
+      : result.error === 'insufficient_funds' || result.error === 'busy' || result.error === 'already_paid' || result.error === 'downgrade_blocked' ? 409
       : result.error === 'account_deleted' ? 403
       : 500
     return NextResponse.json({ error: result.error }, { status })

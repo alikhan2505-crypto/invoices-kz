@@ -41,6 +41,8 @@ export interface MiscContent {
   proPlanName: string
   maxBadge: string
   proFeatures: string[]
+  /** Под кнопкой Про у клиента с действующим Базовым: остаток дней Базового зачтётся (п. 1.3 аудита 02.11.2026). */
+  basicCreditNote: (days: number) => string
   activeLabel: string
   higherPlanNotice: string
   renewButtonLabel: (period: 'monthly' | 'annual') => string
@@ -186,6 +188,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     proPlanName: 'Про',
     maxBadge: 'Максимум',
     proFeatures: ['Безлимитные счета', 'КП, АВР и накладные', 'Шаблоны и повторяющиеся счета', 'ЭЦП и договоры', 'Сверка оплат по выписке', 'ЭСФ — скоро', 'Kaspi Bot — весь кабинет магазина', 'AI-агент для клиентов', 'Приоритетная поддержка'],
+    basicCreditNote: (days: number) => `Остаток Базового зачтётся: +${days} дн. к Про`,
     activeLabel: '✓ Активен',
     higherPlanNotice: 'У вас более высокий тариф',
     renewButtonLabel: (period) => period === 'annual' ? 'Продлить на год' : 'Продлить на месяц',
@@ -327,6 +330,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     proPlanName: 'Про',
     maxBadge: 'Максимум',
     proFeatures: ['Шексіз шоттар', 'КҰ, ОЖА және жүкқұжаттар', 'Үлгілер мен қайталанатын шоттар', 'ЭЦҚ және шарттар', 'Төлемдерді банк үзінді көшірмесімен салыстыру', 'ЭШФ — жақында', 'Kaspi Bot — дүкеннің бүкіл кабинеті', 'Клиенттерге арналған AI-агент', 'Басым қолдау'],
+    basicCreditNote: (days: number) => `Базалық тарифтің қалдығы есепке алынады: Про-ға +${days} күн`,
     activeLabel: '✓ Белсенді',
     higherPlanNotice: 'Сізде жоғарырақ тариф бар',
     renewButtonLabel: (period) => period === 'annual' ? 'Бір жылға ұзарту' : 'Бір айға ұзарту',
@@ -468,6 +472,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     proPlanName: 'Pro',
     maxBadge: 'Maximum',
     proFeatures: ['Unlimited invoices', 'Quotes, acts & delivery notes', 'Templates & recurring invoices', 'E-signature & contracts', 'Bank statement matching', 'E-invoices (ESF) — soon', 'Kaspi Bot — the whole shop dashboard', 'AI agent for customers', 'Priority support'],
+    basicCreditNote: (days: number) => `Your remaining Basic days carry over: +${days} days of Pro`,
     activeLabel: '✓ Active',
     higherPlanNotice: 'You already have a higher plan',
     renewButtonLabel: (period) => period === 'annual' ? 'Extend by a year' : 'Extend by a month',
