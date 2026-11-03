@@ -8,15 +8,22 @@
 // released within 5000ms»).
 //
 // Здесь одновременные вызовы без аргумента сливаются в один запрос, а успешный
-// ответ живёт короткое время и сбрасывается любым событием входа/выхода/
-// обновления. Вызов с готовым токеном (getUser(jwt)) идёт как раньше. Ответ
-// по-прежнему приходит от сервера, просто один раз вместо шести.
+// ответ живёт короткое время. Сбрасывают его события, после которых пользователь
+// мог измениться: выход, смена данных, вход другого человека. Начальная загрузка
+// сессии, обновление токена и вход того же пользователя (supabase шлёт SIGNED_IN
+// при старте страницы и при возврате на вкладку) ответ не меняют, и сбрасывать из-за
+// них нельзя: на замере /dashboard такое событие во время первого запроса запускало
+// второй. Вызов с готовым токеном
+// (getUser(jwt)) идёт как раньше. Ответ по-прежнему приходит от сервера, просто
+// один раз вместо шести.
 
 export const GET_USER_CACHE_MS = 20_000
 
+interface SessionLike { user?: { id?: string } | null }
+
 interface AuthLike<R> {
   getUser: (jwt?: string) => Promise<R>
-  onAuthStateChange: (callback: () => void) => unknown
+  onAuthStateChange: (callback: (event: string, session: SessionLike | null) => void) => unknown
 }
 
 interface Options {
@@ -32,6 +39,9 @@ export function coalesceGetUser<R extends { error: unknown; data: { user: unknow
   const original = auth.getUser.bind(auth)
   let inflight: Promise<R> | null = null
   let cached: { at: number; value: R } | null = null
+  const userIdOf = (res: R | null | undefined) => (res?.data.user as { id?: string } | null)?.id
+  // Кто сейчас вошёл по последнему событию сессии (null - никто / ещё не знаем).
+  let sessionUserId: string | null = null
   // Событие может прийти, пока запрос в полёте: его ответ уже устарел.
   let generation = 0
 
@@ -42,7 +52,9 @@ export function coalesceGetUser<R extends { error: unknown; data: { user: unknow
     const startedIn = generation
     const request = original().then(
       res => {
-        if (!res.error && res.data.user && startedIn === generation) cached = { at: now(), value: res }
+        // Ответ принадлежит тому, кто вошёл сейчас (иначе пришёл от прошлой сессии).
+        const current = !sessionUserId || userIdOf(res) === sessionUserId
+        if (!res.error && res.data.user && startedIn === generation && current) cached = { at: now(), value: res }
         return res
       },
     ).finally(() => {
@@ -54,9 +66,21 @@ export function coalesceGetUser<R extends { error: unknown; data: { user: unknow
 
   // Колбэк только сбрасывает кэш: вызывать здесь supabase нельзя (событие
   // приходит изнутри блокировки сессии, это был бы взаимный затор).
-  auth.onAuthStateChange(() => {
+  const reset = () => {
     generation++
     cached = null
     inflight = null
+  }
+  auth.onAuthStateChange((event, session) => {
+    const previous = sessionUserId
+    if (event !== 'SIGNED_OUT') sessionUserId = session?.user?.id ?? sessionUserId
+    if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
+    if (event === 'SIGNED_IN') {
+      // Тот же человек (старт страницы, возврат на вкладку): ничего не меняется.
+      const sameUser = (!previous || previous === sessionUserId) && (!cached || userIdOf(cached.value) === sessionUserId)
+      if (sameUser) return
+    }
+    if (event === 'SIGNED_OUT') sessionUserId = null
+    reset()
   })
 }
