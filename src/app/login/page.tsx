@@ -251,6 +251,9 @@ export default function Login() {
   if (checkingSession) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4" aria-busy="true">
+        {/* checkingSession начинается с true и на сервере: без этого заголовка в исходном
+            HTML страницы входа не было ни одного h1 (аудит 02.11.2026). Виден только читалкам. */}
+        <h1 className="sr-only">INVOICES.KZ</h1>
         <div className="w-8 h-8 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin" />
         {dialogElement}
       </main>

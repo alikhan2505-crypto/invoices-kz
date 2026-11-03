@@ -250,6 +250,9 @@ export default function Upgrade() {
   // pending-plan scroll below.
   const [profileChecked, setProfileChecked] = useState(false)
   const [pendingScrollPlan, setPendingScrollPlan] = useState<string | null>(null)
+  // Пока профиль не загружен, 'free' в plan - просто начальное значение, а не правда:
+  // Про-админ секунду видел «Бесплатно · Текущий». Отметки «Текущий» ставим по этому полю.
+  const shownPlan = profileChecked ? plan : ''
   const [userId, setUserId] = useState('')
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
   const [showModal, setShowModal] = useState(false)
@@ -1048,20 +1051,20 @@ export default function Upgrade() {
           {/* Plans: stacked on a phone, one equal-height row from lg up. */}
           <div className="grid gap-4 lg:grid-cols-3 lg:gap-5 items-stretch mb-6 lg:max-w-[1400px] lg:mx-auto">
             {/* Free */}
-            <PlanCard tone="free" current={plan === 'free'} index={0} reduceMotion={!!reduceMotion}>
+            <PlanCard tone="free" current={shownPlan === 'free'} index={0} reduceMotion={!!reduceMotion}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.freePlanName}</h3>
-                {plan === 'free' && <PlanBadge solid>{t.currentBadge}</PlanBadge>}
+                {shownPlan === 'free' && <PlanBadge solid>{t.currentBadge}</PlanBadge>}
               </div>
               <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>0 ₸</div>
               <FeatureList items={t.freeFeatures} />
             </PlanCard>
 
             {/* Basic */}
-            <PlanCard id="plan-basic" tone="basic" current={plan === 'basic'} index={1} reduceMotion={!!reduceMotion}>
+            <PlanCard id="plan-basic" tone="basic" current={shownPlan === 'basic'} index={1} reduceMotion={!!reduceMotion}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.basicPlanName}</h3>
-                {plan === 'basic'
+                {shownPlan === 'basic'
                   ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
                   : <PlanBadge>{t.popularBadge}</PlanBadge>}
               </div>
@@ -1082,10 +1085,10 @@ export default function Upgrade() {
             </PlanCard>
 
             {/* Pro */}
-            <PlanCard id="plan-pro" tone="pro" current={plan === 'pro'} index={2} reduceMotion={!!reduceMotion}>
+            <PlanCard id="plan-pro" tone="pro" current={shownPlan === 'pro'} index={2} reduceMotion={!!reduceMotion}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.proPlanName}</h3>
-                {plan === 'pro'
+                {shownPlan === 'pro'
                   ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
                   : <PlanBadge>{t.maxBadge}</PlanBadge>}
               </div>
