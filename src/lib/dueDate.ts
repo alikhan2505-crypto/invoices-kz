@@ -8,8 +8,13 @@ export function addDaysToDateString(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10)
+// Казахстан без перехода на летнее время: сутки по Алматы (UTC+5). Раньше возвращалась дата по UTC,
+// и с 00:00 до 05:00 по Алматы «сегодня» было вчерашним числом (срок оплаты по умолчанию и дата счёта
+// на день меньше, аудит 02.11.2026).
+const ALMATY_OFFSET_MS = 5 * 60 * 60 * 1000
+
+export function todayDateString(now: Date = new Date()): string {
+  return new Date(now.getTime() + ALMATY_OFFSET_MS).toISOString().slice(0, 10)
 }
 
 // defaultDueDaysRaw comes from profiles.default_due_days, stored as text.

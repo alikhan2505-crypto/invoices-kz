@@ -23,6 +23,17 @@ describe('todayDateString', () => {
   it('returns a YYYY-MM-DD string', () => {
     expect(todayDateString()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
+
+  it('день считается по Алматы: ночью с 00:00 до 05:00 это уже следующее число по UTC', () => {
+    expect(todayDateString(new Date('2026-11-03T18:59:59Z'))).toBe('2026-11-03') // 23:59:59 в Алматы
+    expect(todayDateString(new Date('2026-11-03T19:00:00Z'))).toBe('2026-11-04') // 00:00 в Алматы
+    expect(todayDateString(new Date('2026-11-04T04:59:00Z'))).toBe('2026-11-04') // 09:59 в Алматы
+  })
+
+  it('граница года и месяца', () => {
+    expect(todayDateString(new Date('2026-12-31T19:30:00Z'))).toBe('2027-01-01')
+    expect(todayDateString(new Date('2026-02-28T20:00:00Z'))).toBe('2026-03-01')
+  })
 })
 
 describe('computeDefaultDueDate', () => {
