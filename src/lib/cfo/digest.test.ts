@@ -55,7 +55,7 @@ describe('buildDigest', () => {
 describe('buildDigest with invoices.kz', () => {
   it('counts expected invoices as today receipts and reports overdue receivables', () => {
     const w = { ...ws([]), countInvoices: true, invoices: [
-      { id: 'a', number: '15', amount: 7_000_00, status: 'draft', dueDate: '2026-10-08', createdOn: '2026-10-01', paidOn: null, clientName: 'ТОО Альфа' },
+      { id: 'a', number: '15', amount: 7_000_00, status: 'sent', dueDate: '2026-10-08', createdOn: '2026-10-01', paidOn: null, clientName: 'ТОО Альфа' },
       { id: 'b', number: '9', amount: 3_000_00, status: 'overdue', dueDate: '2026-10-01', createdOn: '2026-09-20', paidOn: null, clientName: 'ТОО Бета' },
     ] }
     const text = buildDigest(w, '2026-10-08')

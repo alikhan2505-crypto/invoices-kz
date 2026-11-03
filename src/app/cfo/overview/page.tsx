@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { accountBalanceAt, cashAccounts, loanAccounts } from '@/lib/cfo/balances'
-import { buildDashboard } from '@/lib/cfo/dashboard'
+import { buildDashboard, runwayLabel } from '@/lib/cfo/dashboard'
 import { daysInMonth, monthKey, todayIso } from '@/lib/cfo/dates'
 import { forecastOperations } from '@/lib/cfo/invoiceLink'
 import { dayLabel, monthTitle, opTitle, plural, shortMonth } from '@/lib/cfo/labels'
@@ -95,7 +95,7 @@ export default function CfoOverview() {
         <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || (family ? 'на всех картах и наличными' : 'на всех счетах и в кассах')} tone={d.cashNow < 0 ? 'bad' : undefined} />
         <Kpi
           label="Запас денег"
-          value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${formatNumber(d.runwayDays)} дн.`}
+          value={runwayLabel(d.runwayDays, d.cashNow, formatNumber)}
           sub={d.runwayDays === null ? `нет выплат за ${d.runwayWindowDays} дн.` : `без новых поступлений, по средним выплатам за ${d.runwayWindowDays} ${plural(d.runwayWindowDays, 'день', 'дня', 'дней')}`}
           tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined}
         />

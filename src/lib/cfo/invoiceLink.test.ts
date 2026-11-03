@@ -11,7 +11,7 @@ const articles: CfoArticle[] = [
   { id: 'other', name: 'Прочие доходы', kind: 'income', activity: 'operating', pnlGroup: 'finance', archived: false, sort: 5 },
   { id: 'rev', name: 'Выручка от услуг', kind: 'income', activity: 'operating', pnlGroup: 'revenue', archived: false, sort: 10 },
 ]
-const inv = (p: Partial<InvoiceLite>): InvoiceLite => ({ id: 'i', number: '1', amount: 100_00, status: 'draft', dueDate: null, createdOn: '2026-10-01', paidOn: null, clientName: 'ТОО Ромашка', ...p })
+const inv = (p: Partial<InvoiceLite>): InvoiceLite => ({ id: 'i', number: '1', amount: 100_00, status: 'sent', dueDate: null, createdOn: '2026-10-01', paidOn: null, clientName: 'ТОО Ромашка', ...p })
 const ws = (invoices: InvoiceLite[], operations: CfoOperation[] = [], countInvoices = true): Workspace => ({
   userId: 'u', companyId: 'c', companyName: 'X', telegramDigest: false, countInvoices, invoices, accounts, articles, operations, recurrences: [], plan: [],
 })
@@ -43,5 +43,23 @@ describe('overdueReceivables / unpostedPaid / forecastOperations', () => {
     const w = (on: boolean) => ws([inv({ dueDate: '2026-10-20' })], [], on)
     expect(forecastOperations(w(true), '2026-10-07')).toHaveLength(1)
     expect(forecastOperations(w(false), '2026-10-07')).toHaveLength(0)
+  })
+})
+
+describe('черновики не считаются ожидаемой оплатой и просрочкой', () => {
+  it('черновик не попадает ни в прогноз, ни в «Не оплачены в срок», отправленный - попадает', () => {
+    const list = ws([
+      inv({ id: 'd-old', status: 'draft', dueDate: '2026-09-01' }),
+      inv({ id: 'd-new', status: 'draft', dueDate: '2026-10-20' }),
+      inv({ id: 's-old', status: 'sent', dueDate: '2026-09-01' }),
+      inv({ id: 's-new', status: 'sent', dueDate: '2026-10-20' }),
+    ])
+    expect(overdueReceivables(list, '2026-10-07').map((i) => i.id)).toEqual(['s-old'])
+    expect(expectedInflows(list, '2026-10-07').map((o) => o.id)).toEqual(['inv:s-new'])
+  })
+
+  it('просмотренный и помеченный просроченным остаются неоплаченными', () => {
+    const list = ws([inv({ id: 'v', status: 'viewed', dueDate: '2026-09-01' }), inv({ id: 'o', status: 'overdue', dueDate: '2026-09-02' })])
+    expect(overdueReceivables(list, '2026-10-07').map((i) => i.id)).toEqual(['v', 'o'])
   })
 })

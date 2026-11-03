@@ -35,6 +35,17 @@ function daysBetween(from: string, to: string): number {
 // Сколько дней покрывают данные: от самого раннего начала учёта по счёту или
 // самой ранней фактической операции до сегодня включительно, не больше окна.
 // На 17 днях учёта делить расходы на 90 дней нельзя — запас выходил в 5 раз больше.
+/** Запас дольше этого срока показываем как «больше года»: «123 249 дн.» (337 лет) ничего не говорит. */
+export const RUNWAY_CAP_DAYS = 365
+
+/** Подпись для плитки «Запас денег»: «—», «нет денег», «больше года» или число дней. */
+export function runwayLabel(runwayDays: number | null, cashNow: number, formatDays: (n: number) => string = String): string {
+  if (runwayDays === null) return '—'
+  if (cashNow <= 0) return 'нет денег'
+  if (runwayDays > RUNWAY_CAP_DAYS) return 'больше года'
+  return `${formatDays(runwayDays)} дн.`
+}
+
 export function runwayWindow(accounts: Pick<CfoAccount, 'openingDate'>[], actual: Pick<CfoOperation, 'paidOn'>[], today: string): number {
   const starts = [...accounts.map((a) => a.openingDate), ...actual.map((o) => o.paidOn)].filter((d) => d <= today)
   if (starts.length === 0) return 1

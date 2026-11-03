@@ -7,7 +7,9 @@ import type { CfoOperation, InvoiceLite } from './types'
 
 // Счёт без срока оплаты ждём через неделю после выставления.
 export const DAYS_WITHOUT_DUE_DATE = 7
-const UNPAID = new Set(['draft', 'sent', 'viewed', 'overdue'])
+// Черновик клиенту не выставлен: это не долг и не ожидаемая оплата, ни в прогнозе, ни в «Не оплачены в срок»
+// (в аудите 02.11.2026 в просрочке висели черновики, которые так и не отправили).
+const UNPAID = new Set(['sent', 'viewed', 'overdue'])
 
 export const isInvoiceVirtual = (op: Pick<CfoOperation, 'id'>) => op.id.startsWith('inv:')
 export const invoiceIdOf = (op: Pick<CfoOperation, 'id'>) => op.id.slice(4)

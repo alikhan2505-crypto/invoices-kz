@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDashboard } from './dashboard'
+import { buildDashboard, runwayLabel, RUNWAY_CAP_DAYS } from './dashboard'
 import type { CfoAccount, CfoArticle, CfoOperation, CfoPlanItem } from './types'
 
 const t = (tenge: number) => tenge * 100
@@ -152,5 +152,25 @@ describe('buildDashboard', () => {
     const upcoming18 = result.upcoming.find((o) => o.paidOn === '2026-03-18')
     expect(upcoming18).toBeDefined()
     expect(upcoming18?.id).toBe('rec:r1:2026-03-18')
+  })
+})
+
+describe('runwayLabel: плитка «Запас денег»', () => {
+  it('нет выплат - тире; нет денег - «нет денег» (раньше нуля и отрицательного баланса)', () => {
+    expect(runwayLabel(null, 500_000)).toBe('—')
+    expect(runwayLabel(0, 0)).toBe('нет денег')
+    expect(runwayLabel(0, -10)).toBe('нет денег')
+  })
+
+  it('до года - число дней, дальше - «больше года» (123 249 дней = 337 лет не показываем)', () => {
+    expect(runwayLabel(49, 1_000_000)).toBe('49 дн.')
+    expect(runwayLabel(RUNWAY_CAP_DAYS, 1_000_000)).toBe('365 дн.')
+    expect(runwayLabel(RUNWAY_CAP_DAYS + 1, 1_000_000)).toBe('больше года')
+    expect(runwayLabel(123_249, 1_000_000)).toBe('больше года')
+  })
+
+  it('число форматируется переданной функцией (разряды)', () => {
+    expect(runwayLabel(1234, 1, () => '1 234')).toBe('больше года')
+    expect(runwayLabel(300, 1, n => `#${n}`)).toBe('#300 дн.')
   })
 })
