@@ -21,6 +21,7 @@ import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import type { ToolEventMedium } from '@/lib/toolEvents/schema'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinWatchButton from '@/components/BinWatchButton'
+import { binWatchDict } from '@/lib/i18n/binWatch'
 import TelegramBotCta from '@/components/TelegramBotCta'
 import PersonCheckPanel from '@/components/PersonCheckPanel'
 import { usePersonCheckAccess } from '@/components/usePersonCheckAccess'
@@ -243,7 +244,10 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
             <input
               id="bin"
               inputMode="numeric"
+              pattern="[0-9]*"
               autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder={t.binPlaceholder}
               value={bin}
               onChange={e => setBin(normalizeBin(e.target.value).slice(0, 12))}
@@ -355,6 +359,23 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                       {t.kgdNote}
                     </div>
                   )}
+                  {/* Блок «Следить за этим БИН» стоит в самом низу длинного результата (на телефоне около
+                      половины страницы), его почти никто не доскролливал: 0 нажатий за 10 дней при 19 проверивших.
+                      Ссылка сверху показывает обещание сразу и прокручивает к блоку. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const block = document.querySelector<HTMLElement>('[data-bin-watch]')
+                      if (!block) return
+                      const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                      block.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' })
+                      block.querySelector<HTMLElement>('input')?.focus({ preventScroll: true })
+                    }}
+                    className="text-[13px] font-semibold text-left mt-2 min-h-11 pr-2"
+                    style={{ color: 'var(--nav-accent)', touchAction: 'manipulation' }}
+                  >
+                    {binWatchDict[lang].cardTitle} ↓
+                  </button>
                 </div>
 
                 <div className="divide-y" style={{ borderColor: 'var(--nav-border)' }}>
