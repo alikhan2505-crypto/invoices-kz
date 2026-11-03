@@ -22,6 +22,19 @@ export interface AuthContent {
   checkEmailTitle: string
   undeliverableEmailAlert: string
   spamHint: string
+  /** «Открыть Gmail» на экране «проверьте почту» (03.11.2026). */
+  openMailButton: (provider: string) => string
+  /** Подсказка про опечатку в адресе до отправки письма. */
+  didYouMean: (fixed: string) => string
+  useFixButton: string
+  keepMineButton: string
+  /** Вход по коду из письма (включается LOGIN_CODE_ENABLED в src/app/login/page.tsx). */
+  codeLabel: string
+  codePlaceholder: string
+  codeButton: string
+  codeChecking: string
+  codeInvalid: string
+  codeHint: string
   resendLinkButton: string
   resentNote: string
   linkSentPrefix: string
@@ -97,6 +110,16 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     checkEmailTitle: 'Проверьте почту!',
     undeliverableEmailAlert: 'На этот адрес письма не доставляются — почтовый сервис отклонил их. Проверьте, нет ли опечатки в адресе, или войдите с другого.',
     spamHint: 'Письмо приходит за минуту. Если его нет — загляните в «Спам».',
+    openMailButton: (provider) => `Открыть ${provider}`,
+    didYouMean: (fixed) => `Проверьте адрес: возможно, вы имели в виду ${fixed}`,
+    useFixButton: 'Да, исправить',
+    keepMineButton: 'Нет, отправить так',
+    codeLabel: 'Код из письма',
+    codePlaceholder: '000000',
+    codeButton: 'Войти по коду',
+    codeChecking: 'Проверяем',
+    codeInvalid: 'Код не подошёл или устарел. Проверьте цифры или запросите письмо ещё раз.',
+    codeHint: 'Письмо открылось в другом приложении? Введите код из него здесь.',
     resendLinkButton: 'Отправить ещё раз',
     resentNote: 'Отправили повторно',
     linkSentPrefix: 'Мы отправили ссылку для входа на',
@@ -170,6 +193,16 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     checkEmailTitle: 'Поштаңызды тексеріңіз!',
     undeliverableEmailAlert: 'Бұл мекенжайға хаттар жеткізілмейді — пошта қызметі оларды қабылдамады. Мекенжайда қате жоқ па, тексеріңіз немесе басқасымен кіріңіз.',
     spamHint: 'Хат бір минутта келеді. Келмесе — «Спам» бумасын қараңыз.',
+    openMailButton: (provider) => `${provider} ашу`,
+    didYouMean: (fixed) => `Мекенжайды тексеріңіз: мүмкін, ${fixed} дегенді білдірген шығарсыз`,
+    useFixButton: 'Иә, түзету',
+    keepMineButton: 'Жоқ, солай жіберу',
+    codeLabel: 'Хаттағы код',
+    codePlaceholder: '000000',
+    codeButton: 'Кодпен кіру',
+    codeChecking: 'Тексерілуде',
+    codeInvalid: 'Код сәйкес келмеді немесе ескірді. Сандарды тексеріңіз немесе хатты қайта сұраңыз.',
+    codeHint: 'Хат басқа қолданбада ашылды ма? Хаттағы кодты осы жерге енгізіңіз.',
     resendLinkButton: 'Қайта жіберу',
     resentNote: 'Қайта жіберілді',
     linkSentPrefix: 'Кіру сілтемесін мына поштаға жібердік:',
@@ -244,6 +277,16 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     checkEmailTitle: 'Check your inbox!',
     undeliverableEmailAlert: 'Mail to this address is not being delivered — the provider rejected it. Check the address for a typo, or sign in with another one.',
     spamHint: 'The letter arrives within a minute. If it has not, check your spam folder.',
+    openMailButton: (provider) => `Open ${provider}`,
+    didYouMean: (fixed) => `Check the address: did you mean ${fixed}?`,
+    useFixButton: 'Yes, fix it',
+    keepMineButton: 'No, send as typed',
+    codeLabel: 'Code from the email',
+    codePlaceholder: '000000',
+    codeButton: 'Sign in with the code',
+    codeChecking: 'Checking',
+    codeInvalid: 'The code did not match or has expired. Check the digits or request the email again.',
+    codeHint: 'Did the email open in another app? Enter the code from it here.',
     resendLinkButton: 'Send it again',
     resentNote: 'Sent again',
     linkSentPrefix: 'We sent a sign-in link to:',
