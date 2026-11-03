@@ -73,6 +73,8 @@ export interface ProfileCoreContent {
 
   // requisites page (requisites/page.tsx)
   requisitesHeaderLabel: string
+  /** Над формой реквизитов: поля подставлены из бесплатного инструмента, человек проверяет и сохраняет сам. */
+  toolRequisitesNote: string
   companyNameFieldLabel: string
   requisitesMissingAlert: (missing: string) => string
   profileNotSavedMessage: string
@@ -242,6 +244,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountAdminRefusal: 'Аккаунт администратора удалить нельзя.',
 
     requisitesHeaderLabel: 'Реквизиты компании',
+    toolRequisitesNote: 'Подставили ваши реквизиты из бесплатного инструмента (они хранились только в этом браузере). Проверьте и сохраните.',
     companyNameFieldLabel: 'Название компании / ИП *',
     companyNamePlaceholder: 'ИП Смагулов А.К.',
     binIinFieldLabel: 'БИН / ИИН *',
@@ -395,6 +398,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountAdminRefusal: 'Әкімші аккаунтын жоюға болмайды.',
 
     requisitesHeaderLabel: 'Компания деректемелері',
+    toolRequisitesNote: 'Деректемелеріңізді тегін құралдан қостық (олар тек осы браузерде сақталған). Тексеріп, сақтаңыз.',
     companyNameFieldLabel: 'Компания / ЖК атауы *',
     companyNamePlaceholder: 'ЖК Смағұлов А.Қ.',
     binIinFieldLabel: 'БСН / ЖСН *',
@@ -548,6 +552,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountAdminRefusal: 'An administrator account cannot be deleted.',
 
     requisitesHeaderLabel: 'Company details',
+    toolRequisitesNote: 'We filled in your details from the free tool (they were stored only in this browser). Check them and save.',
     companyNameFieldLabel: 'Company / sole proprietor name *',
     companyNamePlaceholder: 'Sole Proprietor Smagulov A.K.',
     binIinFieldLabel: 'BIN / IIN *',

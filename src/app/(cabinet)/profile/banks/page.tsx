@@ -18,6 +18,8 @@ import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { autoKbe, needsManualKbe, suggestKbe } from '@/lib/kbe'
+import { loadRequisites } from '@/lib/tools-i18n/requisites'
+import { bankFromToolRequisites, type ToolBankAccount } from '@/lib/tools-i18n/requisitesHandoff'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -96,6 +98,9 @@ export default function Banks() {
   // трогает. Сохранённый КБе автоматически не меняется никогда.
   const [kbeManual, setKbeManual] = useState(false)
   const kbeSuggestion = suggestKbe(kbeSource)
+  // Счёт, который человек уже вписывал в бесплатный инструмент (03.11.2026, requisitesHandoff.ts).
+  // Предлагаем его только пока в кабинете нет ни одного счёта; добавляет человек сам.
+  const [toolBank, setToolBank] = useState<ToolBankAccount | null>(null)
 
   // Новый счёт: пока поле не тронуто, КБе следует за профилем (профиль может
   // дозагрузиться уже после открытия формы).
@@ -145,6 +150,7 @@ export default function Banks() {
       supabase.from('profiles').select('company_name, bin_iin').eq('id', user.id).maybeSingle(),
     ])
     setAccounts(data || [])
+    setToolBank((data || []).length === 0 ? bankFromToolRequisites(loadRequisites()) : null)
     const name = prof?.company_name || ''
     const bin = prof?.bin_iin || ''
     setKbeSource(prev => (prev.name === name && prev.bin === bin ? prev : { name, bin }))
@@ -160,6 +166,17 @@ export default function Banks() {
     // selected; the rest open in manual mode so nothing the user already
     // saved is silently blanked by the new control.
     setManualBank(!findBankByBik(acc.bik) && !findBankByName(acc.bank_name))
+    setShowForm(true)
+  }
+
+  function applyToolBank() {
+    if (!toolBank) return
+    setEditingId(null)
+    // КБе из инструмента есть только если его правили руками; иначе он следует за профилем (ТОО 17, ИП 19).
+    setKbeManual(!!toolBank.kbe)
+    setForm({ bank_name: toolBank.bank_name, iik: toolBank.iik, bik: toolBank.bik, kbe: toolBank.kbe || '19', currency: 'KZT' })
+    setManualBank(!findBankByBik(toolBank.bik) && !findBankByName(toolBank.bank_name))
+    setIikTouched(false)
     setShowForm(true)
   }
 
@@ -235,6 +252,20 @@ export default function Banks() {
                   {t.returnToInvoiceButton}
                 </button>
               )}
+            </div>
+          )}
+
+          {!loading && toolBank && accounts.length === 0 && !showForm && (
+            <div className="mb-4 rounded-xl p-3 flex items-center gap-3" style={{ background: 'var(--nav-accent-soft)' }}>
+              <div className="flex-1 min-w-0 text-xs" style={{ color: 'var(--nav-text-primary)' }}>
+                <div className="font-semibold">{t.bankFromToolTitle}</div>
+                <div className="mt-0.5 truncate" style={{ color: 'var(--nav-text-secondary)' }}>{toolBank.bank_name}, {toolBank.iik}</div>
+              </div>
+              <button type="button" onClick={applyToolBank}
+                className="text-xs font-semibold px-3 min-h-[44px] rounded-lg flex-shrink-0"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {t.bankFromToolAdd}
+              </button>
             </div>
           )}
 

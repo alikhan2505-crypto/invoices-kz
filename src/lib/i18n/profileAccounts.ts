@@ -10,6 +10,9 @@ export interface ProfileAccountsContent {
   // banks page (banks/page.tsx)
   banksHeaderLabel: string
   noAccountsLabel: string
+  /** Подсказка на пустой странице счетов: счёт, который человек уже вписывал в бесплатный инструмент. */
+  bankFromToolTitle: string
+  bankFromToolAdd: string
   mainBadgeLabel: string
   bikPrefixLabel: (bik: string) => string
   currencyActiveLabel: (currency: string) => string
@@ -90,6 +93,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     banksHeaderLabel: 'Банковские счета',
     noAccountsLabel: 'Нет банковских счетов',
+    bankFromToolTitle: 'Банковский счёт из бесплатного инструмента',
+    bankFromToolAdd: 'Добавить этот счёт',
     mainBadgeLabel: 'Основной',
     bikPrefixLabel: (bik: string) => `БИК: ${bik}`,
     currencyActiveLabel: (currency: string) => `${currency} · Активен`,
@@ -163,6 +168,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     banksHeaderLabel: 'Банк шоттары',
     noAccountsLabel: 'Банк шоттары жоқ',
+    bankFromToolTitle: 'Тегін құралдағы банк шоты',
+    bankFromToolAdd: 'Осы шотты қосу',
     mainBadgeLabel: 'Негізгі',
     bikPrefixLabel: (bik: string) => `БСК: ${bik}`,
     currencyActiveLabel: (currency: string) => `${currency} · Белсенді`,
@@ -236,6 +243,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     banksHeaderLabel: 'Bank accounts',
     noAccountsLabel: 'No bank accounts',
+    bankFromToolTitle: 'Bank account from the free tool',
+    bankFromToolAdd: 'Add this account',
     mainBadgeLabel: 'Main',
     bikPrefixLabel: (bik: string) => `BIK: ${bik}`,
     currencyActiveLabel: (currency: string) => `${currency} · Active`,

@@ -12,6 +12,8 @@ import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 import { validateBinIin, digitsOnly } from '@/lib/kzIdentifiers'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
+import { loadRequisites } from '@/lib/tools-i18n/requisites'
+import { fillProfileFromToolRequisites } from '@/lib/tools-i18n/requisitesHandoff'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
@@ -126,6 +128,8 @@ export default function Requisites() {
   // ?next=/create — сюда прислал /create, где ждёт черновик счёта; после
   // сохранения возвращаем туда же, а не в /profile. См. src/lib/returnPath.ts.
   const [returnTo, setReturnTo] = useState<ReturnPath | null>(null)
+  // Поля подставлены из реквизитов бесплатного инструмента (03.11.2026, requisitesHandoff.ts): сохраняет человек сам.
+  const [fromTool, setFromTool] = useState(false)
 
   useEffect(() => {
     // Адрес есть только в браузере; прочитать его при рендере — расхождение гидратации.
@@ -145,7 +149,7 @@ export default function Requisites() {
         .eq('id', user.id)
         .single()
       if (data) {
-        setProfile({
+        const own = {
           company_name: data.company_name || '',
           bin_iin: data.bin_iin || '',
           address: data.address || '',
@@ -153,7 +157,11 @@ export default function Requisites() {
           phone: data.phone || '',
           director_name: data.director_name || '',
           accountant_name: data.accountant_name || '',
-        })
+        }
+        // Человек уже вписывал реквизиты в бесплатный счёт, КП, акт или накладную: не просим вводить второй раз.
+        const handoff = fillProfileFromToolRequisites(own, loadRequisites())
+        setProfile(handoff.next)
+        if (handoff.filled > 0) setFromTool(true)
       }
     }
     load()
@@ -239,6 +247,12 @@ export default function Requisites() {
           {returnTo && (
             <div className="mb-4 rounded-xl p-3 text-xs" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)' }}>
               {t.returnToInvoiceHint}
+            </div>
+          )}
+
+          {fromTool && (
+            <div role="status" className="mb-4 rounded-xl p-3 text-xs" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)' }}>
+              {t.toolRequisitesNote}
             </div>
           )}
 
