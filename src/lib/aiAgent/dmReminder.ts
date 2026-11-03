@@ -80,7 +80,7 @@ export const REMINDER_TIME_BUDGET_MS = 30_000
 export const REMINDER_STUCK_AFTER_MS = 10 * 60_000
 
 /** Ссылки /go/<код>, которые получают токен. Остальные ответы агента не затрагиваются. */
-export const REMINDER_TRACKED_GO_CODES = ['dm-kontragent-btn', 'dm-kontragent'] as const
+export const REMINDER_TRACKED_GO_CODES = ['dm-kontragent-btn', 'dm-kontragent', 'ad-kontragent-btn', 'ad-kontragent'] as const
 
 /** Ссылка в напоминании -- отдельная кампания, чтобы отличать заходы по напоминанию (goLinks.ts). */
 export const DEFAULT_REMINDER_TEXT =

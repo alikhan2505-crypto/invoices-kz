@@ -82,6 +82,15 @@ describe('кнопка КОНТРАГЕНТ в директе (отдельна�
   })
 })
 
+describe('реклама «Начатые переписки» (03.11.2026)', () => {
+  it('ad-*: источник meta / paid_dm, инструмент тот же, органика dm-* не тронута', () => {
+    expect(resolveGo('ad-kontragent')).toBe('/tools/kontragent?utm_source=meta&utm_medium=paid_dm&utm_campaign=kontragent_ad')
+    expect(resolveGo('ad-kontragent-btn')).toBe('/tools/kontragent?utm_source=meta&utm_medium=paid_dm&utm_campaign=kontragent_ad_btn')
+    expect(resolveGo('ad-marzha')).toBe('/tools/margin?utm_source=meta&utm_medium=paid_dm&utm_campaign=margin_ad')
+    expect(resolveGo('dm-kontragent')).toBe('/tools/kontragent?utm_source=dm&utm_medium=outreach&utm_campaign=kontragent_oct')
+  })
+})
+
 describe('ссылка в напоминании КОНТРАГЕНТ', () => {
   it('dm-kontragent-rem: тот же инструмент, отдельная кампания kontragent_oct_rem', () => {
     for (const [code, p, campaign] of [

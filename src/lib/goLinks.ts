@@ -82,6 +82,11 @@ export const GO_LINKS: readonly GoLink[] = [
   // Ссылка в НАПОМИНАНИИ через ~2 часа после ответа на слово КОНТРАГЕНТ (aiAgent/dmReminder.ts):
   // отдельная кампания, чтобы отличать заходы по напоминанию от первого ответа.
   link('dm-kontragent-rem', '/tools/kontragent', 'dm', 'outreach', 'kontragent_oct_rem', 'личные сообщения: ссылка в напоминании через 2 часа после слова БИН/КОНТРАГЕНТ'),
+  // Платная реклама «Начатые переписки» (03.11.2026): человек пришёл из рекламы, а не из ролика. Отдельный
+  // источник meta / paid_dm, чтобы стоимость регистрации с рекламы считалась отдельно от органики (dm-*).
+  link('ad-kontragent', '/tools/kontragent', 'meta', 'paid_dm', 'kontragent_ad', 'личные сообщения из платной рекламы: ссылка в тексте ответа на слово БИН'),
+  link('ad-kontragent-btn', '/tools/kontragent', 'meta', 'paid_dm', 'kontragent_ad_btn', 'личные сообщения из платной рекламы: КНОПКА «Открыть проверку»'),
+  link('ad-marzha', '/tools/margin', 'meta', 'paid_dm', 'margin_ad', 'личные сообщения из платной рекламы: ответ про калькулятор маржи'),
   link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
   // Личные сообщения (25.10.2026, ещё 8 кодовых слов из роликов).

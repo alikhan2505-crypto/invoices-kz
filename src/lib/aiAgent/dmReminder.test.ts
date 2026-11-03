@@ -54,6 +54,13 @@ describe('токен и ссылки', () => {
     expect(hasTrackedLink('https://invoices.kz/go/dm-kontragent-rem')).toBe(false)
   })
 
+  it('ссылки из платной рекламы (ad-kontragent[-btn]) тоже получают токен, а ad-marzha нет', () => {
+    const tok = 'AbCdEf0123456789'
+    expect(withReminderToken('https://invoices.kz/go/ad-kontragent', tok)).toBe(`https://invoices.kz/go/ad-kontragent?utm_content=${tok}`)
+    expect(withReminderToken('https://invoices.kz/go/ad-kontragent-btn', tok)).toBe(`https://invoices.kz/go/ad-kontragent-btn?utm_content=${tok}`)
+    expect(hasTrackedLink('https://invoices.kz/go/ad-marzha')).toBe(false)
+  })
+
   it('в токене нет персональных данных: ссылка = только адрес + случайная строка', () => {
     const t = withReminderToken('https://invoices.kz/go/dm-kontragent', newReminderToken())
     expect(t).toMatch(/^https:\/\/invoices\.kz\/go\/dm-kontragent\?utm_content=[A-Za-z0-9_-]{16}$/)
