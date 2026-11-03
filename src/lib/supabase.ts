@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createSharedSessionStorage, sharedCookieDomain } from './sharedSessionStorage'
+import { coalesceGetUser } from './coalesceGetUser'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,3 +30,7 @@ function sharedStorage() {
 const storage = sharedStorage()
 
 export const supabase = createClient(supabaseUrl, supabaseKey, storage ? { auth: { storage } } : undefined)
+
+// Пять-шесть компонентов страницы зовут getUser() сразу; в браузере это один запрос вместо очереди
+// (см. coalesceGetUser.ts). На сервере окна нет, и клиент остаётся как был.
+if (typeof window !== 'undefined') coalesceGetUser(supabase.auth)
