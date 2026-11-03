@@ -1325,9 +1325,9 @@ export default function CreateInvoicePage() {
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" inputMode="tel" autoComplete="off" maxLength={16}
                     onChange={e => setClientPhone(formatKzPhone(e.target.value))} />
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex items-center gap-2 cursor-pointer select-none min-h-6 pointer-coarse:min-h-10">
                   <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
+                    className="w-3.5 h-3.5 pointer-coarse:w-5 pointer-coarse:h-5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
                   <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.noContractLabel}</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -1564,9 +1564,9 @@ export default function CreateInvoicePage() {
                       onChange={e => setClientPhone(formatKzPhone(e.target.value))} />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex items-center gap-2 cursor-pointer select-none min-h-6 pointer-coarse:min-h-10">
                   <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
+                    className="w-3.5 h-3.5 pointer-coarse:w-5 pointer-coarse:h-5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
                   <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.noContractLabel}</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -1710,7 +1710,7 @@ export default function CreateInvoicePage() {
                 <div className="flex justify-between text-sm text-white/70 mb-3 tabular-nums">
                   <span ref={vatHintRef} className="relative flex items-center gap-1.5">
                     {t.vat16Label}
-                    <button type="button" onClick={() => setShowVatHint(v => !v)} className="text-white/50 hover:text-white/90 transition-colors" aria-label={t.vatHintAriaLabel}>
+                    <button type="button" onClick={() => setShowVatHint(v => !v)} className="p-1.5 -m-1.5 pointer-coarse:p-3 pointer-coarse:-m-3 text-white/50 hover:text-white/90 transition-colors" aria-label={t.vatHintAriaLabel}>
                       <InfoIcon />
                     </button>
                     {showVatHint && (
