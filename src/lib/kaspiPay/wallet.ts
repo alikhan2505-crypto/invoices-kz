@@ -78,15 +78,20 @@ export async function debitWalletForCommission(userId: string, amount: number, k
 
 // Generic unified-wallet debit for non-commission spend categories
 // (Kaspi Shop price checks, AI-agent replies). Same atomic RPC + loud
-// ledger-failure contract as debitWalletForCommission.
+// ledger-failure contract as debitWalletForCommission. Unlike commission
+// (charged after the customer's money already moved, so allowed to dip below
+// zero), this spend is guarded: the RPC returns NULL when the balance can't
+// cover it, and that is surfaced as an error instead of a negative balance.
+// Every caller treats a failed debit as best-effort and only logs it.
 export async function debitWallet(
   userId: string,
   amountTenge: number,
   type: 'kaspi_shop_check' | 'ai_agent_reply',
   note: string
 ): Promise<number> {
-  const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: amountTenge })
+  const { data, error } = await supabase.rpc('debit_wallet_balance_guarded', { p_user_id: userId, p_amount: amountTenge })
   if (error) throw new Error(`wallet debit (${type}) failed for user ${userId}: ${error.message}`)
+  if (data === null || data === undefined) throw new Error(`wallet debit (${type}) skipped for user ${userId}: insufficient funds`)
   const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
     user_id: userId,
     type,
