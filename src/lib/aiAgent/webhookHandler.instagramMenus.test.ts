@@ -18,7 +18,7 @@ const h = vi.hoisted(() => {
     aiCalls: 0,
     queries: [] as { table: string; op: string }[],
   }
-  return { state }
+  return { state, fetchHandle: vi.fn(async (_id: string, _token: string) => null as string | null) }
 })
 
 vi.mock('@supabase/supabase-js', () => {
@@ -174,6 +174,8 @@ vi.mock('@/lib/instagram', async () => {
   }
 })
 
+vi.mock('@/lib/instagramProfile', () => ({ fetchInstagramUserHandle: (id: string, token: string) => h.fetchHandle(id, token) }))
+
 import { handleTenantIncoming } from './webhookHandler'
 
 const conn = { connectionId: 'c1', agentId: 'agent1', externalAccountId: 'ig1', accessToken: 'tok' }
@@ -214,6 +216,8 @@ beforeEach(() => {
   h.state.convs = {}
   h.state.aiCalls = 0
   h.state.queries = []
+  h.fetchHandle.mockReset()
+  h.fetchHandle.mockResolvedValue(null)
 })
 
 describe('агент БЕЗ особых строк: поведение прежнее', () => {
@@ -547,5 +551,37 @@ describe('токен напоминания в ответе на КОНТРАГ�
     h.state.templates = [...SPECIAL, REM]
     await handleTenantIncoming(conn, dm('d1', '@reminder'))
     expect(h.state.sends[0].text).toBe('AI-ответ')
+  })
+})
+
+describe('имя клиента в личных сообщениях (аудит 02.11.2026: в диалогах был числовой id)', () => {
+  const IGSID = '17841400000000001'
+  const dmFrom = (id: string) => dm('dn-' + id, 'Здравствуйте', { fromUsername: id, replyTarget: id })
+
+  it('в строку диалога пишется username из профиля, ответ уходит по id', async () => {
+    h.fetchHandle.mockResolvedValue('aigerim.kz')
+    await handleTenantIncoming(conn, dmFrom(IGSID))
+    expect(h.fetchHandle).toHaveBeenCalledWith(IGSID, 'tok')
+    expect(h.state.convs['conv-' + IGSID]).toBe('aigerim.kz')
+    expect(h.state.sends[0]).toMatchObject({ kind: 'dm', to: IGSID })
+  })
+
+  it('профиль не получен: остаётся id, как и раньше, и ответ всё равно уходит', async () => {
+    h.fetchHandle.mockResolvedValue(null)
+    await handleTenantIncoming(conn, dmFrom(IGSID))
+    expect(h.state.convs['conv-' + IGSID]).toBe(IGSID)
+    expect(h.state.sends).toHaveLength(1)
+  })
+
+  it('сбой запроса профиля не ломает приём сообщения', async () => {
+    h.fetchHandle.mockRejectedValue(new Error('network'))
+    await handleTenantIncoming(conn, dmFrom(IGSID))
+    expect(h.state.convs['conv-' + IGSID]).toBe(IGSID)
+    expect(h.state.sends).toHaveLength(1)
+  })
+
+  it('комментарий приходит уже с username: профиль не запрашивается', async () => {
+    await handleTenantIncoming(conn, comment('cmn1', 'Привет'))
+    expect(h.fetchHandle).not.toHaveBeenCalled()
   })
 })

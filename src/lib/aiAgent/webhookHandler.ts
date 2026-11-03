@@ -3,6 +3,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, sendInstagramButtonTemplate, sendPrivateReply, InstagramApiError } from '@/lib/instagram'
 import { parseTemplateReplyText, type ButtonTemplate } from '@/lib/instagramButtonTemplate'
+import { fetchInstagramUserHandle } from '@/lib/instagramProfile'
 import { sendTemplateReply } from './templateButtonReply'
 import { pickProductPhoto } from './productPhoto'
 import { generateAiReply } from '@/lib/instagramAiReply'
@@ -174,6 +175,27 @@ async function commentDefaultAllowedNow(agentId: string, defaultText: string, pa
   return commentDefaultAllowed({ isReply: false, text: params.incomingText, handle: params.fromUsername, recent })
 }
 
+// В вебхуке личного сообщения вместо имени приходит числовой id отправителя: в «Диалогах» клиент был
+// числом (аудит 02.11.2026). Узнаём username через Graph API один раз на диалог: уже узнанное имя в
+// строке диалога не перезатирается, а при сбое остаётся id, как и раньше. Только для личных сообщений.
+async function resolveDmHandle(conn: TenantConnection, params: { source: string; fromUsername: string; replyTarget: string }): Promise<string> {
+  if (params.source !== 'dm' || params.fromUsername !== params.replyTarget) return params.fromUsername
+  try {
+    const { data: existing } = await supabase
+      .from('ai_agent_conversations')
+      .select('customer_handle')
+      .eq('agent_id', conn.agentId)
+      .eq('channel', 'instagram')
+      .eq('external_thread_id', params.replyTarget)
+      .maybeSingle()
+    const current = existing?.customer_handle
+    if (typeof current === 'string' && current && current !== params.replyTarget) return current
+    return (await fetchInstagramUserHandle(params.replyTarget, conn.accessToken)) ?? params.fromUsername
+  } catch {
+    return params.fromUsername
+  }
+}
+
 interface TenantIncomingParams {
   source: 'comment' | 'dm'
   externalId: string
@@ -239,13 +261,14 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (await exitTrainingIfDue(supabase, agent)) agent.status = 'active'
 
   // Find or create the conversation thread for this sender.
+  const customerHandle = await resolveDmHandle(conn, params)
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')
     .upsert({
       agent_id: conn.agentId,
       channel: 'instagram',
       external_thread_id: params.replyTarget,
-      customer_handle: params.fromUsername,
+      customer_handle: customerHandle,
       // Persisted rather than left as a runtime-only parameter. Without it the
       // review queue had to assume every Instagram thread was a DM, so
       // approving a comment draft sent a direct message to a comment id and
