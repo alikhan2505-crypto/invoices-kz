@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import { digitsOnly } from '@/lib/kzIdentifiers'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import InvoiceLivePreview, { type PreviewHighlight } from '@/components/InvoiceLivePreview'
@@ -712,16 +713,6 @@ export default function CreateInvoicePage() {
     resetBinLookup()
   }
 
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length === 0) return ''
-    let result = '+7'
-    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) result += ' ' + digits.slice(7, 11)
-    return result
-  }
-
   // Empties the whole form, not just the client. clearClient() below leaves
   // services, note and the contract fields alone -- deliberate there, since it
   // means "different client, same order" -- but that is the wrong shape for
@@ -1312,7 +1303,7 @@ export default function CreateInvoicePage() {
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
                   <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" inputMode="tel" autoComplete="off" maxLength={16}
-                    onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                    onChange={e => setClientPhone(formatKzPhone(e.target.value))} />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
@@ -1550,7 +1541,7 @@ export default function CreateInvoicePage() {
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
                     <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" inputMode="tel" autoComplete="off" maxLength={16}
-                      onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                      onChange={e => setClientPhone(formatKzPhone(e.target.value))} />
                   </div>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none">

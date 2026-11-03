@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -560,17 +561,6 @@ export default function KaspiApiPage() {
     } finally {
       setKaspiDisconnecting(false)
     }
-  }
-
-  function formatKzPhone(value: string) {
-    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
-    if (!digits) return ''
-    let out = '+7'
-    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
-    return out
   }
 
   async function sendTopupToPhone(amount: number) {

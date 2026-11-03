@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -80,16 +81,6 @@ export default function Clients() {
   const [form, setForm] = useState({ name: '', bin_iin: '', email: '', address: '', phone: '' })
 
   useEffect(() => { loadClients() }, [])
-
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length === 0) return ''
-    let result = '+7'
-    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) result += ' ' + digits.slice(7, 11)
-    return result
-  }
 
   async function loadClients() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -269,7 +260,7 @@ export default function Clients() {
                   inputMode="tel"
                   autoComplete="off"
                   maxLength={16}
-                  onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                  onChange={e => setForm({ ...form, phone: formatKzPhone(e.target.value) })}
                 />
               </div>
 

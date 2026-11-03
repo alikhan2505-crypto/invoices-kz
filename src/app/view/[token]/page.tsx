@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { resolveInvoiceKnp, resolveInvoiceVatType } from '@/lib/invoiceTax'
@@ -314,17 +315,6 @@ export default function PublicInvoice() {
     // interval each time (resetting the 150-tick cap along with it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaspiPayment?.status, kaspiPaymentLoading, invoice?.status, token, kaspiPhoneDeclined])
-
-  function formatKzPhone(value: string) {
-    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
-    if (!digits) return ''
-    let out = '+7'
-    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
-    return out
-  }
 
   async function sendKaspiPaymentToPhone() {
     setKaspiPhoneSending(true)

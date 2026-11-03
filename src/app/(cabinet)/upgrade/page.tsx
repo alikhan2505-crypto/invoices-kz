@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
@@ -419,17 +420,6 @@ export default function Upgrade() {
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(p)
     setPlan(getActivePlan(p).plan)
-  }
-
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length === 0) return ''
-    let result = '+7'
-    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
-    return result
   }
 
   // Mints one Kaspi operation and wires the modal to it. Split out of
@@ -1328,7 +1318,7 @@ export default function Upgrade() {
               style={INPUT_STYLE}
               placeholder="+7 777 123 45 67"
               value={payPhone}
-              onChange={e => setPayPhone(formatPhone(e.target.value))}
+              onChange={e => setPayPhone(formatKzPhone(e.target.value))}
               type="tel"
               inputMode="tel"
               autoComplete="tel"

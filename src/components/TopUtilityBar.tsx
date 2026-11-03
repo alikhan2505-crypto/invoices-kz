@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useEffectivePath } from '@/lib/useEffectivePath'
+import { formatKzPhone } from '@/lib/kzPhone'
 import { isUtilityBarHiddenPath } from '@/lib/utilityBarPaths'
 import Link from 'next/link'
 import QRCode from 'qrcode'
@@ -417,17 +418,6 @@ export default function TopUtilityBar() {
     await fetch('/api/notifications/read-all', { method: 'POST', headers })
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     setUnreadCount(0)
-  }
-
-  function formatKzPhone(value: string) {
-    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
-    if (!digits) return ''
-    let out = '+7'
-    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
-    return out
   }
 
   async function sendTopupToPhone(wallet: WalletConfig, amount: number) {

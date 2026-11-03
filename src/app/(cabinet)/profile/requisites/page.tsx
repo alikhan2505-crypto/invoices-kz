@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
@@ -158,17 +159,6 @@ export default function Requisites() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length === 0) return ''
-    let result = '+7'
-    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
-    return result
-  }
 
   async function save() {
     // /create refuses to issue an invoice without a company name AND a БИН.
@@ -342,7 +332,7 @@ export default function Requisites() {
 
             <Field label={t.phoneFieldLabel} placeholder={t.phonePlaceholder} type="tel" maxLength={16}
               inputProps={{ inputMode: 'tel', autoComplete: 'tel' }}
-              value={profile.phone} onChange={v => setProfile({ ...profile, phone: formatPhone(v) })} />
+              value={profile.phone} onChange={v => setProfile({ ...profile, phone: formatKzPhone(v) })} />
 
             <Field label={t.directorNameFieldLabel} placeholder={t.personNamePlaceholder}
               value={profile.director_name} onChange={v => setProfile({ ...profile, director_name: v })} />

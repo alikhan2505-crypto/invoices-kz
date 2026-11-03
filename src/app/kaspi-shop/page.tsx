@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { formatKzPhone } from '@/lib/kzPhone'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -90,16 +91,6 @@ const INPUT_CLS = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition
 // Always normalizes to +7, regardless of whether the seller types the
 // domestic 8-prefix or the international 7 -- the leading digit is
 // discarded either way and replaced with the hardcoded +7.
-function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, '')
-  if (digits.length === 0) return ''
-  let result = '+7'
-  if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-  if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-  if (digits.length > 7) result += ' ' + digits.slice(7, 11)
-  return result
-}
-
 function PauseIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -849,7 +840,7 @@ export default function KaspiShop() {
               ) : !otpToken ? (
                 <div className="flex flex-col gap-2">
                   <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" />
+                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatKzPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" />
                   <button onClick={startConnect} disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {connecting ? 'Отправляем код...' : 'Продолжить'}
