@@ -173,9 +173,12 @@ export default function AuthCallback() {
           // открыть в другом браузере, где localStorage пуст.
           const metaRef = session.user.user_metadata?.referral_code
           const refCode = localStorage.getItem('referral_code') || (typeof metaRef === 'string' ? metaRef : '')
+          // Бонус дают не всегда (с 03.11.2026 только аккаунту до 2 суток): в уведомление
+          // основателю код попадает, только если /api/referral его принял.
+          let refApplied = false
           if (refCode) {
             try {
-              await fetch('/api/referral', {
+              const refRes = await fetch('/api/referral', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -183,6 +186,7 @@ export default function AuthCallback() {
                 },
                 body: JSON.stringify({ userId: session.user.id, referralCode: refCode }),
               })
+              refApplied = refRes.ok
             } catch {}
             localStorage.removeItem('referral_code')
           }
@@ -259,7 +263,7 @@ export default function AuthCallback() {
               body: JSON.stringify({
                 event: 'signup',
                 email: session.user.email,
-                refCode: refCode || undefined,
+                refCode: refApplied ? refCode : undefined,
                 promoCode: promoCode || undefined,
               }),
             })

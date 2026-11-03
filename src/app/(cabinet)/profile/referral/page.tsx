@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import { parseDbTimestamp } from '@/lib/plan'
+import { REFERRAL_MAX_FRIENDS } from '@/lib/referral'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
@@ -95,6 +96,10 @@ export default function Referral() {
 
   const bonusEnd = parseDbTimestamp(profile?.bonus_expires_at)
 
+  // Засчитанных друзей не больше REFERRAL_MAX_FRIENDS: дальше база реферера не награждает.
+  const referralCount = Math.min(Number(profile?.referral_count) || 0, REFERRAL_MAX_FRIENDS)
+  const limitReached = referralCount >= REFERRAL_MAX_FRIENDS
+
   const steps = [
     { step: '1', text: t.referralStep1 },
     { step: '2', text: t.referralStep2 },
@@ -123,16 +128,20 @@ export default function Referral() {
           <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>
             {t.referralBannerDescBefore} <span className="font-bold" style={{ color: 'var(--nav-success)' }}>{t.referralBannerBonusBold}</span> {t.referralBannerDescAfter}
           </div>
-          {/* The 90-day ceiling is enforced in claim_referral_bonus /
-              credit_referrer_bonus, so it has to be stated here -- a page that
-              promises "+7 за каждого" without it would be a promise the
-              database does not keep. */}
+          {/* The ceilings (90 days at a time, 10 friends credited per referrer)
+              are enforced in claim_referral_bonus / credit_referrer_bonus, so
+              they have to be stated here -- a page that promises "+7 за
+              каждого" without them would be a promise the database does not
+              keep. */}
           <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.referralCapNote}</div>
+          {limitReached && (
+            <div className="text-xs mt-2 font-medium" style={{ color: 'var(--nav-text-secondary)' }}>{t.referralLimitReachedNote}</div>
+          )}
         </motion.div>
 
         <motion.div {...fadeIn(2)} className="grid grid-cols-2 gap-3 flex-1">
           <div className={`nav-glass rounded-2xl p-4 text-center flex flex-col justify-center ${CARD_HOVER}`}>
-            <div className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{profile?.referral_count || 0}</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{referralCount} / {REFERRAL_MAX_FRIENDS}</div>
             <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.invitedFriendsLabel}</div>
           </div>
           <div className={`nav-glass rounded-2xl p-4 text-center flex flex-col justify-center ${CARD_HOVER}`}>

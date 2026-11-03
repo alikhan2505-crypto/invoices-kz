@@ -11,6 +11,7 @@ export interface ProfileMiscContent {
   referralBannerBonusBold: string
   referralBannerDescAfter: string
   referralCapNote: string
+  referralLimitReachedNote: string
   invitedFriendsLabel: string
   bonusDaysLabel: string
   yourReferralLinkLabel: string
@@ -129,10 +130,11 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
 
     referralHeaderLabel: 'Пригласить друзей',
     referralBannerTitle: 'Приглашай — получай бонусы',
-    referralBannerDescBefore: 'За каждого приглашённого друга вы оба получаете',
+    referralBannerDescBefore: 'За каждого из первых 10 приглашённых друзей вы оба получаете',
     referralBannerBonusBold: '+7 дней',
     referralBannerDescAfter: 'Базового тарифа бесплатно',
-    referralCapNote: 'Бонусные дни суммируются — максимум 90 дней одновременно.',
+    referralCapNote: 'Бонус за приглашения — не больше чем за 10 друзей (до +70 дней). Бонусные дни суммируются — максимум 90 дней одновременно.',
+    referralLimitReachedNote: 'Лимит бонусов за приглашения исчерпан. Друзья по вашей ссылке по-прежнему получают свои +7 дней, но вам новые дни не начисляются.',
     invitedFriendsLabel: 'Приглашено друзей',
     bonusDaysLabel: 'Бонусных дней осталось',
     yourReferralLinkLabel: 'Ваша реферальная ссылка',
@@ -142,9 +144,9 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     whatsAppShareMessage: (link: string) => `Привет! Попробуй INVOICES.KZ — создавай счета за 1 минуту. Регистрируйся по моей ссылке и получи бонус: ${link}`,
     howItWorksLabel: 'Как это работает',
     referralStep1: 'Поделитесь своей ссылкой с другом',
-    referralStep2: 'Друг входит по ней — через почту или Google',
+    referralStep2: 'Друг регистрируется по ней — через почту или Google',
     referralStep3: 'Сразу после регистрации вы оба получаете +7 дней Базового тарифа',
-    referralStep4: 'Бонус — один раз на каждый новый аккаунт',
+    referralStep4: 'Бонус получает только новый аккаунт (первые 2 суток), а вы — за первых 10 друзей',
 
     servicesHeaderLabel: 'Товары и услуги',
     openAddFormButton: 'Добавить',
@@ -237,10 +239,11 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
 
     referralHeaderLabel: 'Достарды шақыру',
     referralBannerTitle: 'Шақырыңыз — бонус алыңыз',
-    referralBannerDescBefore: 'Шақырылған әрбір дос үшін екеуіңіз де',
+    referralBannerDescBefore: 'Шақырылған алғашқы 10 дос үшін екеуіңіз де',
     referralBannerBonusBold: '+7 күн',
     referralBannerDescAfter: 'тегін Негізгі тарифін аласыздар',
-    referralCapNote: 'Бонустық күндер жинақталады — бір уақытта ең көбі 90 күн.',
+    referralCapNote: 'Шақыру бонусы — ең көбі 10 дос үшін (+70 күнге дейін). Бонустық күндер жинақталады — бір уақытта ең көбі 90 күн.',
+    referralLimitReachedNote: 'Шақыру бонусының лимиті таусылды. Сілтемеңіз бойынша келген достар өз +7 күнін алады, бірақ сізге жаңа күндер қосылмайды.',
     invitedFriendsLabel: 'Шақырылған достар',
     bonusDaysLabel: 'Қалған бонустық күндер',
     yourReferralLinkLabel: 'Сіздің реферал сілтемеңіз',
@@ -250,9 +253,9 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     whatsAppShareMessage: (link: string) => `Сәлеметсіз бе! INVOICES.KZ қолданбасын байқап көріңіз — шоттарды 1 минутта жасаңыз. Менің сілтемем арқылы тіркеліп, бонус алыңыз: ${link}`,
     howItWorksLabel: 'Бұл қалай жұмыс істейді',
     referralStep1: 'Сілтемеңізбен досыңызбен бөлісіңіз',
-    referralStep2: 'Досыңыз сол арқылы кіреді — пошта немесе Google арқылы',
+    referralStep2: 'Досыңыз сол арқылы тіркеледі — пошта немесе Google арқылы',
     referralStep3: 'Тіркелгеннен кейін бірден екеуіңіз де +7 күн Негізгі тарифін аласыздар',
-    referralStep4: 'Бонус әр жаңа аккаунт үшін бір рет беріледі',
+    referralStep4: 'Бонусты тек жаңа аккаунт алады (алғашқы 2 тәулік), ал сіз — алғашқы 10 дос үшін аласыз',
 
     servicesHeaderLabel: 'Тауарлар мен қызметтер',
     openAddFormButton: 'Қосу',
@@ -345,10 +348,11 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
 
     referralHeaderLabel: 'Invite friends',
     referralBannerTitle: 'Invite — earn bonuses',
-    referralBannerDescBefore: 'For every friend you invite, you both get',
+    referralBannerDescBefore: 'For each of your first 10 invited friends, you both get',
     referralBannerBonusBold: '+7 days',
     referralBannerDescAfter: 'of the Basic plan for free',
-    referralCapNote: 'Bonus days add up — up to 90 days at a time.',
+    referralCapNote: 'The invite bonus covers up to 10 friends (up to +70 days). Bonus days add up — up to 90 days at a time.',
+    referralLimitReachedNote: 'The invite bonus limit is reached. Friends who use your link still get their +7 days, but no new days are added for you.',
     invitedFriendsLabel: 'Friends invited',
     bonusDaysLabel: 'Bonus days left',
     yourReferralLinkLabel: 'Your referral link',
@@ -358,9 +362,9 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     whatsAppShareMessage: (link: string) => `Hi! Try INVOICES.KZ — create invoices in 1 minute. Sign up with my link and get a bonus: ${link}`,
     howItWorksLabel: 'How it works',
     referralStep1: 'Share your link with a friend',
-    referralStep2: 'Your friend signs in with it — by email or Google',
+    referralStep2: 'Your friend signs up with it — by email or Google',
     referralStep3: 'Right after they sign up, you both get +7 days of the Basic plan',
-    referralStep4: 'One bonus per new account',
+    referralStep4: 'Only a new account gets the bonus (first 2 days), and you get it for your first 10 friends',
 
     servicesHeaderLabel: 'Products and services',
     openAddFormButton: 'Add',
