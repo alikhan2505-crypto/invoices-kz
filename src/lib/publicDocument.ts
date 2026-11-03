@@ -10,13 +10,17 @@ import { getActivePlan } from '@/lib/plan'
 
 /** Колонки счёта для публичной страницы. */
 export const PUBLIC_INVOICE_COLUMNS =
-  'id, number, status, amount, created_at, due_date, client_name, client_bin, client_email, client_address, contract_number, contract_date, services, note'
+  'id, number, status, amount, created_at, due_date, client_name, client_bin, client_email, client_address, contract_number, contract_date, services, note, knp, vat_type'
 /** То же + user_id/bank_id: нужны серверу для поиска профиля и банка, наружу не уходят. */
 export const INVOICE_SERVER_COLUMNS = `${PUBLIC_INVOICE_COLUMNS}, user_id, bank_id`
 
-/** Публичные поля профиля продавца. email, тариф и is_admin сюда не входят. */
+/**
+ * Публичные поля профиля продавца. email, тариф и is_admin сюда не входят.
+ * vat_type -- режим НДС продавца: запасной вариант для старых счетов, у которых
+ * invoices.vat_type пустой (печатается в PDF, не секрет).
+ */
 export const PUBLIC_PROFILE_COLUMNS =
-  'company_name, bin_iin, address, phone, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links'
+  'company_name, bin_iin, address, phone, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links, vat_type'
 /** Колонки, из которых считается водяной знак (наружу не уходят). */
 export const PLAN_PROFILE_COLUMNS = 'plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin'
 

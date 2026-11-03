@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { resolveStorefrontBySlug } from '@/lib/kaspiShop/storefront'
 import { loadWholesaleModelByVariant, resolveWholesaleLine, type ResolvedWholesaleLine } from '@/lib/kaspiShop/wholesaleStorefront'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
+import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,6 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: 'Не удалось оформить заявку' }, { status: 500 })
   }
 
+  // Режим НДС продавца фиксируем в счёте при создании. Профиль не прочитался —
+  // оставляем null: просмотр тогда возьмёт режим профиля, как и раньше.
+  const { data: sellerProfile } = await supabase
+    .from('profiles').select('vat_type').eq('id', storefront.userId).maybeSingle()
+
   const { data: invoice, error: insertError } = await supabase
     .from('invoices')
     .insert({
@@ -88,6 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       client_bin: clientBin,
       client_email: clientEmail,
       client_phone: clientPhone || null,
+      vat_type: sellerProfile ? resolveInvoiceVatType(null, sellerProfile) : null,
       services: lines,
     })
     .select('public_token')

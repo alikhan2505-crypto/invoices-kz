@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
+import { resolveInvoiceKnp, resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -422,7 +423,9 @@ export default function PublicInvoice() {
       clientAddress: invoice.client_address || '',
       contractNumber: invoice.contract_number || '',
       contractDate: invoice.contract_date ? formatDateSafe(invoice.contract_date) : undefined,
-      knp: invoice.knp || '849',
+      knp: resolveInvoiceKnp(invoice),
+      // НДС из самого счёта; у старых счетов он пустой -- тогда режим продавца.
+      vatType: resolveInvoiceVatType(invoice, profile),
       services: invoiceServices,
       total: Number(invoice.amount),
       note: displayNote || '',

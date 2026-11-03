@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
+import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { UNIT_OPTIONS, unitLabel } from '@/lib/i18n/units'
 import { useLanguage } from '@/components/LanguageProvider'
 import { deleteLabel } from '@/lib/a11yLabels'
@@ -59,10 +60,13 @@ export default function EditInvoice() {
   const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('')
+  // Режим НДС, записанный в самом счёте (у старых счетов пусто — тогда по профилю).
+  // При сохранении не перезаписывается: правка не меняет налоговые значения выпущенного счёта.
+  const [invoiceVatType, setInvoiceVatType] = useState<string | null>(null)
 
   // До тиына: 10.1 * 3 в JS даёт 30.299999999999997, и такая сумма уходила в счёт, запрос Kaspi и сверку с выпиской.
   const total = Math.round(services.reduce((s, i) => s + i.qty * i.price, 0) * 100) / 100
-  const vatType = profile?.vat_type || 'no_vat'
+  const vatType = resolveInvoiceVatType({ vat_type: invoiceVatType }, profile)
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
 
@@ -90,6 +94,7 @@ export default function EditInvoice() {
       setNote(inv.note || '')
       setInvoiceNumber(inv.number || '')
       setInvoiceDate(inv.created_at || '')
+      setInvoiceVatType(inv.vat_type || null)
 
       if (inv.services && inv.services.length > 0) {
         setServices(inv.services.map((s: any) => ({ ...s, type: s.type || 'service' })))

@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { isCronAuthorized } from '@/lib/cronAuth'
 import { getActivePlan } from '@/lib/plan'
 import { escapeHtml } from '@/lib/htmlEscape'
+import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { currentPeriodStart, shouldSkipRecurringOwner } from '@/lib/recurringGuard'
 
 const supabase = createClient(
@@ -91,6 +92,10 @@ export async function GET(request: Request) {
         client_address: inv.client_address,
         services: inv.services,
         note: inv.note,
+        // КНП и режим НДС копируются из оригинала; у старого оригинала их нет —
+        // берём текущий режим НДС продавца (как раньше считалось при просмотре).
+        knp: inv.knp ?? null,
+        vat_type: resolveInvoiceVatType(inv, inv.profiles),
         recurring_active: false, // копия не повторяется
         recurring_parent_id: inv.id,
       }).select().single()

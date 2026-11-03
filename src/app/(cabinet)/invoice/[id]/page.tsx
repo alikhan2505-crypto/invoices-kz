@@ -10,6 +10,7 @@ import KpLangPicker, { useKpDocLang } from '@/components/KpLangPicker'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
+import { resolveInvoiceVatType, resolveInvoiceKnp } from '@/lib/invoiceTax'
 import { isInvoiceLimitError, invoiceLimitFromError, invoiceLimitWindow, checkInvoiceLimit } from '@/lib/invoiceLimit'
 import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -467,6 +468,8 @@ export default function InvoicePage() {
       client_address: invoice.client_address, services: invoice.services,
       note: invoice.note, contract_number: invoice.contract_number,
       contract_date: invoice.contract_date, created_at: new Date().toISOString(),
+      // КНП и режим НДС копии такие же, как у исходного; у старого счёта режим берётся из профиля.
+      knp: invoice.knp ?? null, vat_type: invoice.vat_type ?? (profile ? resolveInvoiceVatType(null, profile) : null),
     }).select().single()
     if (error) {
       // «Дублировать» тоже создаёт счёт, и база считает его в месячный лимит
@@ -560,7 +563,8 @@ export default function InvoicePage() {
       contractDate: displayContractDate,
       services: invoice.services || [],
       total: Number(invoice.amount), note: displayNote || '',
-      autoPrint: false, vatType: profile?.vat_type,
+      knp: resolveInvoiceKnp(invoice),
+      autoPrint: false, vatType: resolveInvoiceVatType(invoice, profile),
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
@@ -586,7 +590,7 @@ export default function InvoicePage() {
   }
 
   function openEsfModal() {
-    const defaultNdsRate = profile?.vat_type === 'vat_16' ? 16 : 0
+    const defaultNdsRate = resolveInvoiceVatType(invoice, profile) === 'vat_16' ? 16 : 0
     setEsfLineConfigs((invoice.services || []).map(() => ({ unitCode: '796', ndsRate: defaultNdsRate })))
     setEsfError('')
     setEsfSuccessId(null)
@@ -917,7 +921,8 @@ export default function InvoicePage() {
             contractDate: displayContractDate,
             services: invoice.services || [],
             total: Number(invoice.amount), note: displayNote || '',
-            autoPrint: true, vatType: profile?.vat_type,
+            knp: resolveInvoiceKnp(invoice),
+            autoPrint: true, vatType: resolveInvoiceVatType(invoice, profile),
             // No scanned signature/stamp image here — the document is about
             // to be cryptographically signed with a real ЭЦП, which would
             // otherwise sit confusingly next to a static picture implying a
@@ -1196,7 +1201,7 @@ export default function InvoicePage() {
                 date: formatDate(invoice.created_at), valid_until: validUntil,
                 client_name: invoice.client_name, client_bin: invoice.client_bin,
                 total: Number(invoice.amount), services: invoice.services,
-                note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
+                note: invoice.note, vat_type: resolveInvoiceVatType(invoice, profile),
               })
               setKpCount(prev => prev + 1)
               // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
@@ -1207,7 +1212,7 @@ export default function InvoicePage() {
                   number: kpNumber, date: formatDate(invoice.created_at), validUntil,
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
                   services: invoice.services || [], total: Number(invoice.amount),
-                  note: invoice.note || '', vatType: profile?.vat_type || 'no_vat',
+                  note: invoice.note || '', vatType: resolveInvoiceVatType(invoice, profile),
                   lang: kpLangRef.current,
                   profile: buildProfile(withSign),
                   bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
@@ -1241,7 +1246,7 @@ export default function InvoicePage() {
                 client_address: invoice.client_address,
                 total: serviceTotal,
                 services: invoice.services?.filter((s: any) => !s.type || s.type === 'service'),
-                vat_type: profile?.vat_type || 'no_vat',
+                vat_type: resolveInvoiceVatType(invoice, profile),
               })
               setAvrCount(prev => prev + 1)
               // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
@@ -1256,7 +1261,7 @@ export default function InvoicePage() {
                   clientAddress: invoice.client_address || '',
                   services: invoice.services?.filter((s: any) => !s.type || s.type === 'service') || [],
                   total: serviceTotal,
-                  vatType: profile?.vat_type || 'no_vat',
+                  vatType: resolveInvoiceVatType(invoice, profile),
                   profile: buildProfile(withSign),
                 }, win)
               })
@@ -1283,7 +1288,7 @@ export default function InvoicePage() {
                 client_name: invoice.client_name, client_bin: invoice.client_bin,
                 total: productTotal,
                 services: invoice.services?.filter((s: any) => s.type === 'product'),
-                vat_type: profile?.vat_type || 'no_vat',
+                vat_type: resolveInvoiceVatType(invoice, profile),
               })
               setNaklCount(prev => prev + 1)
               // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
@@ -1295,7 +1300,7 @@ export default function InvoicePage() {
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
                   services: invoice.services?.filter((s: any) => s.type === 'product') || [],
                   total: productTotal,
-                  vatType: profile?.vat_type || 'no_vat',
+                  vatType: resolveInvoiceVatType(invoice, profile),
                   profile: buildProfile(withSign),
                 }, win)
               })
@@ -1379,7 +1384,7 @@ export default function InvoicePage() {
           clientBin={invoice.client_bin || ''}
           services={invoice.services || []}
           note={displayNote || ''}
-          vatType={profile?.vat_type || 'no_vat'}
+          vatType={resolveInvoiceVatType(invoice, profile)}
           total={Number(invoice.amount)}
         />
       </motion.div>

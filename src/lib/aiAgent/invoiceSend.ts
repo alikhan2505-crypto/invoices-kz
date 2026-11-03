@@ -6,6 +6,7 @@ import { pickProductPhoto } from './productPhoto'
 import { createNotification } from '@/lib/notifications'
 import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
 import { preferenceFor } from '@/lib/notificationPrefs'
+import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
 // draft into a REAL invoices.kz счёт and sends the /view link into the
@@ -177,6 +178,10 @@ export async function sendInvoiceForDraft(
       const services = (draft.items as DraftItem[]).map(i => ({
         name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: 'service',
       }))
+      // Режим НДС продавца фиксируем в счёте при создании. Профиль не прочитался —
+      // оставляем null: просмотр тогда возьмёт режим профиля, как и раньше.
+      const { data: sellerProfile } = await supabase.from('profiles')
+        .select('vat_type').eq('id', agent.user_id).maybeSingle()
       const { data: invoice, error: invError } = await supabase.from('invoices').insert({
         user_id: agent.user_id,
         number,
@@ -184,6 +189,7 @@ export async function sendInvoiceForDraft(
         status: 'sent',
         client_name: draft.customer_name || 'Клиент из чата',
         client_phone: draft.customer_phone || null,
+        vat_type: sellerProfile ? resolveInvoiceVatType(null, sellerProfile) : null,
         services,
         note: 'Выставлен ИИ-агентом из диалога',
       }).select('id, number, public_token').single()

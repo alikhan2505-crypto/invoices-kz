@@ -36,10 +36,10 @@ beforeEach(() => {
     invoices: {
       id: 'i1', number: '7', status: 'sent', amount: 1000, created_at: '2026-10-01', due_date: null,
       client_name: 'Клиент', client_bin: '', client_email: 'c@x.kz', client_address: '', contract_number: null,
-      contract_date: null, services: [], note: null, user_id: 'u1', bank_id: 'b1',
+      contract_date: null, services: [], note: null, knp: '710', vat_type: 'vat_16', user_id: 'u1', bank_id: 'b1',
     },
     profiles: {
-      company_name: 'ТОО', bin_iin: '1', address: 'a', phone: 'p', director_name: 'd', signature_url: '', stamp_url: '',
+      company_name: 'ТОО', bin_iin: '1', address: 'a', phone: 'p', director_name: 'd', signature_url: '', stamp_url: '', vat_type: 'vat_16',
       kaspi_pay_link: null, halyk_pay_link: null, website: null, social_links: [],
       plan: 'pro', plan_expires_at: future, bonus_expires_at: null, trial_expires_at: null, is_admin: false,
       email: 'seller@secret.kz',
@@ -65,7 +65,9 @@ describe('GET /api/public/invoice/[token]', () => {
     const body = await (await call()).json()
     expect(body.invoice).toMatchObject({ id: 'i1', number: '7', amount: 1000, client_name: 'Клиент' })
     expect(body.invoice.status).toBe('viewed') // sent -> viewed on first open
-    expect(body.profile).toMatchObject({ company_name: 'ТОО', bin_iin: '1', director_name: 'd' })
+    // КНП и режим НДС нужны PDF клиента; режим продавца — запасной вариант для старых счетов без своего.
+    expect(body.invoice).toMatchObject({ knp: '710', vat_type: 'vat_16' })
+    expect(body.profile).toMatchObject({ company_name: 'ТОО', bin_iin: '1', director_name: 'd', vat_type: 'vat_16' })
     expect(body.bank).toEqual({ bank_name: 'Halyk', iik: 'KZ1', bik: 'HSBKKZKX', kbe: '19' })
     expect(body.showWatermark).toBe(false)
   })

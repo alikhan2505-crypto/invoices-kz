@@ -26,6 +26,11 @@ describe('splitPublicProfile', () => {
     expect(splitPublicProfile(null)).toEqual({ profile: null, showWatermark: true })
   })
 
+  it('keeps the seller VAT mode (fallback for old invoices) in the public profile', () => {
+    const { profile } = splitPublicProfile({ company_name: 'A', vat_type: 'vat_16', email: 'x@y.kz', plan: 'pro' })
+    expect(profile).toEqual({ company_name: 'A', vat_type: 'vat_16' })
+  })
+
   it('exposes only whitelisted columns', () => {
     expect(PUBLIC_PROFILE_COLUMNS).not.toMatch(/email|plan|is_admin|user_id/)
   })
@@ -39,5 +44,11 @@ describe('toPublicInvoice', () => {
 
   it('column list has no wildcard or owner fields', () => {
     expect(PUBLIC_INVOICE_COLUMNS).not.toMatch(/\*|user_id|bank_id/)
+  })
+
+  it('column list carries the stored KNP and VAT mode for the PDF', () => {
+    const cols = PUBLIC_INVOICE_COLUMNS.split(',').map(c => c.trim())
+    expect(cols).toContain('knp')
+    expect(cols).toContain('vat_type')
   })
 })

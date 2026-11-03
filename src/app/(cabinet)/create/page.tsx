@@ -12,6 +12,7 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { almatyMonthStart, invoiceLimitWindow, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { formatDate, formatDateSafe } from '@/lib/date'
+import { resolveInvoiceVatType, resolveInvoiceKnp } from '@/lib/invoiceTax'
 import { UNIT_OPTIONS, unitLabel } from '@/lib/i18n/units'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -444,7 +445,8 @@ export default function CreateInvoicePage() {
 
   // До тиына: 10.1 * 3 в JS даёт 30.299999999999997, и такая сумма уходила в счёт, запрос Kaspi и сверку с выпиской.
   const total = Math.round(services.reduce((s, i) => s + i.qty * i.price, 0) * 100) / 100
-  const vatType = profile?.vat_type || 'no_vat'
+  // Новый счёт: режим НДС берётся из профиля сейчас и записывается в счёт при создании.
+  const vatType = resolveInvoiceVatType(null, profile)
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
   // Same rules createInvoice() enforces, from the same function -- the
@@ -576,6 +578,8 @@ export default function CreateInvoicePage() {
         setClientPhone(src.client_phone || '')
         setContractNumber(src.contract_number || '')
         setContractDate(src.contract_date || '')
+        // КНП у старых счетов не записан: тогда остаётся значение формы по умолчанию.
+        if (src.knp) setClientKnp(resolveInvoiceKnp(src))
         if (src.services && src.services.length > 0) setServices(src.services)
         if (src.client_name) setClientSelected(true)
       }
@@ -899,6 +903,8 @@ export default function CreateInvoicePage() {
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
       due_date: dueDate || null,
+      knp: resolveInvoiceKnp({ knp: clientKnp }),
+      vat_type: profile ? resolveInvoiceVatType(null, profile) : null,
       services,
       note: note || profile?.default_note || null,
     }).select().single()
@@ -1108,8 +1114,8 @@ export default function CreateInvoicePage() {
       date: new Date().toLocaleDateString('ru-KZ'),
       clientName, clientBin, clientEmail, clientAddress, clientPhone,
       contractNumber, contractDate: contractDate ? formatDateSafe(contractDate) : undefined,
-      knp: clientKnp, services, total,
-      note: note || profile?.default_note || '', autoPrint: false, vatType: profile?.vat_type || 'no_vat',
+      knp: resolveInvoiceKnp({ knp: clientKnp }), services, total,
+      note: note || profile?.default_note || '', autoPrint: false, vatType,
       profile: buildPDFProfile(withSign),
       bank: {
         bank_name: pendingBank?.bank_name || '',
