@@ -3,10 +3,12 @@
 // the readiness indicator above the button and createInvoice() itself, which
 // turns the first problem into the same alert it always showed.
 //
-// These are the page's rules exactly as they stood on 15.10.2026 -- nothing
-// added, nothing relaxed: a client name and a БИН must be there (truthy, as
-// before), there must be at least one line, every line needs a name and none
-// may have a price of 0. The seller's own requisites and bank account are a
+// These are the page's rules as they stood on 15.10.2026: a client name and a БИН
+// must be there (truthy), there must be at least one line, every line needs a
+// name and none may have a price of 0. Since 03.11.2026 the page itself passes an
+// empty clientBin when the БИН is not exactly 12 digits (audit 3.5: «1» used to
+// pass), so a malformed БИН counts as missing here; this function stays a pure
+// truthiness check. The seller's own requisites and bank account are a
 // separate gate that stays in createInvoice(); they are not the form's job.
 
 export type ReadinessProblem = 'clientName' | 'clientBin' | 'itemName' | 'itemPrice'

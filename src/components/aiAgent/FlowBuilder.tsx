@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import TriggerChipsEditor from './TriggerChipsEditor'
+import DecimalField from '@/components/DecimalField'
 
 const INPUT_CLS = 'w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
@@ -236,8 +237,8 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
                     <input value={step.invoiceItem?.name ?? ''} onChange={e => updateInvoiceItem(step.id, { name: e.target.value })}
                       maxLength={120} placeholder="Название позиции (товар/услуга)"
                       className={`${INPUT_CLS} flex-1`} style={{ color: 'var(--nav-text-primary)' }} />
-                    <input type="number" min={1} value={step.invoiceItem?.unitPrice || ''}
-                      onChange={e => updateInvoiceItem(step.id, { unitPrice: Number(e.target.value) })}
+                    <DecimalField value={step.invoiceItem?.unitPrice ?? 0}
+                      onValue={n => updateInvoiceItem(step.id, { unitPrice: n })}
                       placeholder="Цена, ₸"
                       className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', width: '120px' }} />
                   </div>

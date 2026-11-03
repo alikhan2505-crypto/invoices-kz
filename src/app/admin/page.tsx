@@ -528,7 +528,7 @@ export default function Admin() {
                   <input
                     className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm outline-none border border-gray-600"
                     type="number"
-                    value={newPromo.days}
+                    inputMode="numeric" value={newPromo.days}
                     onChange={e => setNewPromo({ ...newPromo, days: Number(e.target.value) })}
                   />
                 </div>
@@ -537,7 +537,7 @@ export default function Admin() {
                   <input
                     className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm outline-none border border-gray-600"
                     type="number"
-                    value={newPromo.max_uses}
+                    inputMode="numeric" value={newPromo.max_uses}
                     onChange={e => setNewPromo({ ...newPromo, max_uses: Number(e.target.value) })}
                   />
                 </div>

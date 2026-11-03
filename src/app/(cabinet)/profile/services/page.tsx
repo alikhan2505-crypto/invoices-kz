@@ -278,6 +278,7 @@ export default function Services() {
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.itemPriceFieldLabel}</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     className={inputClass}
                     placeholder={t.itemPricePlaceholder}
                     value={form.price}

@@ -675,7 +675,7 @@ export default function PublicInvoice() {
                       value={kaspiPhone}
                       onChange={e => setKaspiPhone(formatKzPhone(e.target.value))}
                       placeholder="+7 777 123 45 67"
-                      type="tel" inputMode="tel"
+                      type="tel" inputMode="tel" autoComplete="tel"
                       className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
                       style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }}
                     />

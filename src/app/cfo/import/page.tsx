@@ -32,6 +32,8 @@ function HeaderRowInput({ value, max, onValue }: { value: number; max: number; o
   return (
     <input
       inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete="off"
       className={inputClass}
       style={inputStyle}
       value={shown}

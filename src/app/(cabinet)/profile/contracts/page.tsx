@@ -219,6 +219,11 @@ export default function Contracts() {
                   className={inputClass}
                   placeholder={t.clientEmailFieldPlaceholder}
                   type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={form.client_email}
                   onChange={e => setForm({ ...form, client_email: e.target.value })}
                 />

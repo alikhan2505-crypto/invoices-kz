@@ -28,6 +28,8 @@ import {
   VAT_TYPES, type Form, type Row, type VatType,
 } from './calc'
 import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
+import DecimalField from '@/components/DecimalField'
+import { formatTengeExact, PRICE_DECIMALS, PRICE_MAX, QTY_DECIMALS, QTY_MAX, rowCell, rowNumber } from '@/lib/tools-i18n/rowNumbers'
 
 // Бесплатный генератор счёта на оплату — лид-магнит под самый частотный
 // документный запрос («счёт на оплату образец/скачать»). Правило основателя
@@ -378,20 +380,20 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
                 </div>
                 <div>
                   <label htmlFor="sc-other-bik" className={label} style={labelStyle}>{t.otherBankBikLabel}</label>
-                  <input id="sc-other-bik" className={input} style={inputStyle} autoComplete="off" placeholder={t.otherBankBikPlaceholder} value={f.otherBankBik} onChange={e => set({ otherBankBik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 8) })} />
+                  <input id="sc-other-bik" className={input} style={inputStyle} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder={t.otherBankBikPlaceholder} value={f.otherBankBik} onChange={e => set({ otherBankBik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 8) })} />
                 </div>
               </>
             )}
             <div>
               <label htmlFor="sc-iik" className={label} style={labelStyle}>{t.iikLabel}</label>
-              <input id="sc-iik" className={input} style={inputStyle} autoComplete="off" spellCheck={false} placeholder={t.iikPlaceholder} value={f.iik} onChange={e => set({ iik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 20) })} />
+              <input id="sc-iik" className={input} style={inputStyle} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder={t.iikPlaceholder} value={f.iik} onChange={e => set({ iik: e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 20) })} />
             </div>
             <MoreToggle m={supplierMore} lang={lang} className="sm:col-span-2"
               hint={moreHint([t.kbeLabel, t.directorLabel, t.addressLabel, t.emailLabel])} />
             <MorePanel m={supplierMore}>
               <div>
                 <label htmlFor="sc-kbe" className={label} style={labelStyle}>{t.kbeLabel}</label>
-                <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" aria-describedby="sc-kbe-hint" value={f.kbe} onChange={e => changeKbe(e.target.value)} />
+                <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-describedby="sc-kbe-hint" value={f.kbe} onChange={e => changeKbe(e.target.value)} />
                 <div id="sc-kbe-hint" className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
                   {needsManualKbe({ name: f.companyName, bin: f.binIin }) ? t.kbeHintManual : t.kbeHint}{!kbeManual && kbeSuggestion !== null && ` ${t.kbeAuto}`}
                 </div>
@@ -406,7 +408,7 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
               </div>
               <div>
                 <label htmlFor="sc-email" className={label} style={labelStyle}>{t.emailLabel}</label>
-                <input id="sc-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+                <input id="sc-email" type="email" className={input} style={inputStyle} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={f.email} onChange={e => set({ email: e.target.value })} />
                 <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
                   <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
                   <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
@@ -470,11 +472,11 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
           {f.rows.map((r, i) => (
             <div key={i} className="grid grid-cols-[64px_92px_1fr_28px] sm:grid-cols-[minmax(0,1fr)_72px_100px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
               <input className={`${input} col-span-4 sm:col-span-1`} style={inputStyle} aria-label={t.itemAria(i + 1)} placeholder={t.itemPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
-              <input className={input} style={inputStyle} inputMode="numeric" aria-label={t.qtyAria(i + 1)} placeholder={t.qtyPlaceholder} value={r.qty} onChange={e => setRow(i, { qty: digits(e.target.value).slice(0, 6) })} />
+              <DecimalField className={input} style={inputStyle} ariaLabel={t.qtyAria(i + 1)} placeholder={t.qtyPlaceholder} value={rowNumber(r.qty)} onValue={n => { const v = rowCell(n, QTY_MAX, QTY_DECIMALS); if (v !== null) setRow(i, { qty: v }) }} />
               <select className={`${input} px-2`} style={inputStyle} aria-label={unitAria(lang, i + 1)} value={r.unit || DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
                 {TOOL_UNITS.map(u => <option key={u} value={u}>{UNIT_LABELS[lang][u]}</option>)}
               </select>
-              <input className={input} style={inputStyle} inputMode="numeric" aria-label={t.priceAria(i + 1)} placeholder={t.pricePlaceholder} value={r.price} onChange={e => setRow(i, { price: digits(e.target.value).slice(0, 10) })} />
+              <DecimalField className={input} style={inputStyle} ariaLabel={t.priceAria(i + 1)} placeholder={t.pricePlaceholder} value={rowNumber(r.price)} onValue={n => { const v = rowCell(n, PRICE_MAX, PRICE_DECIMALS); if (v !== null) setRow(i, { price: v }) }} />
               <button
                 type="button"
                 onClick={() => setF(prev => ({ ...prev, rows: prev.rows.length > 1 ? prev.rows.filter((_, j) => j !== i) : prev.rows }))}
@@ -487,7 +489,7 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
               className="text-sm font-semibold" style={accentLink}>{t.addRow}</button>
             <div className="text-right" aria-live="polite">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
-                {t.total(formatTenge(total))}
+                {t.total(formatTengeExact(total))}
               </div>
               {(f.vatType === 'vat_16' || f.vatType === 'vat_0') && total > 0 && (
                 <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>

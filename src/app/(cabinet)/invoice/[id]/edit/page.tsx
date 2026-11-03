@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { digitsOnly } from '@/lib/kzIdentifiers'
 import { formatDate } from '@/lib/date'
 import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { UNIT_OPTIONS, unitLabel } from '@/lib/i18n/units'
@@ -84,7 +85,7 @@ export default function EditInvoice() {
       if (!inv) { router.push('/history'); return }
 
       setClientName(inv.client_name || '')
-      setClientBin(inv.client_bin || '')
+      setClientBin(digitsOnly(inv.client_bin).slice(0, 12))
       setClientEmail(inv.client_email || '')
       setClientAddress(inv.client_address || '')
       setClientPhone(inv.client_phone || '')
@@ -142,6 +143,8 @@ export default function EditInvoice() {
   async function save() {
     if (!clientName) { alert(t.enterClientNameAlert); return }
     if (!clientBin) { alert(t.enterBinIinAlert); return }
+    // БИН/ИИН - ровно 12 цифр, как при создании счёта (на «1» и «12345» раньше не возражали).
+    if (!/^\d{12}$/.test(clientBin)) { alert(t.clientBinMalformedAlert); return }
     if (services.some(s => !s.name || s.price === 0)) {
       alert(t.fillAllServicesAlert); return
     }
@@ -204,12 +207,14 @@ export default function EditInvoice() {
                 <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
                 <input className={inputClass} style={{ color: 'var(--nav-text-primary)' }}
                   placeholder={t.binIinPlaceholder} value={clientBin}
-                  onChange={e => handleBinChange(e.target.value)} />
+                  inputMode="numeric" pattern="[0-9]*" autoComplete="off" autoCorrect="off" spellCheck={false}
+                  onChange={e => handleBinChange(e.target.value.replace(/\D/g, '').slice(0, 12))} />
               </div>
               <div>
                 <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>
                 <input className={inputClass} style={{ color: 'var(--nav-text-primary)' }}
                   placeholder={t.emailPlaceholder} value={clientEmail}
+                  type="email" inputMode="email" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   onChange={e => setClientEmail(e.target.value)} />
               </div>
             </div>
@@ -223,6 +228,7 @@ export default function EditInvoice() {
               <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
               <input className={inputClass} style={{ color: 'var(--nav-text-primary)' }}
                 placeholder={t.buyerPhonePlaceholderEdit} value={clientPhone}
+                type="tel" inputMode="tel" autoComplete="off"
                 onChange={e => setClientPhone(e.target.value)} />
             </div>
           </div>

@@ -23,6 +23,8 @@ import { useRequisites } from '@/lib/tools-i18n/useRequisites'
 import { kpDict } from './dict'
 import { UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS, KP_DEFAULT_UNIT, type KpRow } from './calc'
+import DecimalField from '@/components/DecimalField'
+import { formatTengeExact, PRICE_DECIMALS, PRICE_MAX, QTY_DECIMALS, QTY_MAX, rowCell, rowNumber } from '@/lib/tools-i18n/rowNumbers'
 
 // Бесплатный генератор коммерческого предложения — близнец /tools/avr:
 // черновик в localStorage, рендер — продуктовым generateKP (окно с кнопкой
@@ -310,7 +312,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
             <MorePanel m={supplierMore}>
               <div>
                 <label htmlFor="kp-phone" className={label} style={labelStyle}>{t.phoneLabel}</label>
-                <input id="kp-phone" type="tel" className={input} style={inputStyle} autoComplete="tel" value={f.phone} onChange={e => set({ phone: e.target.value })} />
+                <input id="kp-phone" type="tel" inputMode="tel" className={input} style={inputStyle} autoComplete="tel" value={f.phone} onChange={e => set({ phone: e.target.value })} />
               </div>
               <div>
                 <label htmlFor="kp-director" className={label} style={labelStyle}>{t.directorLabel}</label>
@@ -322,7 +324,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
               </div>
               <div>
                 <label htmlFor="kp-email" className={label} style={labelStyle}>{t.emailLabel}</label>
-                <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+                <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={f.email} onChange={e => set({ email: e.target.value })} />
                 <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
                   <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => setMarketingConsent(e.target.checked)} />
                   <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
@@ -355,11 +357,11 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
             </div>
             <div>
               <label htmlFor="kp-client-phone" className={label} style={labelStyle}>{t.clientPhoneLabel}</label>
-              <input id="kp-client-phone" type="tel" className={input} style={inputStyle} autoComplete="off" value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} />
+              <input id="kp-client-phone" type="tel" inputMode="tel" className={input} style={inputStyle} autoComplete="off" value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} />
             </div>
             <div>
               <label htmlFor="kp-client-email" className={label} style={labelStyle}>{t.clientEmailLabel}</label>
-              <input id="kp-client-email" type="email" className={input} style={inputStyle} autoComplete="off" value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} />
+              <input id="kp-client-email" type="email" className={input} style={inputStyle} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} />
             </div>
           </MorePanel>
           {/* На телефоне номер, дата, срок и примечание свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня). */}
@@ -413,11 +415,11 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
             // с sm — всё в одну строку.
             <div key={i} className="grid grid-cols-[64px_92px_1fr_28px] sm:grid-cols-[1fr_72px_100px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
               <input className={`${input} col-span-4 sm:col-span-1`} style={inputStyle} aria-label={t.rowPlaceholder(i + 1)} placeholder={t.rowPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
-              <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.qtyPlaceholder} — ${i + 1}`} placeholder={t.qtyPlaceholder} value={r.qty} onChange={e => setRow(i, { qty: digits(e.target.value).slice(0, 6) })} />
+              <DecimalField className={input} style={inputStyle} ariaLabel={`${t.qtyPlaceholder} — ${i + 1}`} placeholder={t.qtyPlaceholder} value={rowNumber(r.qty)} onValue={n => { const v = rowCell(n, QTY_MAX, QTY_DECIMALS); if (v !== null) setRow(i, { qty: v }) }} />
               <select className={`${input} px-2`} style={inputStyle} aria-label={unitAria(lang, i + 1)} value={r.unit || KP_DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
                 {KP_UNITS.map(u => <option key={u} value={u}>{UNIT_LABELS[lang][u]}</option>)}
               </select>
-              <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.pricePlaceholder} — ${i + 1}`} placeholder={t.pricePlaceholder} value={r.price} onChange={e => setRow(i, { price: digits(e.target.value).slice(0, 10) })} />
+              <DecimalField className={input} style={inputStyle} ariaLabel={`${t.pricePlaceholder} — ${i + 1}`} placeholder={t.pricePlaceholder} value={rowNumber(r.price)} onValue={n => { const v = rowCell(n, PRICE_MAX, PRICE_DECIMALS); if (v !== null) setRow(i, { price: v }) }} />
               <button
                 type="button"
                 onClick={() => setF(prev => ({ ...prev, rows: prev.rows.length > 1 ? prev.rows.filter((_, j) => j !== i) : prev.rows }))}
@@ -429,7 +431,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
               className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.addRow}</button>
             <div className="text-right">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
-                {t.totalLabel}: {formatTenge(total)}
+                {t.totalLabel}: {formatTengeExact(total)}
               </div>
               {(f.vatType === 'vat_16' || f.vatType === 'vat_0') && total > 0 && (
                 <div className="text-[11px] mt-0.5" style={hintStyle}>{t.vatIncluded(formatTenge(f.vatType === 'vat_16' ? kpVatIncluded(total) : 0), f.vatType === 'vat_16' ? 16 : 0)}</div>

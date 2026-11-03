@@ -25,7 +25,7 @@ const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 ho
 const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
 function Field({
-  label, value, onChange, placeholder, type = 'text', maxLength, className,
+  label, value, onChange, placeholder, type = 'text', maxLength, className, inputProps,
 }: {
   className?: string
   label: string
@@ -34,6 +34,8 @@ function Field({
   placeholder?: string
   type?: string
   maxLength?: number
+  /** Клавиатура и автозаполнение мобильного браузера: inputMode, autoComplete и т.п. */
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement>
 }) {
   return (
     <div className={className}>
@@ -44,6 +46,7 @@ function Field({
         value={value}
         type={type}
         maxLength={maxLength}
+        {...inputProps}
         onChange={e => onChange(e.target.value)}
       />
     </div>
@@ -266,8 +269,13 @@ export default function Requisites() {
                   className={inputClass.replace('w-full', 'flex-1')}
                   placeholder={t.binIinPlaceholder}
                   value={profile.bin_iin}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   onChange={async e => {
-                    const value = e.target.value
+                    const value = digitsOnly(e.target.value).slice(0, 12)
                     setProfile({ ...profile, bin_iin: value })
                     if (value.replace(/\D/g, '').length !== 12) { resetBinLookup(); return }
                   }}
@@ -328,10 +336,12 @@ export default function Requisites() {
             <Field className="md:col-span-2 xl:col-span-1" label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
               value={profile.address} onChange={v => setProfile({ ...profile, address: v })} />
 
-            <Field label={t.emailFieldLabel} placeholder={t.emailPlaceholder}
+            <Field label={t.emailFieldLabel} placeholder={t.emailPlaceholder} type="email"
+              inputProps={{ inputMode: 'email', autoComplete: 'email', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false }}
               value={profile.email} onChange={v => setProfile({ ...profile, email: v })} />
 
             <Field label={t.phoneFieldLabel} placeholder={t.phonePlaceholder} type="tel" maxLength={16}
+              inputProps={{ inputMode: 'tel', autoComplete: 'tel' }}
               value={profile.phone} onChange={v => setProfile({ ...profile, phone: formatPhone(v) })} />
 
             <Field label={t.directorNameFieldLabel} placeholder={t.personNamePlaceholder}

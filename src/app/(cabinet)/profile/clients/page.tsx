@@ -224,7 +224,12 @@ export default function Clients() {
                   className={inputClass}
                   placeholder="123456789012"
                   value={form.bin_iin}
-                  onChange={e => setForm({ ...form, bin_iin: e.target.value })}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={e => setForm({ ...form, bin_iin: e.target.value.replace(/\D/g, '').slice(0, 12) })}
                 />
               </div>
 
@@ -234,6 +239,12 @@ export default function Clients() {
                   className={inputClass}
                   placeholder="client@mail.kz"
                   value={form.email}
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                 />
               </div>
@@ -255,6 +266,8 @@ export default function Clients() {
                   placeholder="+7 776 355 5177"
                   value={form.phone}
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
                   maxLength={16}
                   onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })}
                 />

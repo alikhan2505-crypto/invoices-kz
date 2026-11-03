@@ -992,6 +992,9 @@ export default function Upgrade() {
                   placeholder={t.promoPlaceholder}
                   value={promoCode}
                   autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
                   onKeyDown={e => { if (e.key === 'Enter' && !promoLoading) applyPromo() }}
                 />

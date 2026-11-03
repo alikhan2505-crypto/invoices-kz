@@ -718,7 +718,7 @@ export default function ChannelCards({
             className={`${INPUT_CLS} mb-2`}
             style={{ color: 'var(--nav-text-primary)' }}
             placeholder="123456789:AAH3xk…"
-            autoComplete="off"
+            autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={telegramToken}
             onChange={e => setTelegramToken(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') connectTelegram() }} />

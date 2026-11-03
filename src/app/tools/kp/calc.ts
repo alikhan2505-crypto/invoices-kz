@@ -11,8 +11,9 @@ export interface KpLine { name: string; qty: number; unit: string; price: number
 // Единицы измерения — общий список бесплатных документов (src/lib/tools-i18n/units.ts).
 export { TOOL_UNITS as KP_UNITS, DEFAULT_UNIT as KP_DEFAULT_UNIT } from '@/lib/tools-i18n/units'
 import { DEFAULT_UNIT as KP_DEFAULT_UNIT } from '@/lib/tools-i18n/units'
+import { roundTenge, rowNumber } from '@/lib/tools-i18n/rowNumbers'
 
-const num = (s: string) => Number(s) || 0
+const num = rowNumber
 
 /** Строки, которые попадут в документ: только с названием. */
 export function kpLines(rows: KpRow[]): KpLine[] {
@@ -21,9 +22,9 @@ export function kpLines(rows: KpRow[]): KpLine[] {
     .map(r => ({ name: r.name.trim(), qty: num(r.qty), unit: r.unit || KP_DEFAULT_UNIT, price: num(r.price) }))
 }
 
-/** Итог — ровно по тем строкам, что уйдут в документ (qty × price, как в generateKP). */
+/** Итог — ровно по тем строкам, что уйдут в документ (qty × price, как в generateKP), до тиына (количество и цена бывают дробными). */
 export function kpTotal(rows: KpRow[]): number {
-  return kpLines(rows).reduce((sum, l) => sum + l.qty * l.price, 0)
+  return roundTenge(kpLines(rows).reduce((sum, l) => sum + l.qty * l.price, 0))
 }
 
 /**

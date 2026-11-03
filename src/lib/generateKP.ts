@@ -1,3 +1,4 @@
+import { formatQty } from '@/lib/tools-i18n/rowNumbers'
 interface KPService {
   name: string
   qty: number
@@ -430,7 +431,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
                 <td>${i + 1}</td>
                 ${hasCodes ? `<td>${escapeHtml(s.code || '')}</td>` : ''}
                 <td class="name">${escapeHtml(s.name)}</td>
-                <td>${escapeHtml(s.qty)}</td>
+                <td>${escapeHtml(formatQty(s.qty))}</td>
                 <td>${escapeHtml(kpUnitLabel(s.unit, lang))}</td>
                 <td class="right">${formatMoney(Number(s.price))} ₸</td>
                 <td class="right">${formatMoney(s.qty * s.price)} ₸</td>

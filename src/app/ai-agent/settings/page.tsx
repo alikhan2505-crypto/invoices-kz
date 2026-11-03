@@ -1461,10 +1461,10 @@ export default function AiAgentSettings() {
                         </div>
                       ) : (
                         <>
-                          <input type="text" placeholder="Pixel ID" value={metaPixelIdInput}
+                          <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="Pixel ID" value={metaPixelIdInput}
                             onChange={e => setMetaPixelIdInput(e.target.value)}
                             className="w-full mb-2 text-xs rounded-lg px-3 py-2 nav-glass" style={{ color: 'var(--nav-text-primary)' }} />
-                          <input type="password" placeholder="Токен доступа" value={metaTokenInput}
+                          <input type="password" autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Токен доступа" value={metaTokenInput}
                             onChange={e => setMetaTokenInput(e.target.value)}
                             className="w-full mb-2 text-xs rounded-lg px-3 py-2 nav-glass" style={{ color: 'var(--nav-text-primary)' }} />
                           <button onClick={connectMetaCapi} disabled={metaCapiBusy || !metaPixelIdInput.trim() || !metaTokenInput.trim()}

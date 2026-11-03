@@ -404,6 +404,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
                       placeholder={t.leadPlaceholder}
                       aria-label={t.leadAria}
                       autoComplete="email"
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)]"
                       // WebkitTextFillColor: globals.css задаёт input { -webkit-text-fill-color: #111827 },
                       // и в тёмной теме набранный адрес был почти невиден (как у остальных инструментов).

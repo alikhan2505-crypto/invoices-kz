@@ -283,12 +283,12 @@ export default function KaspiShopMargin() {
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена Kaspi, ₸</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={kaspiPrice} onChange={e => setKaspiPrice(e.target.value)} />
+                    value={kaspiPrice} onChange={e => setKaspiPrice(e.target.value)} inputMode="decimal" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена у поставщика, ₸</span>
                   <input id="margin-sourcing-price" className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={sourcingPrice} onChange={e => setSourcingPrice(e.target.value)} />
+                    value={sourcingPrice} onChange={e => setSourcingPrice(e.target.value)} inputMode="decimal" />
                 </label>
               </div>
 
@@ -296,17 +296,17 @@ export default function KaspiShopMargin() {
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Вес, г</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={weightGrams} onChange={e => setWeightGrams(e.target.value)} />
+                    value={weightGrams} onChange={e => setWeightGrams(e.target.value)} inputMode="decimal" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Упаковка, ₸</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={packagingCost} onChange={e => setPackagingCost(e.target.value)} />
+                    value={packagingCost} onChange={e => setPackagingCost(e.target.value)} inputMode="decimal" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Карго, ₸/кг</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={cargoRatePerKg} onChange={e => setCargoRatePerKg(e.target.value)} />
+                    value={cargoRatePerKg} onChange={e => setCargoRatePerKg(e.target.value)} inputMode="decimal" />
                 </label>
               </div>
 
@@ -321,7 +321,7 @@ export default function KaspiShopMargin() {
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>Комиссия Kaspi, %</span>
                   <input className={`${INPUT_CLS} font-mono py-1.5`} type="number" step="0.1" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={commissionRatePercent} onChange={e => { setCommissionRatePercent(e.target.value); setCategorySelection(MANUAL_CATEGORY) }} />
+                    value={commissionRatePercent} onChange={e => { setCommissionRatePercent(e.target.value); setCategorySelection(MANUAL_CATEGORY) }} inputMode="decimal" />
                 </div>
               </label>
 
@@ -329,7 +329,7 @@ export default function KaspiShopMargin() {
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Доставка Kaspi, ₸</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={deliveryFee} onChange={e => { setDeliveryFee(e.target.value); setDeliveryTouched(true) }} />
+                    value={deliveryFee} onChange={e => { setDeliveryFee(e.target.value); setDeliveryTouched(true) }} inputMode="decimal" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Город (для справки)</span>
@@ -346,7 +346,7 @@ export default function KaspiShopMargin() {
               <label className="block">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка на товар у поставщика (необязательно)</span>
                 <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                  placeholder="https://detail.1688.com/..." value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} />
+                  placeholder="https://detail.1688.com/..." value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
               </label>
             </div>
 
@@ -432,7 +432,7 @@ export default function KaspiShopMargin() {
                   <span className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Цель по марже</span>
                   <div className="flex items-center gap-2">
                     <input className={`${INPUT_CLS} font-mono py-1 px-2 w-20 text-right`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                      value={targetMarginPercent} onChange={e => setTargetMarginPercent(e.target.value)} onBlur={saveTargetMargin} />
+                      value={targetMarginPercent} onChange={e => setTargetMarginPercent(e.target.value)} onBlur={saveTargetMargin} inputMode="decimal" />
                     <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>%</span>
                   </div>
                 </div>

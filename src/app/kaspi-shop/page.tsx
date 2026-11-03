@@ -849,7 +849,7 @@ export default function KaspiShop() {
               ) : !otpToken ? (
                 <div className="flex flex-col gap-2">
                   <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} />
+                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" />
                   <button onClick={startConnect} disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {connecting ? 'Отправляем код...' : 'Продолжить'}
@@ -859,7 +859,7 @@ export default function KaspiShop() {
                 <div className="flex flex-col gap-2">
                   <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
                   <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)}
+                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6}
                     disabled={!!resumeToken || connecting} />
                   <button onClick={completeConnect} disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
@@ -1148,17 +1148,17 @@ export default function KaspiShop() {
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }} title="Бот никогда не опустит цену ниже этого значения. Если конкурент ушёл ниже — бот остановится на минимуме и пришлёт уведомление, а когда конкурент вернётся выше, сам поднимет цену обратно.">Минимальная цена ⓘ</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                                    value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
+                                    value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
-                                    value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} />
+                                    value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                                    value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
+                                    value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} inputMode="decimal" />
                                 </label>
                               </div>
                               {/* Остатки живут по складам/городам (founder,
@@ -1277,7 +1277,7 @@ export default function KaspiShop() {
                 ))}
               </div>
               <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
-                placeholder="Своя сумма, ₸" type="text" inputMode="numeric"
+                placeholder="Своя сумма, ₸" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
                 className="w-full border-b py-2 text-sm outline-none mb-3 bg-transparent"
                 style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-text-primary)' }} />
               <button onClick={() => startTopup((topupAmount ?? Number(topupCustom)) || 0)}
@@ -1382,17 +1382,17 @@ export default function KaspiShop() {
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
                       <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                        value={bulkFloorPrice} onChange={e => setBulkFloorPrice(e.target.value)} />
+                        value={bulkFloorPrice} onChange={e => setBulkFloorPrice(e.target.value)} inputMode="decimal" />
                     </label>
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
                       <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
-                        value={bulkMaxPrice} onChange={e => setBulkMaxPrice(e.target.value)} />
+                        value={bulkMaxPrice} onChange={e => setBulkMaxPrice(e.target.value)} inputMode="decimal" />
                     </label>
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
                       <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                        value={bulkUndercutStep} onChange={e => setBulkUndercutStep(e.target.value)} />
+                        value={bulkUndercutStep} onChange={e => setBulkUndercutStep(e.target.value)} inputMode="decimal" />
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1406,7 +1406,7 @@ export default function KaspiShop() {
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Частота проверки, мин</span>
                       <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
-                        value={bulkFrequency} onChange={e => setBulkFrequency(e.target.value)} />
+                        value={bulkFrequency} onChange={e => setBulkFrequency(e.target.value)} inputMode="numeric" pattern="[0-9]*" />
                     </label>
                     <div className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                       {STRATEGY_DESCRIPTIONS[bulkStrategy] || ''} {STRATEGY_COMMON_NOTE}

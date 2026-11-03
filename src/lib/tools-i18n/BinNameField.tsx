@@ -111,7 +111,7 @@ export default function BinNameField({
     <div className={className}>
       <label htmlFor={id} className={labelClass} style={labelStyle}>{label}</label>
       <div className="flex gap-2">
-        <input id={id} className={inputClass} style={inputStyle} inputMode="numeric" autoComplete="off" spellCheck={false} placeholder={placeholder}
+        <input id={id} className={inputClass} style={inputStyle} inputMode="numeric" pattern="[0-9]*" autoComplete="off" autoCorrect="off" spellCheck={false} placeholder={placeholder}
           value={value ?? ''}
           onChange={e => {
             const next = onlyBinDigits(e.target.value)

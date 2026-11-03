@@ -143,7 +143,7 @@ export default function FirstAccountWizard() {
                 </div>
                 <div className="order-4 sm:order-3 col-span-2 sm:col-span-1">
                   <Field label="Остаток, ₸">
-                    <input className={inputClass} style={inputStyle} inputMode="decimal" value={r.balance} onChange={(e) => patch(r.key, { balance: e.target.value })} placeholder="нет" />
+                    <input className={inputClass} style={inputStyle} inputMode="text" autoComplete="off" value={r.balance} onChange={(e) => patch(r.key, { balance: e.target.value })} placeholder="нет" />
                   </Field>
                 </div>
                 <div className="order-2 sm:order-4">

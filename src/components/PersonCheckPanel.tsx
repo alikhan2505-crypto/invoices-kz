@@ -123,6 +123,7 @@ export default function PersonCheckPanel() {
           <input
             id="iin"
             inputMode="numeric"
+            pattern="[0-9]*"
             autoComplete="off"
             placeholder="12 цифр"
             value={iin}

@@ -215,7 +215,10 @@ export default function BinWatchPage() {
               <div className="flex flex-wrap gap-2">
                 <input
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   aria-label={t.addPlaceholder}
                   placeholder={t.addPlaceholder}
                   value={bin}

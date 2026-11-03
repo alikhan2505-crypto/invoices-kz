@@ -486,14 +486,14 @@ export default function AcquiringPage() {
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfLoginLabel}</label>
                 <input value={esfLogin} onChange={e => setEsfLogin(e.target.value)} placeholder={t.esfLoginPlaceholder}
-                  type="text" required
+                  type="text" required autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
                   style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
               </div>
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfPasswordLabel}</label>
                 <input value={esfPassword} onChange={e => setEsfPassword(e.target.value)} placeholder={t.esfPasswordPlaceholder}
-                  type="password" required
+                  type="password" required autoComplete="new-password"
                   className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
                   style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
               </div>

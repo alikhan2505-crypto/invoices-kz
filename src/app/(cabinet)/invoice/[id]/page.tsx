@@ -1430,7 +1430,7 @@ export default function InvoicePage() {
             </div>
             <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.recipientEmailLabel}</label>
             <input className="w-full rounded-lg px-3 py-3 text-sm outline-none mb-4 transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-              placeholder={t.emailPlaceholder} type="email"
+              placeholder={t.emailPlaceholder} type="email" inputMode="email" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               value={emailTo} onChange={e => setEmailTo(e.target.value)} style={{ color: 'var(--nav-text-primary)' }} />
             <div className="space-y-2">
               <button onClick={sendEmailConfirm} disabled={sendingEmail}
@@ -1549,7 +1549,7 @@ export default function InvoicePage() {
                           ))}
                         </select>
                         <input
-                          type="number" min={0} max={100} step={1}
+                          type="number" inputMode="numeric" min={0} max={100} step={1}
                           className="w-24 rounded-lg px-2 py-2 text-xs outline-none border border-[color:var(--nav-border)]"
                           style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
                           value={esfLineConfigs[i]?.ndsRate ?? 0}

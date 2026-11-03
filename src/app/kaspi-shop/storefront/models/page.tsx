@@ -187,9 +187,9 @@ export default function WholesaleModelsPage() {
             <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Новая модель</div>
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Название (напр. «Лонгслив однотонный Long01»)"
               className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-            <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Цена, ₸" type="number"
+            <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Цена, ₸" type="number" inputMode="decimal"
               className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-            <input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Ссылка на фото"
+            <input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Ссылка на фото" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
             <select value={newCategoryId} onChange={e => setNewCategoryId(e.target.value)}
               className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}>
@@ -244,7 +244,7 @@ export default function WholesaleModelsPage() {
                             <td className="py-1">
                               <input
                                 type="number"
-                                defaultValue={v.stockCount ?? ''}
+                                defaultValue={v.stockCount ?? ''} inputMode="numeric" pattern="[0-9]*"
                                 placeholder="пошив"
                                 onBlur={e => updateVariantStock(m.id, v.id, e.target.value === '' ? null : Number(e.target.value))}
                                 className="w-20 rounded px-2 py-1 text-xs outline-none border border-[color:var(--nav-border)]"
@@ -263,7 +263,7 @@ export default function WholesaleModelsPage() {
                         className="rounded-lg px-2 py-1.5 text-xs outline-none border border-[color:var(--nav-border)] w-28" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
                       <input value={variantColor} onChange={e => setVariantColor(e.target.value)} placeholder="Цвет"
                         className="rounded-lg px-2 py-1.5 text-xs outline-none border border-[color:var(--nav-border)] w-28" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
-                      <input value={variantStock} onChange={e => setVariantStock(e.target.value)} placeholder="Остаток (пусто = пошив)" type="number"
+                      <input value={variantStock} onChange={e => setVariantStock(e.target.value)} placeholder="Остаток (пусто = пошив)" type="number" inputMode="numeric" pattern="[0-9]*"
                         className="rounded-lg px-2 py-1.5 text-xs outline-none border border-[color:var(--nav-border)] w-40" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
                       <button onClick={() => addVariant(m.id)} disabled={addingVariant}
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>

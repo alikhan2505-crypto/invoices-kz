@@ -355,6 +355,10 @@ export default function Banks() {
                   className={inputClass}
                   placeholder={t.bikPlaceholder}
                   value={form.bik}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
                   readOnly={!manualBank && !!selectedBank}
                   onChange={e => setForm({ ...form, bik: e.target.value })}
                 />
@@ -376,7 +380,7 @@ export default function Banks() {
                       if (f.key === 'kbe') setKbeManual(true)
                       setForm({ ...form, [f.key]: e.target.value })
                     }}
-                    {...(f.key === 'iik' ? { autoCapitalize: 'characters', spellCheck: false, onBlur: () => { if (form.iik.trim()) setIikTouched(true) } } : {})}
+                    {...(f.key === 'iik' ? { autoCapitalize: 'characters', autoCorrect: 'off', autoComplete: 'off', spellCheck: false, onBlur: () => { if (form.iik.trim()) setIikTouched(true) } } : { inputMode: 'numeric', pattern: '[0-9]*', autoComplete: 'off' } as const)}
                   />
                   {f.key === 'kbe' && (
                     <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>

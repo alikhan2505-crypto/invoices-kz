@@ -589,7 +589,7 @@ function KaspiShopOrdersInner() {
 
                 <label className="block mb-3">
                   <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Телефон клиента</span>
-                  <input type="tel" placeholder="+7 707 123 45 67" value={reviewModal.phone}
+                  <input type="tel" inputMode="tel" autoComplete="off" placeholder="+7 707 123 45 67" value={reviewModal.phone}
                     onChange={e => setReviewModal(prev => prev ? { ...prev, phone: e.target.value } : prev)}
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none border"
                     style={{ borderColor: phoneInvalid ? 'var(--nav-critical)' : 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />

@@ -294,7 +294,7 @@ export default function SiteGenerator() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Field label="Поддомен">
                 <div className="flex items-center gap-2">
-                  <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                  <input autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())}
                     placeholder="lotos" className={inputClass} />
                   <span className="text-xs text-gray-400 whitespace-nowrap">.{BASE_DOMAIN}</span>
                 </div>
@@ -302,7 +302,7 @@ export default function SiteGenerator() {
 
               <Field label="Ссылка на 2ГИС (необязательно)">
                 <div className="flex items-center gap-2">
-                  <input value={twoGisUrl} onChange={(e) => setTwoGisUrl(e.target.value)}
+                  <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={twoGisUrl} onChange={(e) => setTwoGisUrl(e.target.value)}
                     placeholder="https://2gis.kz/shymkent/firm/70000001101134746" className={inputClass} />
                   <button onClick={fillFrom2gis} disabled={fetchingTwoGis || !twoGisUrl.trim()}
                     className="text-xs bg-gray-700 text-gray-200 px-3 py-2.5 rounded-lg whitespace-nowrap disabled:opacity-50">
@@ -326,10 +326,10 @@ export default function SiteGenerator() {
                 <input value={salon.address} onChange={(e) => setSalon({ ...salon, address: e.target.value })} className={inputClass} />
               </Field>
               <Field label="Телефон">
-                <input value={salon.phone} onChange={(e) => setSalon({ ...salon, phone: e.target.value })} className={inputClass} />
+                <input type="tel" inputMode="tel" autoComplete="off" value={salon.phone} onChange={(e) => setSalon({ ...salon, phone: e.target.value })} className={inputClass} />
               </Field>
               <Field label="WhatsApp">
-                <input value={salon.whatsapp ?? ''} onChange={(e) => setSalon({ ...salon, whatsapp: e.target.value })} className={inputClass} />
+                <input type="tel" inputMode="tel" autoComplete="off" value={salon.whatsapp ?? ''} onChange={(e) => setSalon({ ...salon, whatsapp: e.target.value })} className={inputClass} />
               </Field>
               <Field label="Instagram">
                 <input value={salon.instagram ?? ''} onChange={(e) => setSalon({ ...salon, instagram: e.target.value })} className={inputClass} />

@@ -38,6 +38,7 @@ import { resizeToFit } from './imageResize'
 import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
+import { formatQty } from '@/lib/tools-i18n/rowNumbers'
 import { amountInWordsKzt } from './amountWords'
 
 export interface AVRImages {
@@ -255,7 +256,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
               <td style="text-align:center;">${date}</td>
               <td style="text-align:center;">—</td>
               <td style="text-align:center;">${escapeHtml(s.unit || 'шт')}</td>
-              <td style="text-align:center;">${escapeHtml(s.qty)}</td>
+              <td style="text-align:center;">${escapeHtml(formatQty(s.qty))}</td>
               <td style="text-align:right;">${formatMoney(Number(s.price))}</td>
               <td style="text-align:right;">${formatMoney(s.qty * s.price)}</td>
             </tr>

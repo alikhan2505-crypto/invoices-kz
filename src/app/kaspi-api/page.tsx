@@ -962,7 +962,7 @@ export default function KaspiApiPage() {
                   </div>
                   <input value={kaspiTopupCustom}
                     onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
-                    placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
+                    placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
                     className="w-full py-2 text-sm outline-none mb-1 bg-transparent"
                     style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
                   {kaspiTopupCustom !== '' && Number(kaspiTopupCustom) < MIN_TOPUP_AMOUNT && (
@@ -989,7 +989,7 @@ export default function KaspiApiPage() {
                     <>
                       <input value={topupPhone}
                         onChange={e => setTopupPhone(formatKzPhone(e.target.value))}
-                        placeholder={t.kaspiTopupPhonePlaceholder} type="tel" inputMode="tel"
+                        placeholder={t.kaspiTopupPhonePlaceholder} type="tel" inputMode="tel" autoComplete="tel"
                         className="w-full py-2 text-sm outline-none mb-2 bg-transparent"
                         style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
                       <button
@@ -1133,7 +1133,7 @@ export default function KaspiApiPage() {
             <>
               <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiPhoneLabel}</label>
               <input value={kaspiPhone} onChange={e => setKaspiPhone(formatKaspiPhone(e.target.value))} placeholder={t.kaspiPhonePlaceholder}
-                type="tel" maxLength={16}
+                type="tel" inputMode="tel" autoComplete="tel" maxLength={16}
                 className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
                 style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
               <button onClick={sendKaspiCode} disabled={kaspiSending || !kaspiPhone}
@@ -1146,7 +1146,7 @@ export default function KaspiApiPage() {
             <>
               <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiOtpLabel}</label>
               <input value={kaspiOtp} onChange={e => setKaspiOtp(e.target.value)} placeholder={t.kaspiOtpPlaceholder}
-                type="text" inputMode="numeric" maxLength={6}
+                type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6}
                 className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
                 style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
               <button onClick={verifyKaspiCode} disabled={kaspiVerifying || !kaspiOtp}

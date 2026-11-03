@@ -458,7 +458,7 @@ export default function PrintShopClient() {
             <div className="space-y-2">
               <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ваше имя"
                 className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }} />
-              <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Телефон"
+              <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Телефон" type="tel" inputMode="tel" autoComplete="tel"
                 className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }} />
               <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Комментарий (необязательно)" rows={3}
                 className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }} />

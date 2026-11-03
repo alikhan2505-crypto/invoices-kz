@@ -327,6 +327,11 @@ export default function Login() {
               style={{ backgroundColor: '#fff', color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t.emailPlaceholder}
               type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={e => { formTouched.current = true; setEmail(e.target.value) }}
               onKeyDown={e => e.key === 'Enter' && sendLink()}

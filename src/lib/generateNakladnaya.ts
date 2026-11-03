@@ -35,6 +35,7 @@ import { resizeToFit } from './imageResize'
 import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
+import { formatQty } from '@/lib/tools-i18n/rowNumbers'
 
 // URL картинки (логотип/подпись/печать) в src: resizeToFit при ошибке загрузки
 // возвращает исходный URL из профиля как есть, поэтому пропускаем только
@@ -281,8 +282,8 @@ ${logoBase64 ? `
         <td>${escapeHtml(s.name)}</td>
         <td style="text-align:center;">${escapeHtml(s.code || (i + 1))}</td>
         <td style="text-align:center;">${escapeHtml(s.unit || 'шт')}</td>
-        <td style="text-align:center;">${escapeHtml(s.qty)}</td>
-        <td style="text-align:center;">${escapeHtml(s.qty)}</td>
+        <td style="text-align:center;">${escapeHtml(formatQty(s.qty))}</td>
+        <td style="text-align:center;">${escapeHtml(formatQty(s.qty))}</td>
         <td style="text-align:right;">${formatMoney(Number(s.price))}</td>
         <td style="text-align:right;">${formatMoney(itemTotal)}</td>
         <td style="text-align:right;">${formatMoney(itemVat)}</td>

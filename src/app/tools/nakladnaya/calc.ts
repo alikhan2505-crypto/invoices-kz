@@ -1,4 +1,5 @@
 import type { NakladnayaDict } from './dict'
+import { roundTenge, rowNumber } from '@/lib/tools-i18n/rowNumbers'
 
 // Чистая логика /tools/nakladnaya (без React) — чтобы итог на экране и итог в
 // самой накладной считались одинаково и это можно было проверить тестом.
@@ -44,12 +45,12 @@ export function ruDate(iso: string): string {
 export function documentRows(rows: Row[]) {
   return rows
     .filter(r => r.name.trim())
-    .map(r => ({ name: r.name.trim(), qty: Number(r.qty) || 0, unit: r.unit || 'шт', price: Number(r.price) || 0 }))
+    .map(r => ({ name: r.name.trim(), qty: rowNumber(r.qty), unit: r.unit || 'шт', price: rowNumber(r.price) }))
 }
 
-/** Итог ровно как в документе: Σ qty × price по строкам с наименованием. */
+/** Итог ровно как в документе: Σ qty × price по строкам с наименованием, до тиына (количество и цена бывают дробными). */
 export function documentTotal(rows: Row[]): number {
-  return documentRows(rows).reduce((sum, r) => sum + r.qty * r.price, 0)
+  return roundTenge(documentRows(rows).reduce((sum, r) => sum + r.qty * r.price, 0))
 }
 
 /** НДС 16% «в т. ч.» — та же формула, что в generateNakladnaya. */
@@ -67,12 +68,12 @@ export function validateForm(f: Form, e: NakladnayaDict['errors']): string {
   // попадёт — лучше сказать об этом, чем молча выкинуть её из итога.
   for (let i = 0; i < f.rows.length; i++) {
     const r = f.rows[i]
-    if (!r.name.trim() && Number(r.price) > 0) return e.rowName(i + 1)
+    if (!r.name.trim() && rowNumber(r.price) > 0) return e.rowName(i + 1)
   }
   const rows = documentRows(f.rows)
   if (rows.length === 0) return e.noRows
   for (const r of rows) {
-    if (r.qty < 1) return e.rowQty(r.name)
+    if (r.qty <= 0) return e.rowQty(r.name)
     if (r.price <= 0) return e.rowPrice(r.name)
   }
   if (documentTotal(f.rows) <= 0) return e.zero

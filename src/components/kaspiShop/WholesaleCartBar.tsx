@@ -101,9 +101,9 @@ export default function WholesaleCartBar({ slug }: { slug: string }) {
             <div className="space-y-2 mb-4">
               <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder={t.companyNamePlaceholder} autoComplete="organization"
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-              <input value={clientBin} onChange={e => setClientBin(e.target.value.replace(/\D/g, '').slice(0, 12))} placeholder={t.binPlaceholder} inputMode="numeric"
+              <input value={clientBin} onChange={e => setClientBin(e.target.value.replace(/\D/g, '').slice(0, 12))} placeholder={t.binPlaceholder} inputMode="numeric" pattern="[0-9]*" autoComplete="off"
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-              <input value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder={t.emailPlaceholder} type="email" autoComplete="email"
+              <input value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder={t.emailPlaceholder} type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               <input value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder={t.phoneOptionalPlaceholder} type="tel" inputMode="tel" autoComplete="tel"
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />

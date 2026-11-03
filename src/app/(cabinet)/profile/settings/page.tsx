@@ -264,7 +264,7 @@ export default function InvoiceSettings() {
           </div>
           <div>
             <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.defaultDueDaysFieldLabel}</label>
-            <input type="number" className={INPUT_CLS}
+            <input type="number" inputMode="numeric" className={INPUT_CLS}
               placeholder="3" value={settings.default_due_days}
               onChange={e => setSettings({ ...settings, default_due_days: e.target.value })} />
           </div>

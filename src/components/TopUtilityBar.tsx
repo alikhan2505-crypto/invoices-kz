@@ -868,7 +868,7 @@ export default function TopUtilityBar() {
                           ))}
                         </div>
                         <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
-                          placeholder={u.customAmount} type="text" inputMode="numeric" name="topupCustomAmount"
+                          placeholder={u.customAmount} type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" name="topupCustomAmount"
                           className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
                           style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
                         {topupError && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{topupError}</div>}
@@ -902,7 +902,7 @@ export default function TopUtilityBar() {
                               value={topupPhone}
                               onChange={e => setTopupPhone(formatKzPhone(e.target.value))}
                               placeholder="+7 777 123 45 67"
-                              type="tel" inputMode="tel" name="topupPhone"
+                              type="tel" inputMode="tel" autoComplete="tel" name="topupPhone"
                               className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
                               style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }}
                             />

@@ -295,6 +295,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
                     <input
                       type="text"
                       inputMode={f.unit === 'pieces' ? 'numeric' : 'decimal'}
+                      pattern={f.unit === 'pieces' ? '[0-9]*' : undefined}
                       autoComplete="off"
                       value={raw[f.key]}
                       onChange={e => {
@@ -426,6 +427,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
                   <p className="text-sm mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{t.leadPromptTitle}</p>
                   <div className="flex gap-2">
                     <input value={leadContact} onChange={e => setLeadContact(e.target.value)}
+                      autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       placeholder={t.leadPlaceholder}
                       aria-label={t.leadPlaceholder}
                       className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)]"

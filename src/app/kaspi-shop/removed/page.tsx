@@ -842,7 +842,7 @@ export default function KaspiShopProductAvailability() {
                       <input type="number" disabled={!e.cityId}
                         className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                         style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                        value={stockModal.edits[e.storeCode]?.price ?? ''}
+                        inputMode="decimal" value={stockModal.edits[e.storeCode]?.price ?? ''}
                         onChange={ev => setStockModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [e.storeCode]: { ...prev.edits[e.storeCode], price: ev.target.value } } } : prev)} />
                     </label>
                     <label className="block">
@@ -850,7 +850,7 @@ export default function KaspiShopProductAvailability() {
                       <input type="number" placeholder="Не указан" disabled={!e.cityId}
                         className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                         style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                        value={stockModal.edits[e.storeCode]?.stockCount ?? ''}
+                        inputMode="numeric" pattern="[0-9]*" value={stockModal.edits[e.storeCode]?.stockCount ?? ''}
                         onChange={ev => setStockModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [e.storeCode]: { ...prev.edits[e.storeCode], stockCount: ev.target.value } } } : prev)} />
                     </label>
                   </div>
@@ -965,7 +965,7 @@ export default function KaspiShopProductAvailability() {
                         <input type="number"
                           className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                           style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                          value={addModal.edits[c.cityId]?.price ?? ''}
+                          inputMode="decimal" value={addModal.edits[c.cityId]?.price ?? ''}
                           onChange={ev => setAddModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [c.cityId]: { ...prev.edits[c.cityId], price: ev.target.value } } } : prev)} />
                       </label>
                       {c.points.map(p => (
@@ -974,7 +974,7 @@ export default function KaspiShopProductAvailability() {
                           <input type="number" placeholder="Не указан"
                             className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                             style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                            value={addModal.edits[c.cityId]?.stocks[p.storeCode] ?? ''}
+                            inputMode="numeric" pattern="[0-9]*" value={addModal.edits[c.cityId]?.stocks[p.storeCode] ?? ''}
                             onChange={ev => setAddModal(prev => prev ? {
                               ...prev, saved: false,
                               edits: { ...prev.edits, [c.cityId]: { ...prev.edits[c.cityId], stocks: { ...prev.edits[c.cityId]?.stocks, [p.storeCode]: ev.target.value } } },
@@ -1099,7 +1099,7 @@ export default function KaspiShopProductAvailability() {
                   <label className="block mb-3">
                     <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка на Youtube (необязательно)</span>
                     <input value={newCardModal.youtubeLink}
-                      onChange={ev => setNewCardModal(prev => prev ? { ...prev, youtubeLink: ev.target.value } : prev)}
+                      onChange={ev => setNewCardModal(prev => prev ? { ...prev, youtubeLink: ev.target.value } : prev)} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       className="w-full text-sm rounded-lg px-3 py-2 outline-none border"
                       style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
                   </label>
@@ -1175,7 +1175,7 @@ export default function KaspiShopProductAvailability() {
                                   </select>
                                 )}
                                 {(f.type === 'string' || f.type === 'number') && (
-                                  <input type={f.type === 'number' ? 'number' : 'text'} value={values[0] ?? ''}
+                                  <input type={f.type === 'number' ? 'number' : 'text'} inputMode={f.type === 'number' ? 'decimal' : undefined} value={values[0] ?? ''}
                                     onChange={ev => setAttributeValue(f.attributeCode, ev.target.value ? [ev.target.value] : [])}
                                     className="w-full text-sm rounded-lg px-2 py-1.5 outline-none border"
                                     style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
@@ -1194,7 +1194,7 @@ export default function KaspiShopProductAvailability() {
                             <input type="number"
                               className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                               style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                              value={newCardModal.priceEdits[c.cityId]?.price ?? ''}
+                              inputMode="decimal" value={newCardModal.priceEdits[c.cityId]?.price ?? ''}
                               onChange={ev => setNewCardModal(prev => prev ? { ...prev, saved: false, priceEdits: { ...prev.priceEdits, [c.cityId]: { ...prev.priceEdits[c.cityId], price: ev.target.value } } } : prev)} />
                           </label>
                           {c.points.map(p => (
@@ -1203,7 +1203,7 @@ export default function KaspiShopProductAvailability() {
                               <input type="number" placeholder="Не указан"
                                 className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                                 style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
-                                value={newCardModal.priceEdits[c.cityId]?.stocks[p.storeCode] ?? ''}
+                                inputMode="numeric" pattern="[0-9]*" value={newCardModal.priceEdits[c.cityId]?.stocks[p.storeCode] ?? ''}
                                 onChange={ev => setNewCardModal(prev => prev ? {
                                   ...prev, saved: false,
                                   priceEdits: { ...prev.priceEdits, [c.cityId]: { ...prev.priceEdits[c.cityId], stocks: { ...prev.priceEdits[c.cityId]?.stocks, [p.storeCode]: ev.target.value } } },

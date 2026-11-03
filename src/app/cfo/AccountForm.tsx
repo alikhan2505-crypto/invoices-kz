@@ -69,7 +69,7 @@ export default function AccountForm({ initial, accounts, operations, submitLabel
       </Field>
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label={kind === 'loan' ? 'Остаток долга, ₸ (со знаком минус)' : 'Остаток, ₸'} hint={kind === 'loan' ? 'Например, −12 000 000' : 'Может быть отрицательным (овердрафт)'}>
-          <input className={inputClass} style={inputStyle} inputMode="decimal" placeholder="0" onFocus={(e) => e.currentTarget.select()} aria-describedby={negativeWarning ? 'account-negative-warning' : undefined} value={balance} onChange={(e) => setBalance(e.target.value)} />
+          <input className={inputClass} style={inputStyle} inputMode="text" autoComplete="off" placeholder="0" onFocus={(e) => e.currentTarget.select()} aria-describedby={negativeWarning ? 'account-negative-warning' : undefined} value={balance} onChange={(e) => setBalance(e.target.value)} />
         </Field>
         <Field label="На дату (начало учёта)">
           <input type="date" className={inputClass} style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} />

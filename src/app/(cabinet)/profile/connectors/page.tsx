@@ -154,6 +154,7 @@ export default function ConnectorsPage() {
               </label>
               <input className={INPUT_CLS}
                 placeholder={t.kaspiPayPlaceholder}
+                type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={kaspiLink} onChange={e => setKaspiLink(e.target.value)} />
               <p className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiPayHint}</p>
             </div>
@@ -164,6 +165,7 @@ export default function ConnectorsPage() {
               </label>
               <input className={INPUT_CLS}
                 placeholder={t.halykPayPlaceholder}
+                type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={halykLink} onChange={e => setHalykLink(e.target.value)} />
             </div>
           </div>
@@ -175,6 +177,7 @@ export default function ConnectorsPage() {
           <div className="nav-glass rounded-2xl p-4 flex-1">
             <input className={INPUT_CLS}
               placeholder={t.websitePlaceholder}
+              type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               value={website} onChange={e => setWebsite(e.target.value)} />
           </div>
         </motion.div>
@@ -194,6 +197,7 @@ export default function ConnectorsPage() {
                 <input className={`flex-1 ${INPUT_CLS}`}
                   placeholder={t.socialMediaPlaceholder}
                   value={link}
+                  type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   onChange={e => {
                     const updated = [...socialLinks]
                     updated[i] = e.target.value

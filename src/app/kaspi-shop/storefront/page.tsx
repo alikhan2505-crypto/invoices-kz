@@ -404,7 +404,7 @@ export default function KaspiShopStorefrontSettings() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>invoices.kz/shop/</span>
                     <input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase())}
-                      placeholder="my-store"
+                      placeholder="my-store" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off"
                       className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                   </div>
@@ -643,14 +643,14 @@ export default function KaspiShopStorefrontSettings() {
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                   style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                 <div className="flex gap-2">
-                  <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Цена, ₸" inputMode="numeric"
+                  <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Цена, ₸" inputMode="numeric" pattern="[0-9]*"
                     className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                  <input value={newStock} onChange={e => setNewStock(e.target.value)} placeholder="Остаток (необязательно)" inputMode="numeric"
+                  <input value={newStock} onChange={e => setNewStock(e.target.value)} placeholder="Остаток (необязательно)" inputMode="numeric" pattern="[0-9]*"
                     className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                 </div>
-                <input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Ссылка на фото (необязательно)"
+                <input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Ссылка на фото (необязательно)" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                   style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                 {createError && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{createError}</div>}

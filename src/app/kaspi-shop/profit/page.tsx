@@ -309,7 +309,7 @@ export default function KaspiShopProfit() {
                   </div>
                   {!hasFlatRate && (
                     <div className="flex items-center gap-1.5 mt-1">
-                      <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%"
+                      <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%" inputMode="decimal" autoComplete="off"
                         className={`w-16 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                       <button onClick={saveCommission} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                     </div>
@@ -370,7 +370,7 @@ export default function KaspiShopProfit() {
                       <input
                         value={cogsInputs[p.kaspiMasterSku] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
                         onChange={e => setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))}
-                        placeholder="₸"
+                        placeholder="₸" inputMode="decimal" autoComplete="off"
                         className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                       <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
                         className="flex-shrink-0 text-xs font-medium rounded-lg px-2 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
@@ -424,12 +424,12 @@ export default function KaspiShopProfit() {
               </p>
               <label className="block mb-3">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Реклама, ₸</span>
-                <input type="number" value={adInput} onChange={e => setAdInput(e.target.value)} placeholder="0"
+                <input type="number" value={adInput} onChange={e => setAdInput(e.target.value)} placeholder="0" inputMode="decimal"
                   className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               </label>
               <label className="block mb-4">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Прочие расходы, ₸ (аренда, электроэнергия, упаковка…)</span>
-                <input type="number" value={otherInput} onChange={e => setOtherInput(e.target.value)} placeholder="0"
+                <input type="number" value={otherInput} onChange={e => setOtherInput(e.target.value)} placeholder="0" inputMode="decimal"
                   className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               </label>
               <button onClick={saveExpenses} disabled={savingExpenses}

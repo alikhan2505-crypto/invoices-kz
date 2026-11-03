@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { digitsOnly } from '@/lib/kzIdentifiers'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import InvoiceLivePreview, { type PreviewHighlight } from '@/components/InvoiceLivePreview'
 import { useTweenedNumber } from '@/components/useTweenedNumber'
@@ -451,7 +452,10 @@ export default function CreateInvoicePage() {
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
   // Same rules createInvoice() enforces, from the same function -- the
   // indicator can never call a form ready that the button would then refuse.
-  const readiness = computeInvoiceReadiness({ clientName, clientBin, services })
+  // The client БИН/ИИН is mandatory AND must be exactly 12 digits (audit 3.5:
+  // «1» used to pass). A malformed one counts as missing here, so the
+  // indicator and the button agree; createInvoice() tells the two cases apart.
+  const readiness = computeInvoiceReadiness({ clientName, clientBin: /^\d{12}$/.test(clientBin.trim()) ? clientBin : '', services })
 
   // After creation: the success card, and the button inside it that copied
   // the public link (shows «Ссылка скопирована» for a moment).
@@ -556,7 +560,7 @@ export default function CreateInvoicePage() {
       const { data: tmpl } = await supabase.from('templates').select('*').eq('id', templateId).single()
       if (tmpl) {
         setClientName(tmpl.client_name || '')
-        setClientBin(tmpl.client_bin || '')
+        setClientBin(digitsOnly(tmpl.client_bin).slice(0, 12))
         setClientEmail(tmpl.client_email || '')
         if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
         if (tmpl.client_name) setClientSelected(true)
@@ -572,7 +576,7 @@ export default function CreateInvoicePage() {
       const { data: src } = await supabase.from('invoices').select('*').eq('id', repeatId).eq('user_id', user.id).single()
       if (src) {
         setClientName(src.client_name || '')
-        setClientBin(src.client_bin || '')
+        setClientBin(digitsOnly(src.client_bin).slice(0, 12))
         setClientEmail(src.client_email || '')
         setClientAddress(src.client_address || '')
         setClientPhone(src.client_phone || '')
@@ -644,7 +648,7 @@ export default function CreateInvoicePage() {
       if (draft) {
         setDraftRestoredNotice(true)
         setClientName(draft.clientName)
-        setClientBin(draft.clientBin)
+        setClientBin(digitsOnly(draft.clientBin).slice(0, 12))
         setClientEmail(draft.clientEmail)
         setClientAddress(draft.clientAddress)
         setClientPhone(draft.clientPhone)
@@ -696,7 +700,7 @@ export default function CreateInvoicePage() {
 
   function selectClient(client: any) {
     setClientName(client.name)
-    setClientBin(client.bin_iin || '')
+    setClientBin(digitsOnly(client.bin_iin).slice(0, 12))
     setClientEmail(client.email || '')
     setClientAddress(client.address || '')
     setClientPhone(client.phone || '')
@@ -842,7 +846,7 @@ export default function CreateInvoicePage() {
     // indicator above the button uses too.
     switch (readiness.firstProblem) {
       case 'clientName': alert(t.enterClientNameAlert); return
-      case 'clientBin': alert(t.enterClientBinAlert); return
+      case 'clientBin': alert(clientBin.trim() ? t.clientBinMalformedAlert : t.enterClientBinAlert); return
       case 'itemName': alert(t.addAtLeastOneServiceAlert); return
       case 'itemPrice': alert(t.specifyPriceForAllServicesAlert); return
     }
@@ -1307,7 +1311,7 @@ export default function CreateInvoicePage() {
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
                   <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
+                    placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" inputMode="tel" autoComplete="off" maxLength={16}
                     onChange={e => setClientPhone(formatPhone(e.target.value))} />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1348,9 +1352,11 @@ export default function CreateInvoicePage() {
                   <div className="flex gap-2">
                   <input id="create-client-bin" className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.binIinPlaceholder} value={clientBin}
+                      inputMode="numeric" pattern="[0-9]*" autoComplete="off" autoCorrect="off" spellCheck={false}
                       onFocus={focusPreview({ kind: 'client' })} onBlur={blurPreview}
                       onChange={async e => {
-                        const bin = e.target.value
+                        // Digits only, at most 12 (a pasted «123 456 789 012» still works).
+                        const bin = e.target.value.replace(/\D/g, '').slice(0, 12)
                         setClientBin(bin)
                         // The number in the box no longer matches the data
                         // below it, so the data goes.
@@ -1537,12 +1543,13 @@ export default function CreateInvoicePage() {
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>
                     <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                      placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                      placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)}
+                      type="email" inputMode="email" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                   </div>
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
                     <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                      placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
+                      placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" inputMode="tel" autoComplete="off" maxLength={16}
                       onChange={e => setClientPhone(formatPhone(e.target.value))} />
                   </div>
                 </div>

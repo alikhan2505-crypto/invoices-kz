@@ -4,6 +4,7 @@ import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { amountInWordsKzt } from './amountWords'
 import { resizeToFit } from './imageResize'
 import { escapeHtml, escapeAttr } from './htmlEscape'
+import { formatQty } from '@/lib/tools-i18n/rowNumbers'
 
 interface Service {
   name: string
@@ -268,7 +269,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
               <td>${i + 1}</td>
               <td>${escapeHtml(s.code || (i + 1))}</td>
               <td class="left">${escapeHtml(s.name)}</td>
-              <td>${escapeHtml(s.qty)}</td>
+              <td>${escapeHtml(formatQty(s.qty))}</td>
               <td>${escapeHtml(s.unit || 'шт')}</td>
               <td style="text-align:right">${formatMoney(Number(s.price))}</td>
               <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>

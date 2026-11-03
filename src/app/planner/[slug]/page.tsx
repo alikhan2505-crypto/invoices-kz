@@ -1132,7 +1132,7 @@ function AddBookingModal({ lang, onClose, onSaved }: { lang: Lang; onClose: () =
           <input type="time" value={time} onChange={e => setTime(e.target.value)} className={inputClass} />
         </div>
         <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder={t(lang, 'clientName')} className={inputClass} />
-        <input value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder={t(lang, 'clientPhone')} className={inputClass} />
+        <input value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder={t(lang, 'clientPhone')} type="tel" inputMode="tel" autoComplete="off" className={inputClass} />
         {error && <div className="text-sm text-red-400">{error}</div>}
         <button
           disabled={saving || !serviceName.trim() || !date || !time}
