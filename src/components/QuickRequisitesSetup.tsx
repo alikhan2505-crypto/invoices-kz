@@ -7,7 +7,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { useBinLookup } from '@/components/useBinLookup'
 import { quickRequisitesDict } from '@/lib/i18n/quickRequisites'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
-import { KAZAKHSTAN_BANKS } from '@/lib/kazakhstanBanks'
+import { KAZAKHSTAN_BANKS, OTHER_BANK, findBankByBik } from '@/lib/kazakhstanBanks'
 import { digitsOnly, normalizeIik, validateBinIin, validateIik } from '@/lib/kzIdentifiers'
 import { loadRequisites } from '@/lib/tools-i18n/requisites'
 import { hasToolOffer, planToolRequisites, saveToolRequisites, type ProfileLike } from '@/lib/tools-i18n/saveToolRequisites'
@@ -59,12 +59,27 @@ export default function QuickRequisitesSetup({ profile, profileLoaded, bankCount
   // Какие шаги нужны, запоминаем при первом показе: после сохранения профиля первый шаг не должен
   // исчезнуть из-под человека посреди мастера.
   const stepsRef = useRef<Step[] | null>(null)
+  const seeded = useRef(false)
 
   useEffect(() => {
     if (!profileLoaded || !banksLoaded) return
-    const plan = planToolRequisites(profile, bankCount, loadRequisites())
+    const req = loadRequisites()
+    const plan = planToolRequisites(profile, bankCount, req)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setToolOffer(hasToolOffer(plan, profile))
+    // Из бесплатного документа осталось не всё или с ошибкой (неверная контрольная цифра БИН, ИИК): не просим
+    // вводить заново, а подставляем в поля мастера, и человеку остаётся поправить подсвеченное.
+    if (!seeded.current) {
+      seeded.current = true
+      const savedBin = digitsOnly(req.binIin).slice(0, 12)
+      if (savedBin) setBin(savedBin)
+      if (req.companyName) setName(req.companyName)
+      if (req.address) setAddress(req.address)
+      if (req.director) setDirector(req.director)
+      const savedBik = req.bankBik && req.bankBik !== OTHER_BANK ? findBankByBik(req.bankBik)?.bik : ''
+      if (savedBik) setBik(savedBik)
+      if (req.iik) { setIik(req.iik); setIikTouched(true) }
+    }
   }, [profile, profileLoaded, bankCount, banksLoaded])
 
   // Фокус на первое поле нового шага (после сдвига), чтобы можно было сразу печатать.

@@ -542,7 +542,12 @@ export default function CreateInvoicePage() {
       .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
     setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
 
-    if ((monthInvoices?.length ?? 0) === 0 && !p?.company_name) setShowOnboarding(true)
+    // Памятка «Начало работы» (реквизиты, банк, подпись, первый счёт) остаётся, пока что-то из этого не сделано и
+    // она не закрыта крестиком. Раньше она исчезала сразу после первого шага (реквизиты), и человек не видел, что
+    // дальше нужны банк и подпись (03.11.2026, замечание основателя).
+    const onboardingDismissed = (() => { try { return localStorage.getItem('onboarding_dismissed_' + user.id) === '1' } catch { return false } })()
+    const setupIncomplete = !p?.company_name || !p?.bin_iin || (banks?.length ?? 0) === 0 || !p?.signature_url
+    if ((monthInvoices?.length ?? 0) === 0 && setupIncomplete && !onboardingDismissed) setShowOnboarding(true)
 
     setSavedServices(s || [])
 
@@ -792,6 +797,13 @@ export default function CreateInvoicePage() {
 
   // Onboarding checklist steps 1-2: same trip as the gates in createInvoice()
   // -- park whatever is already typed and come back here after saving.
+  // Крестик на памятке: закрыта насовсем для этого аккаунта на этом устройстве.
+  async function dismissOnboarding() {
+    setShowOnboarding(false)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) { try { localStorage.setItem('onboarding_dismissed_' + user.id, '1') } catch {} }
+  }
+
   async function goFillPrerequisite(href: '/profile/requisites' | '/profile/banks') {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) saveInvoiceDraft(user.id, currentDraft())
@@ -1224,7 +1236,7 @@ export default function CreateInvoicePage() {
           <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.onboardingTitle}</div>
-              <button onClick={() => setShowOnboarding(false)} className="transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
+              <button onClick={() => void dismissOnboarding()} className="transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
             </div>
             <div className="space-y-3">
               {[

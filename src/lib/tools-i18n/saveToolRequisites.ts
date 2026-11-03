@@ -37,11 +37,17 @@ export function planToolRequisites(profile: ProfileLike, bankCount: number, req:
   const needProfile = !current.company_name.trim() || !current.bin_iin.trim()
   const needBank = bankCount === 0
   const { next } = fillProfileFromToolRequisites(current, req)
-  const profileFill: Partial<OwnProfileFields> = {}
+  let profileFill: Partial<OwnProfileFields> = {}
   if (needProfile) {
     for (const k of Object.keys(next) as (keyof OwnProfileFields)[]) if (next[k] !== current[k]) profileFill[k] = next[k]
+    // Сохранённый БИН не проходит проверку контрольной цифры (чужой черновик, опечатка, тестовое значение):
+    // такое не предлагаем и не пишем, человек введёт верный в мастере.
+    if (validateBinIin(profileFill.bin_iin ?? current.bin_iin)) profileFill = {}
   }
-  return { needProfile, needBank, profileFill, bank: needBank ? bankFromToolRequisites(req) : null }
+  let bank = needBank ? bankFromToolRequisites(req) : null
+  // То же для ИИК: счёт с неверным номером в кабинет не кладём (мастер покажет поле для исправления).
+  if (bank && validateIik(bank.iik)) bank = null
+  return { needProfile, needBank, profileFill, bank }
 }
 
 /** Есть ли что предложить: профиль вместе с названием и БИН, и/или целый банковский счёт. */

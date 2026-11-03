@@ -27,7 +27,9 @@ export interface AuthContent {
   /** «Открыть Gmail» на экране «проверьте почту» (03.11.2026). */
   openMailButton: (provider: string) => string
   /** Подсказка про опечатку в адресе до отправки письма. */
-  didYouMean: (fixed: string) => string
+  didYouMeanBefore: string
+  /** Хвост фразы после адреса (у казахского глагол стоит в конце); у ru пусто. Адрес выделяется на странице отдельно. */
+  didYouMeanAfter: string
   useFixButton: string
   keepMineButton: string
   /** Вход по коду из письма (включается LOGIN_CODE_ENABLED в src/app/login/page.tsx). */
@@ -114,7 +116,8 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     undeliverableEmailAlert: 'На этот адрес письма не доставляются — почтовый сервис отклонил их. Проверьте, нет ли опечатки в адресе, или войдите с другого.',
     spamHint: 'Письмо приходит за минуту. Если его нет — загляните в «Спам».',
     openMailButton: (provider) => `Открыть ${provider}`,
-    didYouMean: (fixed) => `Проверьте адрес: возможно, вы имели в виду ${fixed}`,
+    didYouMeanBefore: 'Проверьте адрес: возможно, вы имели в виду',
+    didYouMeanAfter: '?',
     useFixButton: 'Да, исправить',
     keepMineButton: 'Нет, отправить так',
     codeLabel: 'Код из письма',
@@ -198,7 +201,8 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     undeliverableEmailAlert: 'Бұл мекенжайға хаттар жеткізілмейді — пошта қызметі оларды қабылдамады. Мекенжайда қате жоқ па, тексеріңіз немесе басқасымен кіріңіз.',
     spamHint: 'Хат бір минутта келеді. Келмесе — «Спам» бумасын қараңыз.',
     openMailButton: (provider) => `${provider} ашу`,
-    didYouMean: (fixed) => `Мекенжайды тексеріңіз: мүмкін, ${fixed} дегенді білдірген шығарсыз`,
+    didYouMeanBefore: 'Мекенжайды тексеріңіз: мүмкін,',
+    didYouMeanAfter: 'дегенді білдірген шығарсыз',
     useFixButton: 'Иә, түзету',
     keepMineButton: 'Жоқ, солай жіберу',
     codeLabel: 'Хаттағы код',
@@ -283,7 +287,8 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     undeliverableEmailAlert: 'Mail to this address is not being delivered — the provider rejected it. Check the address for a typo, or sign in with another one.',
     spamHint: 'The letter arrives within a minute. If it has not, check your spam folder.',
     openMailButton: (provider) => `Open ${provider}`,
-    didYouMean: (fixed) => `Check the address: did you mean ${fixed}?`,
+    didYouMeanBefore: 'Check the address: did you mean',
+    didYouMeanAfter: '?',
     useFixButton: 'Yes, fix it',
     keepMineButton: 'No, send as typed',
     codeLabel: 'Code from the email',

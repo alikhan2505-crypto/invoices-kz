@@ -287,7 +287,10 @@ export default function Login() {
     setCodeBusy(true)
     setCodeError(false)
     try {
-      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'email' })
+      // Новому адресу Supabase шлёт письмо подтверждения регистрации, и код из него проверяется как 'signup';
+      // существующему письмо со ссылкой, код из него как 'email'. Не знаем заранее, какое пришло: пробуем оба.
+      let { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'email' })
+      if (error) ({ error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'signup' }))
       if (error) { setCodeError(true); return }
       // Сессия уже сохранена в этом браузере. Всё остальное (реферал, слежение за БИН, куда направить
       // новичка) делает /auth/callback, как после ссылки из письма.
@@ -402,7 +405,12 @@ export default function Login() {
             />
             {typoFix && (
               <div role="alert" className="rounded-xl p-3 mb-3 text-xs" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)' }}>
-                <div className="font-medium break-all">{t.didYouMean(typoFix)}</div>
+                {/* Адрес целиком, без переноса по «@», и подчёркнут: его надо прочитать, а не пробежать глазами. */}
+                <div className="font-medium">
+                  {t.didYouMeanBefore}{' '}
+                  <span className="underline whitespace-nowrap font-semibold">{typoFix}</span>
+                  {t.didYouMeanAfter === '?' ? '?' : ` ${t.didYouMeanAfter}`}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" onClick={() => void sendLink({ to: typoFix })}
                     className="rounded-lg px-3 min-h-11 font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>

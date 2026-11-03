@@ -99,13 +99,22 @@ describe('saveToolRequisites', () => {
     expect(calls.map(c => c.table)).toEqual(['bank_accounts'])
   })
 
-  it('refuses a БИН or ИИК that fails the check digit and writes nothing', async () => {
+  it('drops a saved БИН or ИИК that fails the check digit: nothing is offered or written', async () => {
     const a = fakeClient()
-    expect(await saveToolRequisites(a.client, 'u', {}, 0, { ...REQ, binIin: '123456789012' })).toEqual({ ok: false, reason: 'bin' })
+    expect(hasToolOffer(planToolRequisites({}, 1, { ...REQ, binIin: '123456789012' }), {})).toBe(false)
+    expect(await saveToolRequisites(a.client, 'u', {}, 1, { ...REQ, binIin: '123456789012' })).toEqual({ ok: false, reason: 'nothing' })
     expect(a.calls).toEqual([])
     const b = fakeClient()
-    expect(await saveToolRequisites(b.client, 'u', {}, 0, { ...REQ, iik: 'KZ00000000000000000000' })).toEqual({ ok: false, reason: 'iik' })
+    expect(planToolRequisites({ company_name: 'x', bin_iin: '1' }, 0, { ...REQ, iik: 'KZ00000000000000000000' }).bank).toBeNull()
+    expect(await saveToolRequisites(b.client, 'u', { company_name: 'x', bin_iin: '1' }, 0, { ...REQ, iik: 'KZ00000000000000000000' })).toEqual({ ok: false, reason: 'nothing' })
     expect(b.calls).toEqual([])
+  })
+
+  it('saves a good profile and leaves out a bank whose ИИК is wrong', async () => {
+    const { client, calls } = fakeClient()
+    const r = await saveToolRequisites(client, 'u', {}, 0, { ...REQ, iik: 'KZ00000000000000000000' })
+    expect(r).toEqual({ ok: true, savedProfile: true, savedBank: false })
+    expect(calls.map(c => c.table)).toEqual(['profiles'])
   })
 
   it('does not add the bank when the profile write failed', async () => {

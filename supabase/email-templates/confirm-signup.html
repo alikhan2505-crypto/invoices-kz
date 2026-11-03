@@ -1,0 +1,134 @@
+<!-- Supabase Auth → Email Templates → Confirm signup. Это ПЕРВОЕ письмо, которое получает новый человек
+     (новому адресу Supabase шлёт именно подтверждение регистрации, а не Magic Link; Magic Link уходит тем, кто уже
+     зарегистрирован). Старое письмо («Добро пожаловать!», список из четырёх пунктов, без ссылок) устарело:
+     в нём не было ничего из того, что сделано с сентября. Файл хранится здесь, потому что Supabase шаблоны не
+     версионирует: поменяли в панели, обновите файл.
+
+     Стили встроены, вёрстка таблицами: почтовые клиенты режут таблицы стилей и не знают flex и grid. Цвета из
+     DESIGN.md, шрифт Arial/Helvetica (вебшрифт в письме не грузится). Переменная со ссылкой подтверждения должна
+     остаться дословно во всех местах ниже; в комментарии её не пишем, она сработает и внутри комментария. -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;margin:0;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+
+      <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+        Поштаңызды растаңыз · Подтвердите почту и начните · Confirm your email to start
+      </div>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;">
+
+        <tr>
+          <td style="background:#1C2056;padding:22px 28px;">
+            <div style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:.14em;">INVOICES<span style="color:#e5e7eb;">.KZ</span></div>
+            <div style="color:#e5e7eb;font-size:12px;margin-top:6px;">Счета, оплата Kaspi и документы для бизнеса Казахстана</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:30px 28px 8px;">
+            <div style="color:#111827;font-size:20px;font-weight:600;line-height:1.3;">Қош келдіңіз · Добро пожаловать · Welcome</div>
+            <div style="color:#6b7280;font-size:14px;line-height:1.55;margin-top:9px;">
+              Бір рет басып, поштаңызды растаңыз — құпия сөз керек емес.<br>
+              Одно нажатие, чтобы подтвердить почту, пароль не нужен.<br>
+              One tap to confirm your email, no password needed.
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:24px 28px 6px;">
+            <a href="{{ .ConfirmationURL }}"
+               style="display:inline-block;background:#1C2056;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:15px 34px;border-radius:12px;">
+              Растау &nbsp;·&nbsp; Подтвердить &nbsp;·&nbsp; Confirm
+            </a>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:8px 28px 0;">
+            <div style="color:#9ca3af;font-size:12px;line-height:1.5;text-align:center;">
+              Сілтеме 1 сағат жарамды және бір рет қолданылады.<br>
+              Ссылка действует 1 час и срабатывает один раз.<br>
+              The link works once and expires in 1 hour.
+            </div>
+          </td>
+        </tr>
+
+        <tr><td style="padding:24px 28px 0;"><div style="height:1px;background:#e5e7eb;"></div></td></tr>
+
+        <!-- Что уже есть: только то, что работает сейчас; каждая строка ведёт на свою страницу. -->
+        <tr>
+          <td style="padding:20px 28px 0;">
+            <div style="color:#111827;font-size:15px;font-weight:700;">Что уже работает</div>
+            <div style="color:#6b7280;font-size:13px;margin-top:3px;">Қазір не істей аласыз · What you can do right now</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:12px 28px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 12px;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://invoices.kz/create" style="color:#1C2056;font-weight:700;text-decoration:underline;">Счёт на оплату за минуту</a><br>
+                <span style="color:#6b7280;">Казахстанская форма, сумма прописью, НДС, PDF с подписью и печатью, оплата Kaspi по ссылке. 3 счёта в месяц бесплатно.</span>
+              </td></tr>
+              <tr><td style="padding:0 0 12px;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://invoices.kz/tools/kontragent" style="color:#1C2056;font-weight:700;text-decoration:underline;">Проверка контрагента по БИН</a><br>
+                <span style="color:#6b7280;">Неблагонадёжность, ликвидация, налоговый долг, НДС. Есть и в Telegram: <a href="https://t.me/invoices_bin_bot" style="color:#1C2056;text-decoration:underline;">@invoices_bin_bot</a>.</span>
+              </td></tr>
+              <tr><td style="padding:0 0 12px;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://invoices.kz/tools" style="color:#1C2056;font-weight:700;text-decoration:underline;">Бесплатные инструменты</a><br>
+                <span style="color:#6b7280;">КП, акт выполненных работ, накладная, калькуляторы маржи Kaspi, налогов ИП и зарплаты.</span>
+              </td></tr>
+              <tr><td style="padding:0 0 12px;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://kaspi.invoices.kz" style="color:#1C2056;font-weight:700;text-decoration:underline;">Kaspi Bot для продавцов</a><br>
+                <span style="color:#6b7280;">Демпинг цен и заказы Kaspi Магазина в одном кабинете. Тариф Про.</span>
+              </td></tr>
+              <tr><td style="padding:0 0 12px;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://agent.invoices.kz" style="color:#1C2056;font-weight:700;text-decoration:underline;">ИИ-агент для переписки</a><br>
+                <span style="color:#6b7280;">Отвечает клиентам в Instagram, WhatsApp и на сайте и принимает заявки. Тариф Про.</span>
+              </td></tr>
+              <tr><td style="padding:0;font-size:14px;line-height:1.5;color:#111827;">
+                <a href="https://invoices.kz/guides" style="color:#1C2056;font-weight:700;text-decoration:underline;">Короткие разборы</a><br>
+                <span style="color:#6b7280;">Как выставить счёт, пеня за просрочку, комиссии Kaspi по категориям.</span>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr><td style="padding:24px 28px 0;"><div style="height:1px;background:#e5e7eb;"></div></td></tr>
+
+        <tr>
+          <td style="padding:20px 28px 0;">
+            <div style="color:#111827;font-size:14px;font-weight:600;">Қазақша · Русский · English</div>
+            <div style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:5px;">
+              Бұл хат invoices.kz сайтына сіздің поштаңызбен тіркелу сұралғаны үшін келді. Сұрамаған болсаңыз, сілтемені ашпай қоя беріңіз.<br>
+              Это письмо пришло потому, что кто-то начал регистрацию на invoices.kz с вашим адресом. Если это были не вы, не открывайте ссылку: пока по ней не перешли, аккаунт не создаётся.<br>
+              You are getting this because a sign-up on invoices.kz was started with your address. If it wasn't you, leave the link alone: no account is created until it is opened.<br>
+              <b>Біз бұл сілтемені сізден ешқашан сұрамаймыз · Мы никогда не попросим переслать эту ссылку · We will never ask you to forward this link</b>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:16px 28px 26px;">
+            <div style="color:#9ca3af;font-size:12px;line-height:1.6;">
+              Түйме жұмыс істемесе, сілтемені браузерге көшіріңіз ·
+              Если кнопка не работает, скопируйте ссылку в браузер ·
+              If the button does not work, paste this link into your browser:
+              <div style="margin-top:7px;word-break:break-all;"><a href="{{ .ConfirmationURL }}" style="color:#1C2056;">{{ .ConfirmationURL }}</a></div>
+            </div>
+          </td>
+        </tr>
+
+      </table>
+
+      <div style="max-width:560px;color:#9ca3af;font-size:12px;line-height:1.8;padding:16px 8px 0;text-align:center;">
+        <a href="https://invoices.kz" style="color:#6b7280;text-decoration:underline;">invoices.kz</a>
+        &nbsp;·&nbsp; <a href="https://instagram.com/invoices.kz" style="color:#6b7280;text-decoration:underline;">Instagram @invoices.kz</a>
+        &nbsp;·&nbsp; <a href="https://t.me/invoiceskz_support" style="color:#6b7280;text-decoration:underline;">Telegram</a><br>
+        Сұрағыңыз болса, осы хатқа жауап беріңіз · Если есть вопросы, ответьте на это письмо · Reply to this email with any questions
+      </div>
+
+    </td>
+  </tr>
+</table>
