@@ -40,12 +40,23 @@ const MOBILE_STEPS: Record<'business' | 'family', TourStep[]> = {
   ],
 }
 
-// Тур с подсветкой при первом входе в кабинет; «пройден» запоминается у компании.
+// Тур с подсветкой при первом входе в кабинет; «показан» запоминается у компании при показе.
+// Смонтирован и после этого (кроме демо-данных), чтобы его можно было запустить заново
+// из панели помощи; сам он стартует только пока tourDone не выставлен.
+// Компании, у которых тур уже показан в этой вкладке: страница обзора отдаёт тур из двух веток
+// (пустой и заполненный обзор), а tourDone в ws обновится только при следующей загрузке, поэтому
+// без этой памяти перемонтирование показало бы тур второй раз за визит. Ключ - компания, а не
+// «CFO вообще»: другой аккаунт в той же вкладке свой тур увидит.
+const shownCompanies = new Set<string>()
+
 export default function CfoTour() {
   const { ws } = useCfo()
   // Решаем один раз при монтировании: до lg (1024px) меню — выдвижная панель.
   const [mobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches)
-  if (ws.tourDone || ws.hasDemo) return null
+  // Чтение ws.tourDone внутри shouldStart даёт значение на момент монтирования (GuidedTour
+  // решает один раз), а не обновлённое после сохранения: повторного автозапуска из-за этого нет.
+  const alreadyDone = ws.tourDone || shownCompanies.has(ws.companyId)
+  if (ws.hasDemo) return null
   const mode = ws.mode ?? 'business'
-  return <GuidedTour steps={mobile ? MOBILE_STEPS[mode] : STEPS[mode]} shouldStart={async () => true} onFinish={() => markTourDone(ws)} />
+  return <GuidedTour steps={mobile ? MOBILE_STEPS[mode] : STEPS[mode]} shouldStart={async () => { if (alreadyDone) return false; shownCompanies.add(ws.companyId); return true }} onFinish={() => markTourDone(ws)} />
 }

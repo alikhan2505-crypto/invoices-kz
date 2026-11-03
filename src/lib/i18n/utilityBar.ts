@@ -57,6 +57,7 @@ export type UtilityBarContent = {
   notificationSettings: string
   support: string
   about: string
+  replayTour: string
   noCompanyName: string
   profileAndSettings: string
   signOut: string
@@ -125,6 +126,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationSettings: 'Настройки уведомлений',
     support: 'Поддержка',
     about: 'О сервисе',
+    replayTour: 'Показать тур по странице',
     noCompanyName: 'Без названия',
     profileAndSettings: 'Профиль и настройки',
     signOut: 'Выйти',
@@ -185,6 +187,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationSettings: 'Хабарландыру баптаулары',
     support: 'Қолдау',
     about: 'Сервис туралы',
+    replayTour: 'Бет бойынша турды қайта көрсету',
     noCompanyName: 'Атауы жоқ',
     profileAndSettings: 'Профиль және баптаулар',
     signOut: 'Шығу',
@@ -245,6 +248,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationSettings: 'Notification settings',
     support: 'Support',
     about: 'About the service',
+    replayTour: 'Show the page tour again',
     noCompanyName: 'Untitled',
     profileAndSettings: 'Profile and settings',
     signOut: 'Sign out',

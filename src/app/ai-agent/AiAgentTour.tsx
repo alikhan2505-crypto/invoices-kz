@@ -1,11 +1,14 @@
 'use client'
 import { GuidedTour, type TourStep } from '@/components/DashboardTour'
+import { isTourSeen, markTourSeen } from '@/lib/tourSeen'
 
 // Тур первого входа в AI-агент — показывается только когда есть хотя бы один
 // агент (пустое состояние объясняет себя само кнопкой «Создать агента»).
-// «Пройден» — в localStorage, как у тура Kaspi Shop: без миграции, ценой
-// повтора на другом устройстве.
-const KEY = 'ai-agent-tour-done'
+// «Показан» — в localStorage и cookie на .invoices.kz, как у тура Kaspi Shop
+// (src/lib/tourSeen.ts): без миграции, ценой повтора на другом устройстве.
+// Повторно запустить тур можно из панели помощи («?» вверху справа).
+const ID = 'agent'
+const LEGACY_KEY = 'ai-agent-tour-done'
 
 // «menu» (мобильный гамбургер) и «menu-desktop» (строка разделов) никогда не
 // отрисованы одновременно — GuidedTour сам пропустит отсутствующий якорь.
@@ -42,14 +45,15 @@ export default function AiAgentTour() {
   return (
     <GuidedTour
       steps={STEPS}
-      // try/catch: localStorage может бросить (приватный режим) — тур тогда
-      // просто не показываем.
+      // Хранилища недоступны — тур не показываем (isTourSeen тогда отвечает «показан»).
       shouldStart={async () => {
-        try { return !localStorage.getItem(KEY) } catch { return false }
+        const seen = isTourSeen(ID, [LEGACY_KEY])
+        // Уже видели: переносим прежний ключ localStorage в общую cookie и продлеваем её
+        // (Safari стирает cookie из скриптов через 7 дней), чтобы другой адрес тур не показал.
+        if (seen) markTourSeen(ID)
+        return !seen
       }}
-      onFinish={async () => {
-        try { localStorage.setItem(KEY, new Date().toISOString()) } catch {}
-      }}
+      onFinish={async () => markTourSeen(ID)}
     />
   )
 }

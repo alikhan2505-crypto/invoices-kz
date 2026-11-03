@@ -1,12 +1,15 @@
 'use client'
 import { GuidedTour, type TourStep } from '@/components/DashboardTour'
+import { isTourSeen, markTourSeen } from '@/lib/tourSeen'
 
 // Тур первого входа в Kaspi Shop — показывается только когда магазин уже
-// подключён (экран подключения сам объясняет себя). «Пройден» хранится в
-// localStorage, а не в profiles, как у дашборда: это сознательный выбор —
-// без миграции и без лишнего чтения профиля; цена — повтор тура на другом
-// устройстве, что для подсказки приемлемо.
-const KEY = 'kaspi-tour-done'
+// подключён (экран подключения сам объясняет себя). «Показан» хранится не в
+// profiles, как у дашборда, а в localStorage и cookie на .invoices.kz (см.
+// src/lib/tourSeen.ts): без миграции и без лишнего чтения профиля; цена — повтор
+// тура на другом устройстве, что для подсказки приемлемо. Отметка ставится при
+// показе; повторно запустить тур можно из панели помощи («?» вверху справа).
+const ID = 'kaspi'
+const LEGACY_KEY = 'kaspi-tour-done'
 
 // Как в DASHBOARD_STEPS: «menu» (мобильный гамбургер) и «menu-desktop»
 // (строка разделов) никогда не отрисованы одновременно, GuidedTour сам
@@ -48,14 +51,16 @@ export default function KaspiTour() {
   return (
     <GuidedTour
       steps={STEPS}
-      // try/catch: localStorage может бросить (приватный режим) — тур тогда
-      // просто не показываем, он не должен ломать страницу.
+      // Хранилища недоступны — тур не показываем (isTourSeen тогда отвечает «показан»):
+      // он не должен ломать страницу и не должен лезть при каждом заходе.
       shouldStart={async () => {
-        try { return !localStorage.getItem(KEY) } catch { return false }
+        const seen = isTourSeen(ID, [LEGACY_KEY])
+        // Уже видели: переносим прежний ключ localStorage в общую cookie и продлеваем её
+        // (Safari стирает cookie из скриптов через 7 дней), чтобы другой адрес тур не показал.
+        if (seen) markTourSeen(ID)
+        return !seen
       }}
-      onFinish={async () => {
-        try { localStorage.setItem(KEY, new Date().toISOString()) } catch {}
-      }}
+      onFinish={async () => markTourSeen(ID)}
     />
   )
 }

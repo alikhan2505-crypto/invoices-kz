@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 import { formatKzPhone } from '@/lib/kzPhone'
+import { hasReplayableTour, replayTour, subscribeReplayableTour } from '@/lib/tourReplay'
 import { isUtilityBarHiddenPath } from '@/lib/utilityBarPaths'
 import Link from 'next/link'
 import QRCode from 'qrcode'
@@ -116,6 +117,8 @@ export default function TopUtilityBar() {
   const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   const [panel, setPanel] = useState<Panel>(null)
+  // Есть ли на этой странице тур (регистрирует GuidedTour): тогда в панели помощи появляется «Показать тур».
+  const hasPageTour = useSyncExternalStore(subscribeReplayableTour, hasReplayableTour, () => false)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   // loadWalletExtras() runs from closures (init, openPanel) that still see the
@@ -705,7 +708,7 @@ export default function TopUtilityBar() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
               role="dialog" aria-label={u.walletTitle}
-              className="relative nav-glass rounded-[24px] w-full max-w-lg mb-0 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
+              className="relative nav-glass rounded-[24px] w-full max-w-lg mb-0 lg:mb-0 max-h-[84dvh] overflow-y-auto overflow-x-hidden"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
               onClick={e => e.stopPropagation()}
             >
@@ -1006,7 +1009,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div role="dialog" aria-label={u.notificationsTitle} className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-label={u.notificationsTitle} className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80dvh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{u.notificationsTitle}</h2>
@@ -1069,6 +1072,17 @@ export default function TopUtilityBar() {
                   </svg>
                   {u.about}
                 </Link>
+                {/* Тур по странице: пункт есть только там, где на странице есть тур. */}
+                {hasPageTour && (
+                  <button onClick={() => { setPanel(null); replayTour() }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors text-left">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
+                      <path d="M10 8.5l5.5 3.5-5.5 3.5v-7Z" fill="var(--nav-accent)" />
+                    </svg>
+                    {u.replayTour}
+                  </button>
+                )}
               </div>
             </div>
           )}

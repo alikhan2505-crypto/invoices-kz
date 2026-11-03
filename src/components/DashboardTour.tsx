@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { settleTourSteps, tourStepNumber } from '@/lib/tourSteps'
+import { registerTourStarter } from '@/lib/tourReplay'
 
 export type TourStep = { anchor: string; title: string; body: string }
 type Step = TourStep
@@ -92,6 +93,11 @@ function findAnchor(name: string): Element | null {
 
 // Тур с подсветкой для любого экрана: шаги — data-tour якоря на уже отрисованных
 // элементах; показывать ли и как запомнить «пройден» — решает вызывающий.
+//
+// Тур показывается один раз: отметка «показан» (onFinish) сохраняется В МОМЕНТ ПОКАЗА, а не
+// когда человек дойдёт до конца, поэтому закрытие вкладки или обновление страницы посреди тура
+// его не возвращает. Повторно запустить тур можно из панели помощи (иконка «?» вверху справа):
+// каждый тур регистрируется в src/lib/tourReplay.ts.
 export function GuidedTour({ steps: ALL_STEPS, shouldStart, onFinish }: { steps: Step[]; shouldStart: () => Promise<boolean>; onFinish: () => Promise<void> }) {
   const [open, setOpen] = useState(false)
   // The steps of THIS run, resolved once when the tour starts (after the page
@@ -127,49 +133,77 @@ export function GuidedTour({ steps: ALL_STEPS, shouldStart, onFinish }: { steps:
   const [tipHeight, setTipHeight] = useState(0)
   const tipRef = useRef<HTMLDivElement>(null)
 
-  // Decide once, on mount, whether this account has seen the tour. A missing
-  // profile row (or any error) means "don't show" -- the tour is a nicety and
-  // must never be the thing that breaks a dashboard load.
-  //
-  // Yes, dashboard/page.tsx already fetches this profile for its own reasons,
-  // so this is a second read of the same row. That is a deliberate trade: one
-  // indexed primary-key lookup buys a component that mounts anywhere with no
-  // props and no coupling to the dashboard's loading state. If the dashboard's
-  // first paint ever becomes the thing to optimise, pass the flag in as a prop
-  // then -- not before.
+  // Шаги берутся из актуальных пропсов в момент запуска (у CFO набор зависит от режима и ширины экрана).
+  const stepsRef = useRef(ALL_STEPS)
+  useEffect(() => { stepsRef.current = ALL_STEPS })
+  const aliveRef = useRef(true)
+  // Идёт или открыт показ: второй запуск поверх не нужен.
+  const runningRef = useRef(false)
+  // Тур показан сам (не по кнопке «Показать тур»): отметку «показан» надо сохранить, и пока
+  // она не сохранена, повторяем при закрытии. Ручной запуск этих флагов не трогает.
+  const shownByAutoRef = useRef(false)
+  const savedRef = useRef(false)
+  const saveShown = useCallback(async () => {
+    if (savedRef.current) return
+    try {
+      await onFinish()
+      savedRef.current = true
+    } catch (e) {
+      console.error('GuidedTour: failed to save that the tour was shown', e)
+    }
+  }, [onFinish])
+
+  // Находит отрисованные шаги и открывает тур. false - показывать нечего или тур уже идёт.
+  const begin = useCallback(async (): Promise<boolean> => {
+    if (runningRef.current) return false
+    runningRef.current = true
+    // Keep only the steps whose anchor is actually rendered on this
+    // viewport (e.g. skip "menu" on desktop, where that anchor sits in the
+    // DOM behind `lg:hidden`), waiting until late-mounting anchors (header
+    // wallet, desktop nav row) have appeared so the total never changes
+    // mid-run. If nothing has a rendered anchor, don't open the tour at all
+    // rather than show an empty scrim.
+    const run = await settleTourSteps(stepsRef.current, (a) => !!findAnchor(a), { cancelled: () => !aliveRef.current })
+    if (!aliveRef.current || run.length === 0) { runningRef.current = false; return false }
+    const start = 0
+    setSteps(run)
+    // Measure now, in this same batched update, instead of leaving
+    // vw/vh/rect at their zero/null initial state for one frame -- open
+    // and i changing without them means the first paint computes box as
+    // null (full-screen scrim, no highlight) and tipWidth as negative
+    // (vw is still 0), corrected only after the post-paint effect below
+    // runs measure().
+    const startEl = findAnchor(run[start].anchor)
+    setVw(window.innerWidth)
+    setVh(window.innerHeight)
+    setRect(startEl ? startEl.getBoundingClientRect() : null)
+    setI(start)
+    setOpen(true)
+    return true
+  }, [])
+
+  // Решаем один раз при монтировании, надо ли показывать тур. A missing profile row (or any
+  // error) means "don't show" -- the tour is a nicety and must never be the thing that breaks
+  // a page load. Как только тур открылся сам, сразу сохраняем «показан» (см. комментарий к компоненту).
   useEffect(() => {
-    let cancelled = false
+    aliveRef.current = true
     ;(async () => {
       const go = await shouldStart().catch(() => false)
-      if (cancelled || !go) return
-      // Keep only the steps whose anchor is actually rendered on this
-      // viewport (e.g. skip "menu" on desktop, where that anchor sits in the
-      // DOM behind `lg:hidden`), waiting until late-mounting anchors (header
-      // wallet, desktop nav row) have appeared so the total never changes
-      // mid-run. If nothing has a rendered anchor, don't open the tour at all
-      // rather than show an empty scrim.
-      const run = await settleTourSteps(ALL_STEPS, (a) => !!findAnchor(a), { cancelled: () => cancelled })
-      if (cancelled) return
-      if (run.length === 0) return
-      const start = 0
-      setSteps(run)
-      // Measure now, in this same batched update, instead of leaving
-      // vw/vh/rect at their zero/null initial state for one frame -- open
-      // and i changing without them means the first paint computes box as
-      // null (full-screen scrim, no highlight) and tipWidth as negative
-      // (vw is still 0), corrected only after the post-paint effect below
-      // runs measure().
-      const startEl = findAnchor(run[start].anchor)
-      setVw(window.innerWidth)
-      setVh(window.innerHeight)
-      setRect(startEl ? startEl.getBoundingClientRect() : null)
-      setI(start)
-      setOpen(true)
+      if (!aliveRef.current || !go) return
+      // Пока шла проверка, человек мог уже запустить тур вручную: он тоже считается показанным.
+      const opened = await begin()
+      if (!opened && !runningRef.current) return
+      shownByAutoRef.current = true
+      // Если сохранить не вышло, повторим при закрытии тура (finish).
+      void saveShown()
     })()
-    return () => { cancelled = true }
+    return () => { aliveRef.current = false }
     // Решаем один раз при монтировании — шаги и проверка от вызывающего стабильны.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // «Показать тур по странице»: ручной запуск из панели помощи, в любой момент и сколько угодно раз.
+  useEffect(() => registerTourStarter(() => { void begin() }), [begin])
 
   const measure = useCallback(() => {
     const step = STEPS[i]
@@ -217,10 +251,11 @@ export function GuidedTour({ steps: ALL_STEPS, shouldStart, onFinish }: { steps:
 
   const finish = useCallback(async () => {
     setOpen(false)
-    // Close stays optimistic -- blocking the UI on this round-trip would be
-    // worse than a rare re-show.
-    await onFinish().catch((e) => console.error('GuidedTour: failed to save completion', e))
-  }, [onFinish])
+    runningRef.current = false
+    // Обычно отметка уже сохранена при показе. Если тогда не вышло - пробуем ещё раз; закрытие
+    // остаётся оптимистичным: ждать сохранения было бы хуже редкого повторного показа.
+    if (shownByAutoRef.current) await saveShown()
+  }, [saveShown])
 
   const next = useCallback(() => {
     // Skip forward over any step whose anchor isn't rendered on this viewport.
@@ -429,7 +464,10 @@ export function GuidedTour({ steps: ALL_STEPS, shouldStart, onFinish }: { steps:
                 Пропустить
               </button>
               {/* No hover translate on this button: lifting it 2px on :hover moved it out from under a pointer resting on its lower edge, which dropped :hover and put it back -- an endless 2px flicker. */}
+              {/* autoFocus: после «Показать тур» фокус оставался на кнопке «?» под затемнением, и Enter
+                  открывал панель помощи позади тура. */}
               <button
+                autoFocus
                 onClick={next}
                 className="min-h-[44px] px-5 text-[13px] font-semibold rounded-xl transition-[filter] duration-150 hover:brightness-110"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
