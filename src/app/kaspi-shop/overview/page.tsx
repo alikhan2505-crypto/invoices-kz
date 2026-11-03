@@ -48,6 +48,8 @@ export default function KaspiShopOverview() {
   const [products, setProducts] = useState<ProductRow[] | null>(null)
   const [profit, setProfit] = useState<{ net: number; revenue: number; missingCogs: number } | null | undefined>(undefined)
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  // Заказы не удалось получить из Kaspi (ответ с ошибкой, обрыв): без этого 0 и «нет заказов» выглядели как правда.
+  const [ordersFailed, setOrdersFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -85,6 +87,7 @@ export default function KaspiShopOverview() {
         .then(async (d) => {
           if (!alive) return
           if (d?.sessionExpired) setSessionExpired(true)
+          if (!d) setOrdersFailed(true)
           const c: Record<string, number> = d?.counts ?? {}
           setCounts(c)
           const active = WORKING_STATUSES.filter((s) => (c[s] ?? 0) > 0)
@@ -95,7 +98,7 @@ export default function KaspiShopOverview() {
           merged.sort((a, b) => new Date(b.creationTime).getTime() - new Date(a.creationTime).getTime())
           if (alive) setOrders(merged.slice(0, 5))
         })
-        .catch(() => { if (alive) { setCounts({}); setOrders([]) } })
+        .catch(() => { if (alive) { setCounts({}); setOrders([]); setOrdersFailed(true) } })
 
       fetch('/api/kaspi-shop/profit?days=7', { headers })
         .then((r) => (r.ok ? r.json() : null))
@@ -112,7 +115,9 @@ export default function KaspiShopOverview() {
 
   if (!ready) return <LoadingSpinner />
 
-  const inWork = counts ? WORKING_STATUSES.reduce((s, k) => s + (counts[k] ?? 0), 0) : null
+  // Нули при мёртвой сессии или ошибке Kaspi - не данные: показываем «—» и причину.
+  const ordersUnavailable = sessionExpired || ordersFailed
+  const inWork = counts && !ordersUnavailable ? WORKING_STATUSES.reduce((s, k) => s + (counts[k] ?? 0), 0) : null
   const winning = products ? products.filter((p) => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length : null
   const atFloor = products ? products.filter((p) => p.own_current_price <= p.floor_price + 0.01).length : null
 
@@ -148,7 +153,8 @@ export default function KaspiShopOverview() {
           )}
 
           <div className="nav-glass rounded-2xl flex flex-wrap overflow-hidden">
-            {kpi('Заказов в работе', inWork === null ? null : String(inWork), counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
+            {kpi('Заказов в работе', ordersUnavailable ? '—' : inWork === null ? null : String(inWork),
+              sessionExpired ? 'сессия Kaspi истекла' : ordersFailed ? 'не удалось получить из Kaspi' : counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
             {kpi('Дешевле конкурентов', winning === null || products === null ? null : `${winning} из ${products.length}`, atFloor === null ? '' : `упёрлись в минимум: ${atFloor}`)}
             {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : 'после комиссии и расходов')}
           </div>
@@ -175,7 +181,9 @@ export default function KaspiShopOverview() {
                     <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказы из Kaspi…</td></tr>
                   )}
                   {orders !== null && orders.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Сейчас нет заказов в работе</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>
+                      {ordersUnavailable ? 'Заказы сейчас недоступны: нет связи с Kaspi' : 'Сейчас нет заказов в работе'}
+                    </td></tr>
                   )}
                   {orders?.map((o) => (
                     <tr key={o.code} style={{ borderTop: '1px solid var(--nav-border)' }}>

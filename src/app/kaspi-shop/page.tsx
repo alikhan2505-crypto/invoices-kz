@@ -747,6 +747,8 @@ export default function KaspiShop() {
     p => p.own_current_price > 0 && Math.abs(p.own_current_price - p.floor_price) < 0.01
   ).length
   const activeCount = products.filter(p => p.enabled).length
+  // «Работает» при нуле включённых товаров вводило в заблуждение: бот ничего не делает (аудит 02.11.2026).
+  const idleNoProducts = !paused && activeCount === 0
 
   // Which cities this product's demping actually covers: manually tracked
   // cities win; with none picked, auto mode checks the product's own point
@@ -798,7 +800,7 @@ export default function KaspiShop() {
              first-connect case has nothing else on the page to interact with. */
           <div className="fixed inset-x-0 bottom-0 top-14 lg:top-0 z-50 flex items-center justify-center p-3 bg-black/30">
             <motion.div initial={{ opacity: 0, scale: 0.97, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25, ease: EASE }}
-              className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84vh] overflow-y-auto"
+              className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84dvh] overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
               {connected && !needsReconnect && (
@@ -889,9 +891,11 @@ export default function KaspiShop() {
                 <>
                   <button onClick={togglePause}
                     className="text-xs font-bold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
-                    style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
+                    style={idleNoProducts
+                      ? { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)', border: '1px solid var(--nav-border)' }
+                      : { background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
                     {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />}
-                    {paused ? 'На паузе' : 'Работает'}
+                    {paused ? 'На паузе' : idleNoProducts ? 'Нет активных товаров' : 'Работает'}
                   </button>
                   <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 py-2 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
                     Отключить
@@ -1123,7 +1127,7 @@ export default function KaspiShop() {
                     onClick={() => setExpandedId(null)}>
                     <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 10 }}
                       transition={{ duration: 0.25, ease: EASE }}
-                      className="relative nav-glass rounded-[24px] w-full max-w-xl max-h-[86vh] overflow-y-auto"
+                      className="relative nav-glass rounded-[24px] w-full max-w-xl max-h-[86dvh] overflow-y-auto"
                       style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
                       onClick={e => e.stopPropagation()}>
                       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
@@ -1318,7 +1322,7 @@ export default function KaspiShop() {
             <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
               transition={{ duration: 0.3, ease: EASE }}
               onClick={e => e.stopPropagation()}
-              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-lg p-5 max-h-[86vh] flex flex-col"
+              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-lg p-5 max-h-[86dvh] flex flex-col"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
 
