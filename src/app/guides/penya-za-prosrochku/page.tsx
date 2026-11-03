@@ -2,8 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
+import { NBRK_BASE_RATE as RATE, formatPercent, formatRateFraction, formatTenge, legalPenalty } from '@/lib/nbrkBaseRate'
 
 const guide = getGuide('penya-za-prosrochku')!
+
+const DEBT = 1_000_000
+const EXAMPLE_DAYS = 60
+const HALF_YEAR_DAYS = 180
 
 export const metadata: Metadata = {
   title: guideMetaTitle(guide.ru.title),
@@ -55,13 +60,13 @@ export default function Page() {
         фактического платежа (выгодно брать ту, при которой ставка выше).
       </p>
       <p>
-        Пример: долг 1 000 000 ₸, просрочка 60 дней, базовая ставка 15,75% годовых (действует с 27.10.2026):
-        1 000 000 × 0,1575 × 60 / 365 ≈ <strong>25 890 ₸</strong>. За полгода просрочки набегает уже около
-        78 000 ₸ — аргумент, который заметно ускоряет оплату.
+        Пример: долг {formatTenge(DEBT)} ₸, просрочка {EXAMPLE_DAYS} дней, базовая ставка {formatPercent(RATE.percent)}% годовых (действует с {RATE.effectiveFrom}):{' '}
+        {formatTenge(DEBT)} × {formatRateFraction(RATE.percent)} × {EXAMPLE_DAYS} / 365 ≈ <strong>{formatTenge(legalPenalty(DEBT, EXAMPLE_DAYS))} ₸</strong>. За полгода просрочки набегает уже около{' '}
+        {formatTenge(Math.round(legalPenalty(DEBT, HALF_YEAR_DAYS) / 1000) * 1000)} ₸ — аргумент, который заметно ускоряет оплату.
       </p>
       <p className="note">
         Текущую базовую ставку проверяйте на nationalbank.kz — Нацбанк пересматривает её несколько раз в год
-        (следующее плановое решение — 04.12.2026). Для периода до смены ставки и после неё суды обычно
+        (следующее плановое решение — {RATE.nextDecision}). Для периода до смены ставки и после неё суды обычно
         считают по ставке на выбранную дату, а не дробят период — но в споре этот нюанс стоит обсудить с
         юристом.
       </p>
@@ -98,8 +103,8 @@ export default function Page() {
       </p>
 
       <p className="note">
-        Проверено 02.11.2026. Основание: ст. 295, 297, 353 ГК РК; базовая ставка НБ РК 15,75% — решение от
-        23.10.2026, действует с 27.10.2026. Это обзор, а не юридическая консультация: для конкретного спора
+        Проверено {RATE.verifiedOn}. Основание: ст. 295, 297, 353 ГК РК; базовая ставка НБ РК {formatPercent(RATE.percent)}% — решение от{' '}
+        {RATE.decisionDate}, действует с {RATE.effectiveFrom}. Это обзор, а не юридическая консультация: для конкретного спора
         сверьтесь с действующей редакцией норм и юристом.
       </p>
     </GuideShell>

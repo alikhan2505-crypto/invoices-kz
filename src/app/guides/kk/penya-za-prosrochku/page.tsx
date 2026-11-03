@@ -2,8 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
+import { NBRK_BASE_RATE as RATE, formatPercent, formatRateFraction, formatTenge, legalPenalty } from '@/lib/nbrkBaseRate'
 
 const guide = getGuide('penya-za-prosrochku')!
+
+const DEBT = 1_000_000
+const EXAMPLE_DAYS = 60
+const HALF_YEAR_DAYS = 180
 
 export const metadata: Metadata = {
   title: guideMetaTitle(guide.kk.title),
@@ -55,13 +60,13 @@ export default function Page() {
         төлем күні (мөлшерлеме жоғары күнді алған тиімді).
       </p>
       <p>
-        Мысал: борыш 1 000 000 ₸, кешіктіру 60 күн, базалық мөлшерлеме жылдық 15,75% (27.10.2026 бастап
-        қолданыста): 1 000 000 × 0,1575 × 60 / 365 ≈ <strong>25 890 ₸</strong>. Жарты жыл кешіктіруде шамамен
-        78 000 ₸ жиналады — төлемді айтарлықтай жеделдететін дәлел.
+        Мысал: борыш {formatTenge(DEBT)} ₸, кешіктіру {EXAMPLE_DAYS} күн, базалық мөлшерлеме жылдық {formatPercent(RATE.percent)}% ({RATE.effectiveFrom} бастап
+        қолданыста): {formatTenge(DEBT)} × {formatRateFraction(RATE.percent)} × {EXAMPLE_DAYS} / 365 ≈ <strong>{formatTenge(legalPenalty(DEBT, EXAMPLE_DAYS))} ₸</strong>. Жарты жыл кешіктіруде шамамен{' '}
+        {formatTenge(Math.round(legalPenalty(DEBT, HALF_YEAR_DAYS) / 1000) * 1000)} ₸ жиналады — төлемді айтарлықтай жеделдететін дәлел.
       </p>
       <p className="note">
         Ағымдағы базалық мөлшерлемені nationalbank.kz сайтынан тексеріңіз — Ұлттық банк оны жылына бірнеше
-        рет қайта қарайды (кезекті жоспарлы шешім — 04.12.2026).
+        рет қайта қарайды (кезекті жоспарлы шешім — {RATE.nextDecision}).
       </p>
 
       <h2>Өсімпұлды төлетіп алу үшін қалай талап ету керек</h2>
@@ -94,8 +99,8 @@ export default function Page() {
       </p>
 
       <p className="note">
-        02.11.2026 тексерілді. Негіз: ҚР АК 295, 297, 353-баптары; ҰБ базалық мөлшерлемесі 15,75% —
-        23.10.2026 шешімі, 27.10.2026 бастап қолданыста. Бұл шолу, заң кеңесі емес.
+        {RATE.verifiedOn} тексерілді. Негіз: ҚР АК 295, 297, 353-баптары; ҰБ базалық мөлшерлемесі {formatPercent(RATE.percent)}% —{' '}
+        {RATE.decisionDate} шешімі, {RATE.effectiveFrom} бастап қолданыста. Бұл шолу, заң кеңесі емес.
       </p>
     </GuideShell>
   )
