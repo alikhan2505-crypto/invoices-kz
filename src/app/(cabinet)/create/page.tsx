@@ -615,7 +615,7 @@ export default function CreateInvoicePage() {
             setClientPhone(draft.customer_phone || '')
             if (Array.isArray(draft.items) && draft.items.length > 0) {
               setServices(draft.items.map((i: any) => ({
-                name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: 'service',
+                name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: i.type === 'product' ? 'product' : 'service',
               })))
             }
             if (draft.customer_name) setClientSelected(true)

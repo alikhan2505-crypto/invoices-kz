@@ -3,7 +3,13 @@
 // live in invoiceSend.ts / the webhook handlers; this file stays pure
 // for direct unit testing (flow.ts precedent).
 
-export type DraftItem = { name: string; qty: number; unitPrice: number }
+export type DraftItem = {
+  name: string
+  qty: number
+  unitPrice: number
+  /** 'product' -- позиция из каталога владельца; без метки (доставка, услуга, старые черновики) -- 'service'. */
+  type?: 'product' | 'service'
+}
 export type DraftValidation = { ok: true; items: DraftItem[]; total: number } | { ok: false; error: string }
 
 export const INVOICE_AUTONOMY_THRESHOLD = 5
@@ -29,6 +35,24 @@ export const MAX_DISCOUNT_FRACTION = 0.5
 
 function normalizeName(name: string): string {
   return name.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Тип позиции в счёте. Раньше все позиции от ИИ-агента были «Услуга» (жёстко в коде), поэтому
+ * накладную по такому счёту выписать было нельзя (аудит 02.11.2026, п. 1.9). Позиция, чьё название
+ * есть в каталоге владельца (его товары Kaspi), - товар; остальное (доставка, монтаж) - услуга.
+ * Пустой каталог (владелец отключил или каталога нет) ничего не говорит: метку не ставим, и
+ * позиции остаются услугами, как и раньше.
+ */
+export function tagItemTypes(items: DraftItem[], catalog: { name: string }[]): DraftItem[] {
+  if (catalog.length === 0) return items
+  const names = new Set(catalog.map(p => normalizeName(p.name)))
+  return items.map(i => ({ ...i, type: names.has(normalizeName(i.name)) ? 'product' : 'service' }))
+}
+
+/** Тип позиции для строки счёта: только явная метка 'product' делает её товаром. */
+export function invoiceItemType(item: Pick<DraftItem, 'type'>): 'product' | 'service' {
+  return item.type === 'product' ? 'product' : 'service'
 }
 
 // Pure. `catalog` is the same {name, price} list the prompt's «Каталог и

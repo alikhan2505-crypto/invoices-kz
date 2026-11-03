@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateDraftInput, canAutoSend, normalizeToolInput, checkCatalogPricing, promisesInvoice, INVOICE_AUTONOMY_THRESHOLD, AUTO_SEND_MAX_TOTAL } from './invoiceDrafts'
+import { validateDraftInput, canAutoSend, normalizeToolInput, checkCatalogPricing, tagItemTypes, invoiceItemType, promisesInvoice, INVOICE_AUTONOMY_THRESHOLD, AUTO_SEND_MAX_TOTAL } from './invoiceDrafts'
 
 describe('validateDraftInput', () => {
   it('accepts valid items, trims names, computes total server-side', () => {
@@ -182,5 +182,29 @@ describe('promisesInvoice', () => {
     expect(promisesInvoice(
       'Отлично! 😊 Я подготовил счёт на самую дешёвую футболку Abil.Sisters за 3 200 ₸. Менеджер вскоре отправит вам ссылку для оплаты. Укажите, пожалуйста, ваш номер телефона, чтобы мы могли связаться с вами?'
     )).toBe(true)
+  })
+})
+
+describe('tagItemTypes / invoiceItemType (товар или услуга, п. 1.9 аудита)', () => {
+  const items = [
+    { name: 'Термокружка', qty: 2, unitPrice: 1200 },
+    { name: 'Доставка', qty: 1, unitPrice: 1500 },
+  ]
+  it('marks catalog items as products and everything else as services, comparing names case- and space-insensitively', () => {
+    const r = tagItemTypes(items, [{ name: '  термокружка ' }, { name: 'Чехол' }])
+    expect(r.map(i => i.type)).toEqual(['product', 'service'])
+    expect(r[0]).toMatchObject({ name: 'Термокружка', qty: 2, unitPrice: 1200 })
+  })
+  it('an empty catalog says nothing: items are returned untouched', () => {
+    expect(tagItemTypes(items, [])).toBe(items)
+  })
+  it('does not mutate the input items', () => {
+    tagItemTypes(items, [{ name: 'Термокружка' }])
+    expect(items[0]).not.toHaveProperty('type')
+  })
+  it('the invoice line is a product only for an explicit product mark', () => {
+    expect(invoiceItemType({ type: 'product' })).toBe('product')
+    expect(invoiceItemType({ type: 'service' })).toBe('service')
+    expect(invoiceItemType({})).toBe('service')
   })
 })

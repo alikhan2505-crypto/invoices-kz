@@ -64,6 +64,20 @@ describe('sendInvoiceForDraft: налоговые поля счёта из ча�
     expect(h.inserted).not.toHaveProperty('knp')
   })
 
+  it('позиции из каталога владельца попадают в счёт товарами, остальные и старые черновики - услугами (п. 1.9 аудита)', async () => {
+    draft.items = [
+      { name: 'Термокружка', qty: 1, unitPrice: 1000, type: 'product' },
+      { name: 'Доставка', qty: 1, unitPrice: 500, type: 'service' },
+      { name: 'Старая позиция', qty: 1, unitPrice: 300 },
+    ] as typeof draft.items
+    try {
+      await sendInvoiceForDraft(fakeSupabase(), 'd1', { auto: true })
+      expect((h.inserted?.services as Array<{ type: string }>).map(s => s.type)).toEqual(['product', 'service', 'service'])
+    } finally {
+      draft.items = [{ name: 'Товар', qty: 2, unitPrice: 1000 }]
+    }
+  })
+
   it('режим у продавца не задан: no_vat; профиль не прочитался: null', async () => {
     h.profile = { data: { vat_type: null } }
     await sendInvoiceForDraft(fakeSupabase(), 'd1', { auto: true })

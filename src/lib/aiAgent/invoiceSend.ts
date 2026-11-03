@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from './channelSend'
-import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricing, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
+import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricing, tagItemTypes, invoiceItemType, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
 import { loadAgentCatalog, storePinFor } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { createNotification } from '@/lib/notifications'
@@ -47,10 +47,13 @@ export function buildInvoiceToolExecutor(
       // tolerantly); an explicit column list naming it would error before the
       // migration. Opted-out agent -> empty catalog -> nothing to cross-check.
       const { data: agentOwner } = await supabase.from('ai_agents').select('*').eq('id', agent.id).maybeSingle()
+      let draftItems = validated.items
       if (agentOwner?.user_id) {
         const catalog = await loadAgentCatalog(supabase, agentOwner.user_id, storePinFor(agentOwner))
         const priced = checkCatalogPricing(validated.items, catalog)
         if (!priced.ok) return { outcome: 'draft_pending' as const, error: priced.error }
+        // Тот же каталог решает, товар это или услуга (накладная выписывается только по товарам).
+        draftItems = tagItemTypes(validated.items, catalog)
       }
       const missing: ('customer_name' | 'customer_phone')[] = []
       if (!norm.customerName) missing.push('customer_name')
@@ -66,7 +69,7 @@ export function buildInvoiceToolExecutor(
         conversationId,
         customerName: norm.customerName,
         customerPhone: norm.customerPhone,
-        items: validated.items,
+        items: draftItems,
         total: validated.total,
         source: 'ai_tool',
         autoSend: auto,
@@ -176,7 +179,7 @@ export async function sendInvoiceForDraft(
       const { data: number, error: numberError } = await supabase.rpc('claim_invoice_number', { p_user_id: agent.user_id })
       if (numberError) return fail(`нумерация: ${numberError.message}`)
       const services = (draft.items as DraftItem[]).map(i => ({
-        name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: 'service',
+        name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: invoiceItemType(i),
       }))
       // Режим НДС продавца фиксируем в счёте при создании. Профиль не прочитался —
       // оставляем null: просмотр тогда возьмёт режим профиля, как и раньше.
