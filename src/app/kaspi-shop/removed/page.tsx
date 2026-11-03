@@ -806,7 +806,7 @@ export default function KaspiShopProductAvailability() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setStockModal(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.22, ease: EASE }}
-            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86vh] overflow-y-auto"
+            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86dvh] overflow-y-auto"
             style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
             onClick={e => e.stopPropagation()}>
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
@@ -879,7 +879,7 @@ export default function KaspiShopProductAvailability() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setAddModal(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.22, ease: EASE }}
-            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86vh] overflow-y-auto"
+            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86dvh] overflow-y-auto"
             style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
             onClick={e => e.stopPropagation()}>
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
@@ -1008,7 +1008,7 @@ export default function KaspiShopProductAvailability() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setNewCardModal(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.22, ease: EASE }}
-            className="relative nav-glass rounded-[24px] w-full max-w-lg max-h-[86vh] overflow-y-auto"
+            className="relative nav-glass rounded-[24px] w-full max-w-lg max-h-[86dvh] overflow-y-auto"
             style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
             onClick={e => e.stopPropagation()}>
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />

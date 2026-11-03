@@ -300,7 +300,7 @@ function AiAgentDialogsInner() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <PageContainer variant="full" className="pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
+      <PageContainer variant="full" className="pb-6 flex flex-col" style={{ height: 'calc(100dvh - 200px)', minHeight: 560 }}>
         <PageHeader
           className="flex-shrink-0"
           title={sd.dialogsTitle}

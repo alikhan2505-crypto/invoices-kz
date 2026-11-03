@@ -728,7 +728,7 @@ export default function InvoicePage() {
   )
 
   if (!invoice) return (
-    <div className="min-h-[60vh] flex items-center justify-center">
+    <div className="min-h-[60dvh] flex items-center justify-center">
       <p style={{ color: 'var(--nav-text-muted)' }}>{t.invoiceNotFoundLabel}</p>
     </div>
   )
@@ -1491,7 +1491,7 @@ export default function InvoicePage() {
       {/* Модал ЭСФ */}
       {showEsfModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center sm:justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
+          <div className="w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl p-6 max-h-[90dvh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             {esfSuccessId ? (
               <div className="text-center py-2">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>

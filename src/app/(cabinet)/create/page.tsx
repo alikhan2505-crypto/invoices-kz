@@ -1822,7 +1822,7 @@ export default function CreateInvoicePage() {
       {/* Service picker modal */}
       {showServicePicker && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70dvh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.servicePickerTitle}</span>
               <button onClick={() => setShowServicePicker(false)} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
@@ -1872,7 +1872,7 @@ export default function CreateInvoicePage() {
           same WebKit containing-block reason. */}
       {mounted && showBankPicker && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
-          <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
+          <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80dvh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</span>
               <button onClick={closeBankPicker} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
@@ -1931,7 +1931,7 @@ export default function CreateInvoicePage() {
               role="dialog" aria-modal={!showSignModal} aria-labelledby="created-card-title" aria-describedby="created-card-subtitle"
               inert={showSignModal}
               onKeyDown={e => dialogKeyDown(e, () => createdCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus())}
-              className="w-full max-w-md rounded-3xl p-6 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-md rounded-3xl p-6 max-h-[90dvh] overflow-y-auto"
               style={{ background: 'var(--nav-surface-chrome)' }}
               initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

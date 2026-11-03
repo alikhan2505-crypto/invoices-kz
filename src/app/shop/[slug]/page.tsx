@@ -364,7 +364,7 @@ export default function StorefrontPage() {
 
       {checkoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={closeModal}>
-          <div className={`nav-glass rounded-2xl p-5 w-full max-h-[90vh] overflow-y-auto ${payment ? 'max-w-sm sm:max-w-md' : 'max-w-sm sm:max-w-md lg:max-w-3xl'}`} style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
+          <div className={`nav-glass rounded-2xl p-5 w-full max-h-[90dvh] overflow-y-auto ${payment ? 'max-w-sm sm:max-w-md' : 'max-w-sm sm:max-w-md lg:max-w-3xl'}`} style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.yourOrder}</div>
               <button onClick={closeModal} aria-label={t.close} className="text-sm flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>✕</button>

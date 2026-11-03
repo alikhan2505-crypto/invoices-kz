@@ -276,7 +276,7 @@ export default function PrintShopClient() {
             С lg превью липкое и высокое (65vh, не ниже 420px); холст
             заполняет этот блок, а FitCamera подгоняет камеру под его
             реальные пропорции. */}
-        <div className="aspect-square lg:aspect-auto lg:h-[65vh] lg:min-h-[420px] lg:sticky lg:top-6 lg:self-start min-w-0">
+        <div className="aspect-square lg:aspect-auto lg:h-[65dvh] lg:min-h-[420px] lg:sticky lg:top-6 lg:self-start min-w-0">
           <Canvas camera={{ position: [0, 52, 18], fov: 35 }}>
             {/* Three-point studio lighting (no HDRI/environment map -- this
                 is a public page, keeping it to procedural lights avoids a

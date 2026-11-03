@@ -183,7 +183,7 @@ export default function TestChatPanel({ agentId, fill = false, suggestions }: { 
         <div
           ref={transcriptRef}
           className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col gap-3"
-          style={fill ? { minHeight: 0 } : { minHeight: '300px', maxHeight: '55vh' }}
+          style={fill ? { minHeight: 0 } : { minHeight: '300px', maxHeight: '55dvh' }}
           aria-live="polite"
         >
           {messages.length === 0 && !sending && (

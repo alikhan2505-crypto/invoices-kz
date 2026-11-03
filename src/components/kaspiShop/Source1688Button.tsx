@@ -31,7 +31,7 @@ function Dialog({ product, onClose }: { product: Source1688Product; onClose: () 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(10,12,28,0.55)' }}
       onClick={e => { e.stopPropagation(); if (e.target === e.currentTarget) onClose() }}>
       <div role="dialog" aria-modal="true" aria-labelledby="s1688-title"
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-5"
+        className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl p-5"
         style={{ background: 'var(--nav-surface-chrome)', border: '1px solid var(--nav-border)', boxShadow: 'var(--nav-card-glow)' }}>
         <div className="flex items-start justify-between gap-3 mb-1">
           <h2 id="s1688-title" className="text-base font-bold" style={{ color: 'var(--nav-text-primary)' }}>Найти на 1688</h2>
