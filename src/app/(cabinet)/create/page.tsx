@@ -31,6 +31,7 @@ import BinWatchButton from '@/components/BinWatchButton'
 import PageContainer from '@/components/PageContainer'
 import DecimalField from '@/components/DecimalField'
 import ToolRequisitesOffer from '@/components/ToolRequisitesOffer'
+import QuickRequisitesSetup from '@/components/QuickRequisitesSetup'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -1217,6 +1218,7 @@ export default function CreateInvoicePage() {
         })()}
 
         <ToolRequisitesOffer profile={profile} profileLoaded={profileLoaded} bankCount={bankAccounts.length} banksLoaded={banksLoaded} onSaved={() => { void load() }} />
+        <QuickRequisitesSetup profile={profile} profileLoaded={profileLoaded} bankCount={bankAccounts.length} banksLoaded={banksLoaded} onSaved={() => { void load() }} />
 
         {showOnboarding && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
