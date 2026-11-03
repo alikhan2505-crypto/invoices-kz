@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { extractInboundEmail, isReceivedEvent, inboundNotificationText } from '@/lib/inboundEmail'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { secretEquals } from '@/lib/secretEquals'
+import { verifySvixSignature } from '@/lib/svixSignature'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,23 +19,34 @@ const supabase = createClient(
 //
 // Authenticated by a token in the query string rather than a header, because a
 // webhook endpoint is configured as a bare URL -- there is nowhere to put an
-// x-internal-secret. Resend signs its webhooks (Svix) and verifying that
-// signature would be stronger; it is not done here because it needs the svix
-// verifier as a dependency and the shared secret already makes the endpoint
-// unguessable. Worth revisiting if this ever carries anything but replies.
+// x-internal-secret. On top of that, when RESEND_WEBHOOK_SECRET is set (the
+// signing secret of this webhook in the Resend dashboard, `whsec_...`) the Svix
+// signature is verified too (svixSignature.ts). Without the variable only the
+// token guards the endpoint, as before; a warning is logged so the gap is visible.
 export async function POST(req: NextRequest) {
   const expected = process.env.INBOUND_EMAIL_SECRET
   if (!expected) {
     console.error('email/inbound: INBOUND_EMAIL_SECRET is not set')
     return NextResponse.json({ error: 'Not configured' }, { status: 500 })
   }
-  if (req.nextUrl.searchParams.get('token') !== expected) {
+  if (!secretEquals(req.nextUrl.searchParams.get('token'), expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Тело читаем строкой: подпись считается по точным байтам, не по разобранному JSON.
+  const rawBody = await req.text()
+  const signingSecret = process.env.RESEND_WEBHOOK_SECRET
+  if (signingSecret) {
+    if (!verifySvixSignature(req.headers, rawBody, signingSecret)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  } else {
+    console.error('email/inbound: RESEND_WEBHOOK_SECRET is not set, the webhook signature is not verified')
   }
 
   let payload: unknown
   try {
-    payload = await req.json()
+    payload = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
@@ -69,7 +82,7 @@ export async function POST(req: NextRequest) {
   if (error) {
     // A real failure, so let Resend retry -- it holds the message either way.
     console.error('email/inbound: insert failed:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Storage failed' }, { status: 500 })
   }
 
   // Told immediately rather than on a schedule. The reply IS the event, and
