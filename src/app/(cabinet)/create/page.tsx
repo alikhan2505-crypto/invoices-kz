@@ -30,6 +30,7 @@ import PageHeader from '@/components/PageHeader'
 import BinWatchButton from '@/components/BinWatchButton'
 import PageContainer from '@/components/PageContainer'
 import DecimalField from '@/components/DecimalField'
+import ToolRequisitesOffer from '@/components/ToolRequisitesOffer'
 
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -297,6 +298,8 @@ export default function CreateInvoicePage() {
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
+  // Нужен карточке ToolRequisitesOffer: пока банки не загрузились, «банка нет» ещё не факт.
+  const [banksLoaded, setBanksLoaded] = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
   const [pendingInvoice, setPendingInvoice] = useState<any>(null)
@@ -492,6 +495,7 @@ export default function CreateInvoicePage() {
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
     setBankAccounts(banks || [])
+    setBanksLoaded(true)
 
     // Kaspi Cashier connection status, for the "connect for exact-amount
     // tracked payments" hint next to the live preview (desktop only, per
@@ -1211,6 +1215,8 @@ export default function CreateInvoicePage() {
           )
           return null
         })()}
+
+        <ToolRequisitesOffer profile={profile} profileLoaded={profileLoaded} bankCount={bankAccounts.length} banksLoaded={banksLoaded} onSaved={() => { void load() }} />
 
         {showOnboarding && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
