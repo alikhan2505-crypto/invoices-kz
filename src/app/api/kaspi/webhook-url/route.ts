@@ -22,7 +22,15 @@ export async function POST(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { url } = await req.json()
+  const body = await req.json().catch(() => null)
+  // Не JSON, не объект или нет поля url - ошибка запроса: иначе кривое тело молча очистило бы
+  // сохранённый адрес. Очищает только явные url: null / url: ''.
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !('url' in body)) {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
+  }
+  const url: unknown = body.url
+  // Всё, что не строка и не null, - ошибка запроса, а не 500.
+  if (url != null && typeof url !== 'string') return NextResponse.json({ error: 'unsafe_url' }, { status: 400 })
 
   // Explicit null/empty clears the default — not an error.
   if (url) {

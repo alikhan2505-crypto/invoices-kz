@@ -7,6 +7,8 @@ export interface AuthContent {
   /** Ссылка из письма устарела или уже использована (callback вернул на /login?link=expired). */
   linkExpiredNotice: string
   passkeyLoginButton: string
+  /** Слишком частые попытки входа по Face ID / Touch ID (ответ 429). */
+  passkeyTooManyError: string
   googleSignInButton: string
   facebookSignInButton: string
   orEmailDivider: string
@@ -95,6 +97,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     noAccountHint: 'Аккаунта ещё нет? Просто введите почту — мы создадим его сами, пароль придумывать не нужно.',
     linkExpiredNotice: 'Ссылка для входа устарела или уже использована (почтовые программы иногда открывают её сами). Введите почту ещё раз, мы пришлём новую.',
     passkeyLoginButton: 'Войти по Face ID / Touch ID',
+    passkeyTooManyError: 'Слишком много попыток входа. Подождите минуту и попробуйте снова.',
     googleSignInButton: 'Войти через Google',
     facebookSignInButton: 'Войти через Facebook',
     orEmailDivider: 'или через email',
@@ -178,6 +181,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     noAccountHint: 'Аккаунтыңыз жоқ па? Поштаңызды енгізіңіз — біз оны өзіміз жасаймыз, құпия сөз ойлап табудың қажеті жоқ.',
     linkExpiredNotice: 'Кіру сілтемесінің мерзімі өтіп кеткен немесе ол бұрын қолданылған (пошта бағдарламалары кейде оны өздері ашып қояды). Поштаңызды қайта енгізіңіз, жаңасын жібереміз.',
     passkeyLoginButton: 'Face ID / Touch ID арқылы кіру',
+    passkeyTooManyError: 'Кіру әрекеттері тым көп. Бір минут күтіп, қайталап көріңіз.',
     googleSignInButton: 'Google арқылы кіру',
     facebookSignInButton: 'Facebook арқылы кіру',
     orEmailDivider: 'немесе email арқылы',
@@ -262,6 +266,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     noAccountHint: 'No account yet? Just enter your email — we create one for you, and there is no password to invent.',
     linkExpiredNotice: 'That sign-in link has expired or was already used (mail apps sometimes open links on their own). Enter your email again and we will send a new one.',
     passkeyLoginButton: 'Sign in with Face ID / Touch ID',
+    passkeyTooManyError: 'Too many sign-in attempts. Wait a minute and try again.',
     googleSignInButton: 'Sign in with Google',
     facebookSignInButton: 'Sign in with Facebook',
     orEmailDivider: 'or with email',

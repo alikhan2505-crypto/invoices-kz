@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadConnectionById } from '@/lib/kaspiShop/connection'
 import { generatePriceListXml } from '@/lib/kaspiShop/pricing'
 import { ownerHasKaspiShopAccess } from '@/lib/kaspiShop/planGate'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +17,16 @@ const supabase = createClient(
 // it's not practically guessable.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ connectionId: string }> }) {
   const { connectionId } = await params
-  const connection = await loadConnectionById(connectionId)
+  // connectionId - uuid: на мусорный сегмент пути запрос к базе падал бы исключением (500).
+  if (!isUuid(connectionId)) return new NextResponse('Not found', { status: 404 })
+  let connection: Awaited<ReturnType<typeof loadConnectionById>>
+  try {
+    connection = await loadConnectionById(connectionId)
+  } catch (err: any) {
+    // Сбой базы - временный, как и сбой чтения тарифа ниже: не 404 и не 500 с текстом ошибки.
+    console.error('kaspi-shop pricelist: connection lookup failed for connection', connectionId, ':', err?.message)
+    return new NextResponse('Temporarily unavailable', { status: 503 })
+  }
   if (!connection || connection.status !== 'active') {
     return new NextResponse('Not found', { status: 404 })
   }

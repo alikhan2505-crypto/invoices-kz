@@ -184,7 +184,12 @@ export function remainingOf(used: number, limit: number): number {
 
 /** IP посетителя: первый адрес из x-forwarded-for (Vercel ставит его всегда). */
 export function clientIp(headers: Headers): string {
-  return (headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
+  // Vercel сам перезаписывает x-vercel-forwarded-for и x-real-ip адресом клиента. Первое звено
+  // x-forwarded-for верно, только пока перед приложением нет другого прокси: за ним клиент пишет туда
+  // что хочет и в каждом запросе получает новый лимит. Поэтому платформенные заголовки идут первыми,
+  // а x-forwarded-for остаётся запасным вариантом (локально и в тестах).
+  const trusted = (headers.get('x-vercel-forwarded-for') || headers.get('x-real-ip') || '').split(',')[0].trim()
+  return trusted || (headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
 }
 
 /**

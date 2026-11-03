@@ -6,6 +6,7 @@ import {
   EXTERNAL_API_MAX_BODY_CHARS, EXTERNAL_API_MAX_USER_ID_LENGTH, EXTERNAL_API_MAX_CUSTOMER_NAME_LENGTH,
 } from '@/lib/aiAgent/externalApi'
 import { checkLimits, pruneLimiterRows, shouldPrune, readBodyCapped, type LimitSpec } from '@/lib/aiAgent/widgetLimiter'
+import { externalApiAuthFailLimiter, publicClientKey } from '@/lib/aiAgent/publicRouteGuards'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,8 +27,16 @@ export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('authorization')?.replace('Bearer ', '') || ''
   if (!isValidApiKeyFormat(apiKey)) return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
 
+  // Перебор случайных ключей с одного IP упирается в лимит, не доходя до базы
+  // (аудит 02.11.2026). Считаются только отказы: честная интеграция их не копит.
+  const ipKey = publicClientKey(req.headers)
+  if (externalApiAuthFailLimiter.isOver(ipKey)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
   const conn = await loadExternalApiConnection(apiKey)
-  if (!conn) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!conn) {
+    externalApiAuthFailLimiter.record(ipKey)
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
 
   const parsed = await readBodyCapped(req, EXTERNAL_API_MAX_BODY_CHARS)
   if (!parsed.ok) {

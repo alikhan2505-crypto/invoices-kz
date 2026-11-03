@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadWebsiteConnection } from '@/lib/aiAgent/websiteWebhookHandler'
-import { isValidWidgetKeyFormat } from '@/lib/aiAgent/widget'
+import { isValidWidgetKeyFormat, isValidVisitorId } from '@/lib/aiAgent/widget'
+import { widgetPollLimiter, publicClientKey, isValidSince } from '@/lib/aiAgent/publicRouteGuards'
 import { corsJson, corsPreflight } from '@/lib/aiAgent/corsJson'
 
 const supabase = createClient(
@@ -22,8 +23,19 @@ export async function GET(req: NextRequest) {
   const widgetKey = req.nextUrl.searchParams.get('widgetKey') || ''
   const visitorId = (req.nextUrl.searchParams.get('visitorId') || '').trim()
   const since = req.nextUrl.searchParams.get('since')
-  if (!isValidWidgetKeyFormat(widgetKey) || !visitorId) {
+  // Формат visitorId проверяем так же, как в POST: диалога с другим id быть не
+  // может (его создаёт только POST), так что честного посетителя это не задевает,
+  // а мусорные запросы не доходят до базы.
+  if (!isValidWidgetKeyFormat(widgetKey) || !isValidVisitorId(visitorId) || (since && !isValidSince(since))) {
     return corsJson({ error: 'invalid_request' }, 400)
+  }
+
+  // Публичный опрос раз в 5 с без входа: до этого лимита на него не было вовсе,
+  // а каждый вызов - три запроса в базу (аудит 02.11.2026). Лимит по IP в памяти
+  // инстанса, до любого обращения к базе; виджет на 429 просто ждёт следующий
+  // тик (он читает только data.messages), сообщения не теряются: since не двигается.
+  if (!widgetPollLimiter.hit(publicClientKey(req.headers))) {
+    return corsJson({ error: 'rate_limited' }, 429)
   }
 
   const conn = await loadWebsiteConnection(widgetKey)
@@ -52,7 +64,11 @@ export async function GET(req: NextRequest) {
   if (since) query = query.gt('created_at', since)
 
   const { data: rows, error } = await query
-  if (error) return corsJson({ error: error.message }, 500)
+  if (error) {
+    // Текст ошибки PostgREST (имена таблиц и колонок) анониму не отдаём.
+    console.error('ai-agent widget: messages poll failed:', error.message)
+    return corsJson({ error: 'unavailable' }, 500)
+  }
 
   const messages = (rows || []).map(r => ({
     id: r.id,

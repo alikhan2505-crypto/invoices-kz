@@ -83,7 +83,10 @@ export async function POST(req: NextRequest) {
     // 'draft already claimed' = a concurrent approve won the atomic claim
     // -- not a failure of this draft, just a duplicate click.
     const status = result.error === 'draft already claimed' ? 409 : 502
-    return NextResponse.json({ error: status === 409 ? 'Черновик уже обрабатывается' : (result.error || 'Не удалось подтвердить запись') }, { status })
+    // result.error - внутренний текст (SQL базы, ответ канала): в ответ не отдаём, он только в логе
+    // (и в error_message черновика, который показывает карточка).
+    if (status !== 409) console.error('planner booking-drafts POST: confirm failed:', result.error)
+    return NextResponse.json({ error: status === 409 ? 'Черновик уже обрабатывается' : 'Не удалось подтвердить запись' }, { status })
   }
   return NextResponse.json({ ok: true, status: 'confirmed' })
 }

@@ -34,6 +34,10 @@ export async function PATCH(
 
   const { id } = await params
   const body = await req.json().catch(() => null)
+  // Не JSON или не объект - 400, а не «успешное» обновление одного updated_at.
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'bad_body' }, { status: 400 })
+  }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -55,7 +59,11 @@ export async function PATCH(
     .select('id, slug, salon, pattern, status')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Текст ошибки базы (таблицы, колонки) в ответ не отдаём, он только в логе.
+    console.error('salon-sites update failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось сохранить сайт' }, { status: 500 })
+  }
   return NextResponse.json({ site: data })
 }
 
@@ -69,7 +77,10 @@ export async function DELETE(
   const { id } = await params
 
   const { error } = await serviceSupabase.from('salon_sites').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('salon-sites delete failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось удалить сайт' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

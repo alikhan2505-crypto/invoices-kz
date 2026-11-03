@@ -12,7 +12,11 @@ export async function GET(req: NextRequest) {
     .select('id, slug, salon, pattern, status, published_at, created_at')
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Текст ошибки базы (таблицы, колонки) в ответ не отдаём, он только в логе.
+    console.error('salon-sites list failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось загрузить список сайтов' }, { status: 500 })
+  }
   return NextResponse.json({ sites: data ?? [] })
 }
 
@@ -40,7 +44,8 @@ export async function POST(req: NextRequest) {
   if (error) {
     // Поддомен уже занят другим салоном.
     if (error.code === '23505') return NextResponse.json({ error: 'slug_taken' }, { status: 409 })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('salon-sites create failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось создать сайт' }, { status: 500 })
   }
 
   return NextResponse.json({ site: data })

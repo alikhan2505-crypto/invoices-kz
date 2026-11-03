@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { resolveStorefrontBySlug } from '@/lib/kaspiShop/storefront'
 import { getOrCreateKaspiPaymentForShopOrder } from '@/lib/kaspiPay/shopOrderPayment'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -94,6 +95,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     .slice(0, MAX_CART_LINES)
     .map((it: any) => ({ id: it.id as string, qty: it.qty as number }))
   if (items.length === 0) return NextResponse.json({ error: 'Корзина пуста' }, { status: 400 })
+  // id товара - uuid: на мусорный id запрос к базе падал бы исключением (500).
+  // Корзина отклоняется целиком, как и при недоступных товарах ниже.
+  if (items.some((it: { id: string }) => !isUuid(it.id))) {
+    return NextResponse.json({ error: 'Часть товаров в корзине уже недоступна, обновите страницу' }, { status: 400 })
+  }
 
   const { count: recentOrders, error: rateError } = await supabase
     .from('kaspi_shop_orders')

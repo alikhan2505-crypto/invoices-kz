@@ -101,6 +101,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    // Роут публичный: текст ошибки (БД, Resend) наружу не отдаём, он только в логе.
+    console.error('notify-paid: failed:', e?.message)
+    return NextResponse.json({ error: 'Не удалось отправить уведомление' }, { status: 500 })
   }
 }

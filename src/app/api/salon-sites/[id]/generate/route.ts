@@ -50,6 +50,10 @@ export async function POST(
     .select('id, variant_no, direction, html, created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Текст ошибки базы (таблицы, колонки) в ответ не отдаём, он только в логе.
+    console.error('salon-sites variant save failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось сохранить вариант' }, { status: 500 })
+  }
   return NextResponse.json({ variant: data })
 }

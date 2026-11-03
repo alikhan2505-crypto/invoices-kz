@@ -181,7 +181,7 @@ export async function checkAndSettleKaspiPayment(
     if (!secret) {
       console.error('Kaspi webhook skipped for', reqRow.id, '— no webhook secret available (neither per-connection nor KASPI_WEBHOOK_SECRET)')
     } else if (!(await isSafeWebhookUrl(reqRow.callback_url))) {
-      console.error('Kaspi webhook skipped for', reqRow.id, '— unsafe callback_url:', reqRow.callback_url)
+      console.error('Kaspi webhook skipped for', reqRow.id, '— unsafe callback_url:', JSON.stringify(String(reqRow.callback_url).slice(0, 120)))
     } else {
       const payload = JSON.stringify({
         event: 'payment.success',

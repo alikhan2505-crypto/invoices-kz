@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateRegistrationOptions } from '@simplewebauthn/server'
-import { RP_ID, RP_NAME, CHALLENGE_TTL_MS } from '@/lib/webauthn'
+import { RP_ID, RP_NAME } from '@/lib/webauthn'
+import { registerOptionsLimiter, tooManyAttempts, cleanupExpiredChallengesIfDue } from '@/lib/webauthnGuards'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,6 +19,10 @@ export async function POST(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Вход бесплатный, аккаунтов можно наделать сколько угодно, а каждый вызов
+  // пишет строку в webauthn_challenges (аудит 02.11.2026): лимит по аккаунту.
+  if (!registerOptionsLimiter.hit(user.id)) return tooManyAttempts()
 
   const { data: profile } = await supabase.from('profiles').select('email').eq('id', user.id).single()
   const { data: existing } = await supabase
@@ -45,7 +50,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await supabase.from('webauthn_challenges').delete().lt('created_at', new Date(Date.now() - CHALLENGE_TTL_MS).toISOString())
+  await cleanupExpiredChallengesIfDue(supabase)
 
   const { data: challengeRow, error } = await supabase
     .from('webauthn_challenges')

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => ({
   selects: [] as { table: string; cols: string }[],
   rows: {} as Record<string, any>,
+  // Ошибка базы по таблице: { invoices: { message: '...' } }.
+  errors: {} as Record<string, { message: string }>,
   updates: [] as any[],
 }))
 
@@ -14,7 +16,7 @@ vi.mock('@supabase/supabase-js', () => ({
         select(cols: string) { h.selects.push({ table, cols }); return b },
         update(p: any) { isUpdate = true; h.updates.push({ table, p }); return b },
         eq() { return b },
-        maybeSingle: async () => ({ data: h.rows[table] ?? null, error: null }),
+        maybeSingle: async () => ({ data: h.errors[table] ? null : h.rows[table] ?? null, error: h.errors[table] ?? null }),
         then: (res: any, rej: any) => Promise.resolve({ data: null, error: null, isUpdate }).then(res, rej),
       }
       return b
@@ -32,6 +34,7 @@ const future = new Date(Date.now() + 10 * 86400_000).toISOString()
 beforeEach(() => {
   h.selects = []
   h.updates = []
+  h.errors = {}
   h.rows = {
     invoices: {
       id: 'i1', number: '7', status: 'sent', amount: 1000, created_at: '2026-10-01', due_date: null,
@@ -75,5 +78,13 @@ describe('GET /api/public/invoice/[token]', () => {
   it('keeps the watermark for a seller without an active plan', async () => {
     h.rows.profiles = { ...h.rows.profiles, plan: 'free', plan_expires_at: null }
     expect((await (await call()).json()).showWatermark).toBe(true)
+  })
+
+  it('сбой базы: 500 lookup_failed, текст ошибки (таблица, колонки) анониму не отдаётся', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.errors.invoices = { message: 'permission denied for table invoices' }
+    const res = await call()
+    expect(res.status).toBe(500)
+    expect(JSON.stringify(await res.json())).toBe('{"error":"lookup_failed"}')
   })
 })

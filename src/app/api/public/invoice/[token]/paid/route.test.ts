@@ -47,4 +47,12 @@ describe('POST /api/public/invoice/[token]/paid', () => {
     h.notify.mockRejectedValue(new Error('chat down'))
     expect((await call()).status).toBe(200)
   })
+
+  it('сбой базы: в ответе только общий код, текст ошибки (таблица, колонки) анониму не отдаётся', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.result = { data: null, error: { message: 'relation "invoices" column "public_token" does not exist' } }
+    const res = await call()
+    expect(res.status).toBe(500)
+    expect(JSON.stringify(await res.json())).toBe('{"error":"update_failed"}')
+  })
 })

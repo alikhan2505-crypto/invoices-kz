@@ -39,8 +39,11 @@ async function loadDocumentTitleAndToken(documentType: string, documentId: strin
 // (Security audit 2026-09-04. Same "possession of an identifier implies
 // authorization" shape as the public_token RLS policies fixed the same day.)
 export async function POST(req: NextRequest) {
-  const { signatureId, signatureCms, publicToken } = await req.json()
-  if (!signatureId || !signatureCms || !publicToken) {
+  // Тело не JSON или поля не строки — 400, а не необработанное исключение (500).
+  const body = await req.json().catch(() => null)
+  const { signatureId, signatureCms, publicToken } = body ?? {}
+  if (typeof signatureId !== 'string' || typeof signatureCms !== 'string' || typeof publicToken !== 'string'
+    || !signatureId || !signatureCms || !publicToken) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 })
   }
 
@@ -76,7 +79,9 @@ export async function POST(req: NextRequest) {
     clientSignerName = parseSignerName(clientSig?.subject)
     clientSignerIin = clientSig?.userId || null
   } catch (e: any) {
-    return NextResponse.json({ error: `SIGEX: ${e.message}` }, { status: 502 })
+    // Ответ SIGEX (тело, статусы, адреса) анониму не отдаём: он только в логе.
+    console.error('client-sign: SIGEX failed:', e?.message)
+    return NextResponse.json({ error: 'Не удалось подтвердить подпись, попробуйте ещё раз' }, { status: 502 })
   }
 
   let ddcPdfUrl: string | null = null
@@ -108,7 +113,11 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', signatureId)
 
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (updateError) {
+    // Текст ошибки базы (таблица, колонки) анониму не отдаём.
+    console.error('client-sign: signature update failed:', updateError.message)
+    return NextResponse.json({ error: 'Не удалось сохранить подпись' }, { status: 500 })
+  }
 
   // Событие «Клиент подписал документ ЭЦП» (document_signed): письмо — как
   // и раньше по умолчанию включено, Telegram — по выбору владельца.

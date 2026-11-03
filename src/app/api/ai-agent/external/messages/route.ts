@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadExternalApiConnection } from '@/lib/aiAgent/externalApiWebhookHandler'
 import { isValidApiKeyFormat } from '@/lib/aiAgent/externalApi'
+import { externalApiAuthFailLimiter, publicClientKey, isValidSince } from '@/lib/aiAgent/publicRouteGuards'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,12 +16,20 @@ export async function GET(req: NextRequest) {
   const apiKey = req.headers.get('authorization')?.replace('Bearer ', '') || ''
   if (!isValidApiKeyFormat(apiKey)) return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
 
+  // Перебор случайных ключей с одного IP упирается в лимит, не доходя до базы
+  // (аудит 02.11.2026). Считаются только отказы: честная интеграция их не копит.
+  const ipKey = publicClientKey(req.headers)
+  if (externalApiAuthFailLimiter.isOver(ipKey)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
   const conn = await loadExternalApiConnection(apiKey)
-  if (!conn) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!conn) {
+    externalApiAuthFailLimiter.record(ipKey)
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
 
   const externalUserId = (req.nextUrl.searchParams.get('externalUserId') || '').trim()
   const since = req.nextUrl.searchParams.get('since')
-  if (!externalUserId) return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+  if (!externalUserId || (since && !isValidSince(since))) return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
 
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')
@@ -45,7 +54,11 @@ export async function GET(req: NextRequest) {
   if (since) query = query.gt('created_at', since)
 
   const { data: rows, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Текст ошибки PostgREST (имена таблиц и колонок) наружу не отдаём.
+    console.error('ai-agent external: messages poll failed:', error.message)
+    return NextResponse.json({ error: 'unavailable' }, { status: 500 })
+  }
 
   const messages = (rows || []).map(r => ({
     id: r.id,

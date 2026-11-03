@@ -38,6 +38,10 @@ export async function POST(
     .select('id, slug, status, published_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Текст ошибки базы (таблицы, колонки) в ответ не отдаём, он только в логе.
+    console.error('salon-sites publish failed:', error.message)
+    return NextResponse.json({ error: 'Не удалось опубликовать сайт' }, { status: 500 })
+  }
   return NextResponse.json({ site: data })
 }

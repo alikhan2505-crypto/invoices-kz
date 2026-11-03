@@ -15,6 +15,14 @@ function req(ip = '203.0.113.9') {
   }) as any
 }
 
+function reqRaw(raw: string, ip = '203.0.113.77') {
+  return new Request('https://invoices.kz/api/planner/login/init', {
+    method: 'POST',
+    body: raw,
+    headers: { 'x-forwarded-for': ip, 'content-type': 'application/json' },
+  }) as any
+}
+
 beforeEach(() => {
   process.env.CUSTOMER_TELEGRAM_BOT_USERNAME = 'test_bot'
   h.db = createCounterDbFake()
@@ -31,6 +39,34 @@ describe('POST /api/planner/login/init', () => {
     const body = await r.json()
     expect(body.code).toMatch(/^[0-9a-f]{48}$/)
     expect(body.botUsername).toBe('test_bot')
+  })
+
+  it('кривое тело (не JSON, не объект, slug не строка) даёт 400, а не 500', async () => {
+    for (const raw of ['not json', '', 'null', '[]', '"x"', '{"slug":123}', '{"slug":{"a":1}}', '{"slug":"   "}']) {
+      const r = await POST(reqRaw(raw))
+      expect(r.status, raw).toBe(400)
+      expect((await r.json()).error).toBe('bad_slug')
+    }
+  })
+
+  it('сбой записи кода: 500 с общим кодом, текст ошибки базы (таблица, ограничение) не уходит наружу', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.db.otherHandler = (q) => {
+      if (q.table === 'salon_sites') return { data: { id: 'site-1' }, error: null }
+      if (q.table === 'planner_sessions' && q.op === 'insert') {
+        return { data: null, error: { message: 'duplicate key value violates unique constraint "planner_sessions_code_key"' } }
+      }
+      return { data: null, error: null }
+    }
+    const r = await POST(req('203.0.113.88'))
+    expect(r.status).toBe(500)
+    const text = JSON.stringify(await r.json())
+    expect(text).toBe('{"error":"insert_failed"}')
+    expect(text).not.toContain('planner_sessions')
+    expect(text).not.toContain('constraint')
+    // Детали не потеряны, а лежат в логе.
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('planner login init'), expect.stringContaining('planner_sessions_code_key'))
+    spy.mockRestore()
   })
 
   it('stops one IP after the per-minute limit (429), another IP still works', async () => {

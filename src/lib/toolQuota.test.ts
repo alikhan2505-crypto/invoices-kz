@@ -315,6 +315,13 @@ describe('clientIp', () => {
     expect(clientIp(new Headers({ 'x-forwarded-for': '198.51.100.4, 10.0.0.1' }))).toBe('198.51.100.4')
     expect(clientIp(new Headers())).toBe('unknown')
   })
+
+  it('prefers the headers the platform sets itself over the first hop of x-forwarded-for', () => {
+    // За посторонним прокси первое звено x-forwarded-for задаёт клиент, платформенные заголовки - нет.
+    expect(clientIp(new Headers({ 'x-forwarded-for': '1.2.3.4, 198.51.100.4', 'x-real-ip': '198.51.100.4' }))).toBe('198.51.100.4')
+    expect(clientIp(new Headers({ 'x-forwarded-for': '1.2.3.4, 198.51.100.4', 'x-vercel-forwarded-for': '198.51.100.9', 'x-real-ip': '198.51.100.4' }))).toBe('198.51.100.9')
+    expect(clientIp(new Headers({ 'x-vercel-forwarded-for': ' 198.51.100.9 , 10.0.0.1' }))).toBe('198.51.100.9')
+  })
 })
 
 describe('cleanCompanyName', () => {

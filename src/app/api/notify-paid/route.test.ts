@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   invoice: null as any,
   counters: new Map<string, number>(),
   failCounter: false,
+  // Сбой чтения счёта с «внутренностями» в тексте (имя таблицы, SQL).
+  invoiceThrows: null as string | null,
 }))
 
 vi.mock('resend', () => ({ Resend: class { emails = { send: sendMock } } }))
@@ -25,7 +27,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from(table: string) {
       if (table === 'invoices') {
-        return { select: () => { const q: any = { eq: () => q, single: async () => ({ data: state.invoice, error: null }) }; return q } }
+        return { select: () => { const q: any = { eq: () => q, single: async () => { if (state.invoiceThrows) throw new Error(state.invoiceThrows); return { data: state.invoice, error: null } } }; return q } }
       }
       if (table === 'tool_kontragent_checks') {
         return {
@@ -57,6 +59,7 @@ beforeEach(() => {
   tgMock.mockReset()
   state.counters = new Map()
   state.failCounter = false
+  state.invoiceThrows = null
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -124,5 +127,18 @@ describe.each([
     for (const body of [{}, { invoiceId: 123 }, { invoiceId: ['a'] }, { invoiceId: 'x'.repeat(100) }, 'not json']) {
       expect((await post(req(body))).status, JSON.stringify(body)).toBe(400)
     }
+  })
+
+  it('внутренний сбой: 500 с общим текстом, без текста ошибки (SQL, таблицы) в ответе, детали только в логе', async () => {
+    state.invoiceThrows = 'relation "invoices" does not exist: select number from invoices'
+    const res = await post(req({ invoiceId: 'inv-1' }))
+    expect(res.status).toBe(500)
+    const text = JSON.stringify(await res.json())
+    expect(text).not.toContain('invoices')
+    expect(text).not.toContain('relation')
+    expect(text).not.toContain('select')
+    expect(sendMock).not.toHaveBeenCalled()
+    // Детали не потеряны: они уходят в лог.
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining(_name), expect.stringContaining('relation "invoices"'))
   })
 })

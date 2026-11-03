@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateAuthenticationOptions } from '@simplewebauthn/server'
-import { RP_ID, CHALLENGE_TTL_MS } from '@/lib/webauthn'
+import { RP_ID } from '@/lib/webauthn'
+import { loginOptionsLimiter, webauthnClientKey, tooManyAttempts, cleanupExpiredChallengesIfDue } from '@/lib/webauthnGuards'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,13 +12,19 @@ const supabase = createClient(
 // No auth required — this starts a discoverable/usernameless passkey login.
 // The browser itself shows the account picker; we learn who's signing in
 // only once login-verify receives back a credential id.
-export async function POST() {
+//
+// Каждый вызов пишет строку в webauthn_challenges, а вызывать может кто угодно
+// (аудит 02.11.2026), поэтому: лимит по IP (отказ ДО записи в базу) и уборка
+// просроченных челленджей раз в минуту на инстанс, а не на каждый вызов.
+export async function POST(req: NextRequest) {
+  if (!loginOptionsLimiter.hit(webauthnClientKey(req.headers))) return tooManyAttempts()
+
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
     userVerification: 'preferred',
   })
 
-  await supabase.from('webauthn_challenges').delete().lt('created_at', new Date(Date.now() - CHALLENGE_TTL_MS).toISOString())
+  await cleanupExpiredChallengesIfDue(supabase)
 
   const { data: challengeRow, error } = await supabase
     .from('webauthn_challenges')

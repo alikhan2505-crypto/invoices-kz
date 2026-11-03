@@ -78,7 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { conversation } = resolved
 
   const sendError = await sendIntoConversation(supabase, conversation, text)
-  if (sendError) return NextResponse.json({ error: sendError }, { status: 502 })
+  if (sendError) {
+    // sendError - сырой текст ответа канала (Telegram, WhatsApp, Instagram API): в ответ не отдаём, он только в логе.
+    console.error('planner booking message POST: send failed:', sendError)
+    return NextResponse.json({ error: 'Не удалось отправить сообщение' }, { status: 502 })
+  }
 
   // Пауза ИИ — только после успешной отправки: иначе неудачная отправка
   // молча выключала бота, а владелец ничего не отправил (как в ai-agent/dialogs/reply).

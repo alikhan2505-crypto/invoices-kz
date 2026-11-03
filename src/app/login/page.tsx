@@ -158,6 +158,8 @@ export default function Login() {
     setPasskeyLoading(true)
     try {
       const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' })
+      // 429 приходит с английским текстом для API-клиентов: человеку показываем свой язык.
+      if (optRes.status === 429) { alert(t.passkeyTooManyError); return }
       const optJson = await optRes.json()
       if (optJson.error) { alert(t.errorPrefix(optJson.error)); return }
 
@@ -168,6 +170,7 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ challengeId: optJson.challengeId, response: authResp }),
       })
+      if (verifyRes.status === 429) { alert(t.passkeyTooManyError); return }
       const verifyJson = await verifyRes.json()
       if (verifyJson.error) { alert(t.errorPrefix(verifyJson.error)); return }
 

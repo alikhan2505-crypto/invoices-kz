@@ -5,6 +5,7 @@ import { resolveStorefrontBySlug } from '@/lib/kaspiShop/storefront'
 import { loadWholesaleModelByVariant, resolveWholesaleLine, type ResolvedWholesaleLine } from '@/lib/kaspiShop/wholesaleStorefront'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { resolveInvoiceVatType } from '@/lib/invoiceTax'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,6 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     .slice(0, MAX_CART_LINES)
     .map((it: any) => ({ modelId: it.modelId, size: it.size, color: it.color, qty: it.qty }))
   if (items.length === 0) return NextResponse.json({ error: 'Корзина пуста' }, { status: 400 })
+  // modelId - uuid: на мусорный id запрос к базе падал бы исключением (500).
+  // Корзина отклоняется целиком, как и при недоступных товарах ниже.
+  if (items.some(it => !isUuid(it.modelId))) {
+    return NextResponse.json({ error: 'Часть товаров в корзине больше недоступна, обновите страницу' }, { status: 400 })
+  }
 
   let resolved: (ResolvedWholesaleLine | null)[]
   try {

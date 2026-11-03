@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByApiToken } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
 import { getWalletBalance, computeCommission } from '@/lib/kaspiPay/wallet'
+import { isWebhookUrlShapeSafe } from '@/lib/kaspiPay/webhookSafety'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,10 +34,25 @@ export async function POST(req: NextRequest) {
   }
   if (!found) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { amount, order_id, callback_url } = await req.json()
-  if (!amount || !order_id || typeof amount !== 'number' || amount <= 0) {
+  // Тело не JSON или не объект — 400, а не необработанное исключение (500).
+  const body = await req.json().catch(() => null)
+  const { amount, order_id, callback_url } = body ?? {}
+  if (!amount || !order_id || typeof amount !== 'number' || amount <= 0
+    || (typeof order_id !== 'string' && typeof order_id !== 'number')) {
     return NextResponse.json({ error: 'amount and order_id required' }, { status: 400 })
   }
+  // callback_url уходит в базу и потом в исходящий вызов: только строка (или не задан).
+  if (callback_url != null && typeof callback_url !== 'string') {
+    return NextResponse.json({ error: 'callback_url must be a string' }, { status: 400 })
+  }
+  // Заведомо небезопасный адрес (не http(s), localhost, внутренние диапазоны, логин в адресе) отвергаем
+  // сразу, чтобы клиент API узнал об этом, а не получил молчаливый пропуск webhook при оплате.
+  // Без DNS: авторитетная проверка остаётся прямо перед отправкой (settlePayment.ts).
+  if (callback_url && !isWebhookUrlShapeSafe(callback_url)) {
+    return NextResponse.json({ error: 'unsafe_callback_url' }, { status: 400 })
+  }
+  // Kaspi и колонка order_id принимают строку; число от клиента приводим, а не пропускаем как есть.
+  const orderId = String(order_id)
 
   // The real enforcement point for the whole feature: creating a NEW payment
   // is what's monetized (2% of it, debited on settlement), not connecting or
@@ -64,7 +80,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const payment = await createPayment(found.connection, { amount, orderId: order_id })
+    const payment = await createPayment(found.connection, { amount, orderId })
 
     // A payment now genuinely exists on Kaspi's side and money can change
     // hands — an untracked insert failure here must not still report
@@ -73,7 +89,7 @@ export async function POST(req: NextRequest) {
     const { error: insertError } = await supabase.from('kaspi_payment_requests').insert({
       user_id: found.userId,
       invoice_id: null,
-      order_id,
+      order_id: orderId,
       amount,
       kaspi_operation_id: payment.operationId,
       qr_token: payment.qrToken,

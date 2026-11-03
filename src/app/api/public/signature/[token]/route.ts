@@ -26,7 +26,9 @@ const SIGNATURE_FIELDS = 'id, status, owner_signed_at, client_signed_at, owner_s
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const type = req.nextUrl.searchParams.get('type') || ''
-  const table = DOCUMENT_TABLES[type]
+  // hasOwnProperty, а не DOCUMENT_TABLES[type]: ?type=constructor / __proto__ / toString
+  // находит свойство прототипа (функцию), и запрос к базе падал бы 500 вместо 404.
+  const table = Object.prototype.hasOwnProperty.call(DOCUMENT_TABLES, type) ? DOCUMENT_TABLES[type] : undefined
   if (!token || !table) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const { data: doc, error } = await supabase

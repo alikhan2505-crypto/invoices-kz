@@ -52,7 +52,11 @@ export async function POST(req: NextRequest) {
     site_id: site.id,
     expires_at: new Date(Date.now() + CODE_TTL_MS).toISOString(),
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Маршрут без входа: текст ошибки базы наружу не отдаём, он только в логе.
+    console.error('planner login init: insert failed:', error.message)
+    return NextResponse.json({ error: 'insert_failed' }, { status: 500 })
+  }
 
   return NextResponse.json({ code, botUsername, expiresInSeconds: CODE_TTL_MS / 1000 })
 }

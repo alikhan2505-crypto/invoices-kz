@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
 import { RP_ID, EXPECTED_ORIGINS, CHALLENGE_TTL_MS } from '@/lib/webauthn'
+import { loginVerifyLimiter, webauthnClientKey, tooManyAttempts } from '@/lib/webauthnGuards'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,15 +10,28 @@ const supabase = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const { challengeId, response } = await req.json()
-  if (!challengeId || !response?.id) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+  // Лимит по IP до любых обращений к базе (аудит 02.11.2026): маршрут открыт без входа.
+  if (!loginVerifyLimiter.hit(webauthnClientKey(req.headers))) return tooManyAttempts()
 
+  // Битый JSON и не-строки -- это 400, а не 500 и не странный фильтр в запросе к базе.
+  const body = await req.json().catch(() => null)
+  const challengeId: unknown = body?.challengeId
+  const response = body?.response
+  if (typeof challengeId !== 'string' || !challengeId || typeof response?.id !== 'string' || !response.id) {
+    return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+  }
+
+  // Челлендж одноразовый: забираем его одним DELETE ... RETURNING ещё ДО проверки.
+  // Раньше он читался отдельным запросом и удалялся только после успешной
+  // проверки: при сбое подпись можно было пробовать на том же челлендже снова,
+  // а два параллельных запроса с одним ответом оба проходили чтение.
   const { data: challengeRow } = await supabase
     .from('webauthn_challenges')
-    .select('challenge, created_at')
+    .delete()
     .eq('id', challengeId)
     .eq('type', 'authentication')
-    .single()
+    .select('challenge, created_at')
+    .maybeSingle()
 
   if (!challengeRow || Date.now() - new Date(challengeRow.created_at).getTime() > CHALLENGE_TTL_MS) {
     return NextResponse.json({ error: 'Challenge expired, try again' }, { status: 400 })
@@ -46,10 +60,11 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 400 })
+    // Текст ошибки библиотеки (ожидаемые origin/RP ID, детали разбора ответа)
+    // анониму не отдаём: подробности только в лог.
+    console.error('webauthn login-verify: verification threw:', e?.message)
+    return NextResponse.json({ error: 'Verification failed' }, { status: 400 })
   }
-
-  await supabase.from('webauthn_challenges').delete().eq('id', challengeId)
 
   if (!verification.verified) {
     return NextResponse.json({ error: 'Verification failed' }, { status: 400 })
