@@ -1,17 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from './connection'
 import { checkStatus } from './client'
+import { COMMISSION_RATE, computeCommission } from './commission'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const COMMISSION_RATE = 0.02
-
-export function computeCommission(amount: number): number {
-  return Math.round(amount * COMMISSION_RATE)
-}
+// Сама константа и расчёт живут в commission.ts; здесь их прежний адрес.
+export { COMMISSION_RATE, computeCommission }
 
 export async function getWalletBalance(userId: string): Promise<number> {
   const { data, error } = await supabase

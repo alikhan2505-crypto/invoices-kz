@@ -517,7 +517,10 @@ export default function InvoicePage() {
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = t.whatsappShareMessage(invoice.number, Number(invoice.amount).toLocaleString('ru-KZ'), link)
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
-    await updateStatus('sent')
+    // Только черновик становится «отправлен», как и в /api/send-invoice: повторная
+    // отправка ссылки на оплаченный (отменённый, просмотренный, просроченный) счёт
+    // не должна откатывать его статус назад.
+    if (invoice.status === 'draft') await updateStatus('sent')
   }
 
   async function sendEmailConfirm() {
