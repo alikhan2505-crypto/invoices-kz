@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { mapCategorySample, productDemandScore, categoryDemandScore } from '@/lib/kaspiShop/nicheTrends'
 import { snapshotRowsFromSample } from '@/lib/kaspiShop/nicheCollections'
+import { secretEquals } from '@/lib/secretEquals'
 
 // The offerCounts branch loops up to 150 per-SKU updates in one request
 // (the script chunks them) -- default serverless timeout is too tight
@@ -38,7 +39,7 @@ const SNAPSHOT_RETENTION_DAYS = 400
 // processed independently, so chunking is idempotent-safe.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-kaspi-shop-cron-secret')
-  if (!secret || secret !== process.env.KASPI_SHOP_CRON_SECRET) {
+  if (!secretEquals(secret, process.env.KASPI_SHOP_CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -7,6 +7,7 @@ import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT 
 import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
 import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
 import { entryMatchesWabaId } from '@/lib/aiAgent/whatsappWabaMatch'
+import { secretEquals } from '@/lib/secretEquals'
 
 // Inbound WhatsApp Cloud API webhook for every connected customer number --
 // mirrors src/app/api/instagram/webhook/route.ts's exact shape (GET verify
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('hub.verify_token')
   const challenge = req.nextUrl.searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN && challenge) {
+  if (mode === 'subscribe' && secretEquals(token, process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) && challenge) {
     return new NextResponse(challenge, { status: 200 })
   }
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })

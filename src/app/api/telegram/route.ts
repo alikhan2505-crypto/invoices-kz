@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { claimWindowSlot, dayBucket, windowKey } from '@/lib/windowLimits'
+import { secretEquals } from '@/lib/secretEquals'
 
 // Не больше стольких уведомлений «Новый пользователь» в сутки от одного аккаунта: настоящему человеку
 // хватает одного, а аккаунт-спамщик иначе забивал бы личный Telegram основателя (аудит 02.11.2026).
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
 
   const internalSecret = req.headers.get('x-internal-secret')
-  const isInternal = !!internalSecret && internalSecret === process.env.INTERNAL_API_SECRET
+  const isInternal = secretEquals(internalSecret, process.env.INTERNAL_API_SECRET)
 
   let message: string
 

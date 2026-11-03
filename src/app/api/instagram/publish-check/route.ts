@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPublishToken } from '@/lib/instagramPublishToken'
+import { secretEquals } from '@/lib/secretEquals'
 
 // Pre-flight for "can we actually publish a post right now?".
 //
@@ -21,7 +22,7 @@ import { loadPublishToken } from '@/lib/instagramPublishToken'
 const GRAPH_API = 'https://graph.instagram.com/v21.0'
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('x-internal-secret') !== process.env.IG_AUTOMATION_SECRET) {
+  if (!secretEquals(req.headers.get('x-internal-secret'), process.env.IG_AUTOMATION_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

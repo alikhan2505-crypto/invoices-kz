@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { secretEquals } from '@/lib/secretEquals'
 import {
   MIGRATION_REQUIRED_MESSAGE,
   REEL_MAX_BYTES,
@@ -149,7 +150,7 @@ async function createReelDraft(body: Record<string, unknown>) {
 // rather than a single photo plus a caption they have to open and read.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.IG_AUTOMATION_SECRET) {
+  if (!secretEquals(internalSecret, process.env.IG_AUTOMATION_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

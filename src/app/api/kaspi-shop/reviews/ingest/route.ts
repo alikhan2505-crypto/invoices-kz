@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { mapReviewsResponse } from '@/lib/kaspiShop/reviews'
 import { ownerHasKaspiShopAccess, trackedProductOwnerId } from '@/lib/kaspiShop/planGate'
+import { secretEquals } from '@/lib/secretEquals'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +17,7 @@ const supabase = createClient(
 // same split as /api/kaspi-shop/niches/deliver and /cron/apply.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-kaspi-shop-cron-secret')
-  if (!secret || secret !== process.env.KASPI_SHOP_CRON_SECRET) {
+  if (!secretEquals(secret, process.env.KASPI_SHOP_CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

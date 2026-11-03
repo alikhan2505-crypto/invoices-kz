@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { secretEquals } from '@/lib/secretEquals'
 
 // One-time setup call: registers our webhook URL with Telegram so button
 // presses on post drafts reach /api/instagram/telegram-webhook. Re-running
 // this is harmless — Telegram just overwrites the existing webhook config.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.IG_AUTOMATION_SECRET) {
+  if (!secretEquals(internalSecret, process.env.IG_AUTOMATION_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

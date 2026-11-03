@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { mapNicheResponse } from '@/lib/kaspiShop/niches'
 import { completeNicheCheck, failNicheCheck } from '@/lib/kaspiShop/nicheChecks'
 import { debitKaspiShopWallet } from '@/lib/kaspiShop/wallet'
+import { secretEquals } from '@/lib/secretEquals'
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-kaspi-shop-cron-secret')
-  if (!secret || secret !== process.env.KASPI_SHOP_CRON_SECRET) {
+  if (!secretEquals(secret, process.env.KASPI_SHOP_CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

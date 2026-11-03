@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { applyPriceCheckResult } from '@/lib/kaspiShop/checkCycle'
+import { secretEquals } from '@/lib/secretEquals'
 
 // Called by the GitHub Actions workflow once per due product, after it has
 // fetched (or failed to fetch) that product's raw competitor offers
@@ -9,7 +10,7 @@ import { applyPriceCheckResult } from '@/lib/kaspiShop/checkCycle'
 // lives) rather than in the GitHub Actions script.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-kaspi-shop-cron-secret')
-  if (!secret || secret !== process.env.KASPI_SHOP_CRON_SECRET) {
+  if (!secretEquals(secret, process.env.KASPI_SHOP_CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

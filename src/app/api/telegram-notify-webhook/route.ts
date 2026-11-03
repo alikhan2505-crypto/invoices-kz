@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { parseStartToken } from '@/lib/telegramNotify'
 import { isConnectTokenFresh } from '@/lib/telegramConnectToken'
 import { handleCfoMessage, handleCfoPhoto } from '@/lib/cfo/telegramHandle'
+import { secretEquals } from '@/lib/secretEquals'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,7 +27,7 @@ async function reply(chatId: number, text: string) {
 // directly (no deep-link) deserves to know what it's for.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-telegram-bot-api-secret-token')
-  if (!secret || secret !== process.env.TELEGRAM_NOTIFY_WEBHOOK_SECRET) {
+  if (!secretEquals(secret, process.env.TELEGRAM_NOTIFY_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

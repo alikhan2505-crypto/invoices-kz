@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getMediaInsights } from '@/lib/instagram'
+import { secretEquals } from '@/lib/secretEquals'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,7 +13,7 @@ const supabase = createClient(
 // before generating the next batch of content.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.IG_AUTOMATION_SECRET) {
+  if (!secretEquals(internalSecret, process.env.IG_AUTOMATION_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

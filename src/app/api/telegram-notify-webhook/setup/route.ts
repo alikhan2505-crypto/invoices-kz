@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { secretEquals } from '@/lib/secretEquals'
 
 // One-time (idempotent — re-running just overwrites Telegram's stored
 // webhook config) registration call, run by the user after deploy. Mirrors
@@ -6,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // bot/webhook/secret instead of the admin-alerts one.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.TELEGRAM_NOTIFY_WEBHOOK_SECRET) {
+  if (!secretEquals(internalSecret, process.env.TELEGRAM_NOTIFY_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

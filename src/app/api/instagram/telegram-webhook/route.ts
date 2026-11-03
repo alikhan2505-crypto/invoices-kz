@@ -6,6 +6,7 @@ import { escapeHtml } from '@/lib/htmlEscape'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
+import { secretEquals } from '@/lib/secretEquals'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,7 +161,7 @@ async function runReelPublish(draft: any, cb: any): Promise<void> {
 // else is ignored. Registered once via /api/instagram/setup-webhook.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-telegram-bot-api-secret-token')
-  if (!secret || secret !== process.env.IG_AUTOMATION_SECRET) {
+  if (!secretEquals(secret, process.env.IG_AUTOMATION_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
