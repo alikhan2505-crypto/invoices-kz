@@ -24,6 +24,9 @@ export default function Admin() {
   const [users, setUsers] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
+  // По умолчанию вкладка «Заявки на оплату» показывает только то, что ждёт решения: остальные
+  // (оплаченные, просроченные, отклонённые) копились и прятали живые заявки (аудит 02.11.2026).
+  const [showAllPayments, setShowAllPayments] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ users: 0, invoices: 0, paid: 0 })
   const [search, setSearch] = useState('')
@@ -255,6 +258,7 @@ export default function Admin() {
   )
 
   const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'confirmed').length
+  const visiblePayments = showAllPayments ? payments : payments.filter(p => p.status === 'pending' || p.status === 'confirmed')
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -291,7 +295,7 @@ export default function Admin() {
       </div>
 
       <div className="max-w-4xl lg:max-w-6xl 2xl:max-w-[1600px] mx-auto p-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[
             { label: t.usersStatLabel, value: stats.users, color: 'text-blue-400' },
             { label: t.totalInvoicesStatLabel, value: stats.invoices, color: 'text-green-400' },
@@ -337,12 +341,26 @@ export default function Admin() {
 
         {tab === 'payments' && (
           <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
+            {payments.length > 0 && (
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-400 xl:col-span-2">
+                <span>{showAllPayments ? `Все заявки: ${payments.length}` : `Ждут решения: ${pendingPayments} из ${payments.length}`}</span>
+                <button onClick={() => setShowAllPayments(v => !v)}
+                  className="bg-gray-800 text-gray-300 border border-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-700 whitespace-nowrap">
+                  {showAllPayments ? 'Только ждущие' : 'Показать все'}
+                </button>
+              </div>
+            )}
             {payments.length === 0 ? (
               <div className="text-center py-12 text-gray-500 xl:col-span-2">
                 <div className="text-4xl mb-3">💳</div>
                 <div>{t.noPaymentsYetLabel}</div>
               </div>
-            ) : payments.map(payment => {
+            ) : visiblePayments.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 xl:col-span-2">
+                <div className="text-4xl mb-3">✅</div>
+                <div>Новых заявок нет</div>
+              </div>
+            ) : visiblePayments.map(payment => {
               const badge = statusBadge(payment.status)
               return (
                 <div key={payment.id}
