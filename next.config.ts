@@ -43,6 +43,14 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
+      // Язык страниц, у которых он задан адресом. В статическом HTML <html lang>
+      // всегда «ru» (корневой layout не читает cookies, иначе все публичные
+      // страницы стали бы динамическими, см. src/lib/langResolve.ts), а настоящий
+      // язык ставит встроенный скрипт в браузере. Поисковики и читалки, которые
+      // скрипт не выполняют, узнают язык из этого заголовка (аудит 02.11.2026).
+      { source: '/tools/kk/:path*', headers: [{ key: 'Content-Language', value: 'kk' }] },
+      { source: '/tools/en/:path*', headers: [{ key: 'Content-Language', value: 'en' }] },
+      { source: '/guides/kk/:path*', headers: [{ key: 'Content-Language', value: 'kk' }] },
     ]
   },
   // Короткие адреса для печатных QR (наклейки на машине и т.п.). QR напечатан навсегда,
@@ -60,6 +68,14 @@ const nextConfig: NextConfig = {
       // /go/<код> — короткие ссылки для постов и рекламы: инструмент + готовая UTM-метка.
       // Таблица кодов — src/lib/goLinks.ts; неизвестный код уходит на главную.
       ...goRedirects(),
+      // На поддомене CFO рабочие адреса начинаются с /cfo/…; адрес без префикса
+      // (cfo.invoices.kz/settings) вёл в 404.
+      {
+        source: '/:section(overview|settings|plan|operations|calendar|import)',
+        has: [{ type: 'host', value: 'cfo.invoices.kz' }],
+        destination: '/cfo/:section',
+        permanent: false,
+      },
     ]
   },
 };

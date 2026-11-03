@@ -42,20 +42,43 @@ export async function POST(req: NextRequest) {
   // trial_expires_at every time saveStep1 ran); since this route now owns
   // the write, we add the guard here rather than let a retried/duplicated
   // call push the trial further out each time.
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('profiles')
     .select('trial_expires_at')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+  if (readError) {
+    console.error('onboarding/grant: profile read failed:', readError.message)
+    return NextResponse.json({ error: 'Failed to grant trial' }, { status: 500 })
+  }
+  // Профиля ещё нет (создаётся клиентом перед этим вызовом): отдавать срок, который
+  // никуда не записан, нельзя - вызывающий повторит запрос.
+  if (!existing) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-  let trialExpiresAt: string | null = existing?.trial_expires_at ?? null
+  let trialExpiresAt: string | null = existing.trial_expires_at ?? null
   if (!trialExpiresAt) {
     const trialExpires = new Date()
     trialExpires.setDate(trialExpires.getDate() + 7)
-    trialExpiresAt = trialExpires.toISOString()
-    await supabase.from('profiles')
-      .update({ trial_expires_at: trialExpiresAt })
+    const granted = trialExpires.toISOString()
+    // PostgREST считает успехом и update, не задевший ни одной строки, и update
+    // с ошибкой базы: срок возвращаем только если он действительно записан.
+    const { data: updated, error: updateError } = await supabase.from('profiles')
+      .update({ trial_expires_at: granted })
       .eq('id', user.id)
+      .is('trial_expires_at', null)
+      .select('id')
+    if (updateError) {
+      console.error('onboarding/grant: trial write failed:', updateError.message)
+      return NextResponse.json({ error: 'Failed to grant trial' }, { status: 500 })
+    }
+    if (!updated || updated.length === 0) {
+      // Параллельный вызов успел раньше: отдаём то, что записал он.
+      const { data: current } = await supabase.from('profiles').select('trial_expires_at').eq('id', user.id).maybeSingle()
+      trialExpiresAt = current?.trial_expires_at ?? null
+      if (!trialExpiresAt) return NextResponse.json({ error: 'Failed to grant trial' }, { status: 500 })
+    } else {
+      trialExpiresAt = granted
+    }
   }
 
   return NextResponse.json({ trialExpiresAt })
