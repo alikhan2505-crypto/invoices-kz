@@ -29,7 +29,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 vi.mock('resend', () => ({ Resend: class { emails = { send: async () => ({}) } } }))
 vi.mock('@/lib/cronAuth', () => ({ isCronAuthorized: () => true }))
-vi.mock('@/lib/plan', () => ({ getActivePlan: () => 'pro' }))
+vi.mock('@/lib/plan', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/plan')>()), getActivePlan: () => 'pro' }))
 vi.mock('@/lib/recurringGuard', () => ({
   currentPeriodStart: () => new Date('2026-11-01T00:00:00Z'),
   shouldSkipRecurringOwner: () => false,
@@ -57,6 +57,20 @@ describe('GET /api/cron/recurring: налоговые поля копии', () =
     await GET(new Request('http://localhost/x'))
     expect(h.inserted?.knp).toBeNull()
     expect(h.inserted?.vat_type).toBe('vat_16')
+  })
+
+  it('копия переносит договор, банк, телефон клиента, привязку клиента, флаг НДС и срок оплаты', async () => {
+    h.source = {
+      ...base, knp: null, vat_type: null, profiles: { vat_type: null },
+      client_id: 'c1', client_phone: '+77001112233', contract_number: 'Д-5', contract_date: '2026-01-10',
+      bank_id: 'b1', is_vat_payer: true, due_date: '2026-10-15', created_at: '2026-10-01 10:00:00',
+    }
+    await GET(new Request('http://localhost/x'))
+    expect(h.inserted).toMatchObject({
+      client_id: 'c1', client_phone: '+77001112233', contract_number: 'Д-5', contract_date: '2026-01-10',
+      bank_id: 'b1', is_vat_payer: true,
+    })
+    expect(h.inserted?.due_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('до миграции (колонок нет в select *): knp -> null, НДС по профилю', async () => {

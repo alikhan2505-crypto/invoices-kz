@@ -6,6 +6,7 @@ import { getActivePlan } from '@/lib/plan'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { currentPeriodStart, shouldSkipRecurringOwner } from '@/lib/recurringGuard'
+import { recurringCopyFields } from '@/lib/recurringCopy'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -90,6 +91,8 @@ export async function GET(request: Request) {
         client_bin: inv.client_bin,
         client_email: inv.client_email,
         client_address: inv.client_address,
+        // Договор, банк, телефон клиента, флаг НДС и срок оплаты (тот же отступ от даты выставления).
+        ...recurringCopyFields(inv, today),
         services: inv.services,
         note: inv.note,
         // КНП и режим НДС копируются из оригинала; у старого оригинала их нет —
