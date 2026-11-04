@@ -87,6 +87,10 @@ export const GO_LINKS: readonly GoLink[] = [
   link('ad-kontragent', '/tools/kontragent', 'meta', 'paid_dm', 'kontragent_ad', 'личные сообщения из платной рекламы: ссылка в тексте ответа на слово БИН'),
   link('ad-kontragent-btn', '/tools/kontragent', 'meta', 'paid_dm', 'kontragent_ad_btn', 'личные сообщения из платной рекламы: КНОПКА «Открыть проверку»'),
   link('ad-marzha', '/tools/margin', 'meta', 'paid_dm', 'margin_ad', 'личные сообщения из платной рекламы: ответ про калькулятор маржи'),
+  // Реклама рилсов серии «Клиент просит счёт, а ты…» (04.11.2026): заготовленное сообщение кнопки рекламы
+  // «Хочу счёт на оплату за минуту», ответ со ссылкой на бесплатный счёт.
+  link('ad-schet', '/tools/schet', 'meta', 'paid_dm', 'schet_ad', 'личные сообщения из платной рекламы: ссылка в ответе про счёт на оплату'),
+  link('ad-schet-btn', '/tools/schet', 'meta', 'paid_dm', 'schet_ad_btn', 'личные сообщения из платной рекламы: КНОПКА «Открыть счёт»'),
   link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
   // Личные сообщения (25.10.2026, ещё 8 кодовых слов из роликов).
