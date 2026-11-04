@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DashboardTour from '@/components/DashboardTour'
 import GettingStarted from '@/components/GettingStarted'
+import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
@@ -592,7 +593,9 @@ export default function DashboardPage() {
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    // После входа вернуть сюда, а не на «домашнюю» страницу продуктов: на
+    // дашборд ведут письма и мастер реквизитов живёт здесь.
+    if (!user) { setPostLoginRedirect('/dashboard'); router.push('/login'); return }
     const { data: { session } } = await supabase.auth.getSession()
     const [{ data }, { data: profile }] = await Promise.all([
       supabase.from('invoices').select('*, clients(name)').eq('user_id', user.id).order('created_at', { ascending: false }),

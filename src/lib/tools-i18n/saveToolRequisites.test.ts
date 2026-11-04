@@ -46,6 +46,15 @@ describe('test fixtures', () => {
 })
 
 describe('planToolRequisites / hasToolOffer', () => {
+  it('bank alone is not offered while the cabinet would still lack a company and BIN (card would save nothing and hide the wizard)', () => {
+    // Банк из бесплатного счёта, а название пустое или БИН с неверной контрольной цифрой.
+    expect(hasToolOffer(planToolRequisites({}, 0, { ...REQ, companyName: '' }), {})).toBe(false)
+    expect(hasToolOffer(planToolRequisites({}, 0, { ...REQ, binIin: '123456789012' }), {})).toBe(false)
+    // Компания уже в кабинете — банк из инструмента предлагается как раньше.
+    const full = { company_name: 'ТОО Ромашка', bin_iin: REQ.binIin }
+    expect(hasToolOffer(planToolRequisites(full, 0, REQ), full)).toBe(true)
+  })
+
   it('offers both profile and bank to an empty account', () => {
     const plan = planToolRequisites({}, 0, REQ)
     expect(plan.needProfile && plan.needBank).toBe(true)

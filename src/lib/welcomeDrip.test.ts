@@ -2,8 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import {
-  STEPS, DAILY_STEPS, INSTANT_STEP, LAUNCH, MIN_GAP_HOURS,
-  pickDailyStep, dailyWindow, instantWindow, trialUntil, trackedUrl,
+  STEPS, DAILY_STEPS, INSTANT_STEP, LAUNCH, SETUP_LAUNCH, MIN_GAP_HOURS,
+  pickDailyStep, dailyWindow, instantWindow, trialUntil, trackedUrl, needsSetupReminder,
   isEmailConfirmed, getAuthIdentity, makeRecipientResolver, sendDrip, dripIdempotencyKey,
   type DripProfile,
 } from './welcomeDrip'
@@ -28,16 +28,25 @@ describe('welcome drip schedule', () => {
   it('keeps step numbers unique and the sequence 10 min → 1 → 3 → 7 days', () => {
     expect(new Set(STEPS.map(s => s.n)).size).toBe(STEPS.length)
     expect(step(INSTANT_STEP).afterDays).toBeUndefined()
-    expect(DAILY_STEPS.map(s => s.afterDays)).toEqual([1, 3, 7])
-    // Старые номера не меняют смысла: 2 — 3-й день, 3 — 7-й день, новое письмо — 4.
+    expect(DAILY_STEPS.map(s => s.afterDays)).toEqual([1, 1, 3, 7])
+    // Старые номера не меняют смысла: 2 — 3-й день, 3 — 7-й день, 4 — сутки, 5 — сутки без реквизитов.
     expect(step(2).afterDays).toBe(3)
     expect(step(3).afterDays).toBe(7)
     expect(step(4).afterDays).toBe(1)
+    expect(step(5).afterDays).toBe(1)
   })
 
-  it('daily windows do not overlap', () => {
+  it('daily windows of different days do not overlap; same-day steps are mutual alternatives', () => {
     const windows = DAILY_STEPS.map(dailyWindow)
-    for (let i = 1; i < windows.length; i++) expect(windows[i].from).toBeGreaterThanOrEqual(windows[i - 1].to)
+    for (let i = 1; i < windows.length; i++) {
+      if (DAILY_STEPS[i].afterDays === DAILY_STEPS[i - 1].afterDays) {
+        expect(windows[i]).toEqual(windows[i - 1])
+        expect(DAILY_STEPS[i].excludes).toContain(DAILY_STEPS[i - 1].n)
+        expect(DAILY_STEPS[i - 1].excludes).toContain(DAILY_STEPS[i].n)
+      } else {
+        expect(windows[i].from).toBeGreaterThanOrEqual(windows[i - 1].to)
+      }
+    }
     expect(windows[0]).toEqual({ from: 1, to: 3 })
   })
 
@@ -83,6 +92,52 @@ describe('welcome drip schedule', () => {
   it('never writes to accounts created before LAUNCH', () => {
     const old = new Date(new Date(LAUNCH).getTime() - DAY).toISOString()
     expect(pickDailyStep(old, [], new Date(old).getTime() + 1.5 * DAY)).toBeNull()
+  })
+
+  describe('day-1 mail depends on the cabinet (step 5 replaces step 4)', () => {
+    const fresh = '2026-11-10T06:00:00.000Z'
+    const fMs = new Date(fresh).getTime()
+    const fAt = (days: number) => fMs + days * DAY
+    const none = { requisites: false, bank: false }
+    const noBank = { requisites: true, bank: false }
+    const ready = { requisites: true, bank: true }
+
+    it('sends the setup reminder instead of services when requisites or bank are missing', () => {
+      expect(pickDailyStep(fresh, [], fAt(1.1), none)?.n).toBe(5)
+      expect(pickDailyStep(fresh, [], fAt(1.1), noBank)?.n).toBe(5)
+      expect(pickDailyStep(fresh, [], fAt(1.1), { requisites: false, bank: true })?.n).toBe(5)
+      expect(pickDailyStep(fresh, [], fAt(1.1), ready)?.n).toBe(4)
+    })
+
+    it('sends only one of the two: no services mail after the reminder, even once the cabinet is filled', () => {
+      const s5 = [{ step: 5, sent_at: new Date(fAt(1.1)).toISOString() }]
+      expect(pickDailyStep(fresh, s5, fAt(2.2), ready)).toBeNull()
+      expect(pickDailyStep(fresh, s5, fAt(2.2), none)).toBeNull()
+      const s4 = [{ step: 4, sent_at: new Date(fAt(1.1)).toISOString() }]
+      expect(pickDailyStep(fresh, s4, fAt(2.2), none)).toBeNull()
+      // Дальше цепочка идёт как обычно.
+      expect(pickDailyStep(fresh, s5, fAt(3.1), none)?.n).toBe(2)
+    })
+
+    it('unknown cabinet state keeps the old services mail (never nags on a failed query)', () => {
+      expect(pickDailyStep(fresh, [], fAt(1.1))?.n).toBe(4)
+      expect(pickDailyStep(fresh, [], fAt(1.1), undefined)?.n).toBe(4)
+    })
+
+    it('accounts registered before SETUP_LAUNCH keep the services mail', () => {
+      const before = new Date(new Date(SETUP_LAUNCH).getTime() - HOUR).toISOString()
+      const bMs = new Date(before).getTime()
+      expect(pickDailyStep(before, [], bMs + 1.1 * DAY, none)?.n).toBe(4)
+      expect(needsSetupReminder(none, bMs)).toBe(false)
+      expect(needsSetupReminder(none, new Date(SETUP_LAUNCH).getTime())).toBe(true)
+    })
+
+    it('still respects the gap after the welcome mail and the window', () => {
+      const welcomeSent = { step: INSTANT_STEP, sent_at: new Date(fAt(1.1) - 2 * HOUR).toISOString() }
+      expect(pickDailyStep(fresh, [welcomeSent], fAt(1.1), none)).toBeNull()
+      expect(pickDailyStep(fresh, [], fAt(0.5), none)).toBeNull()
+      expect(pickDailyStep(fresh, [], fAt(3.1), none)?.n).toBe(2)
+    })
   })
 
   it('instant window is 10 minutes to 24 hours old, never before LAUNCH', () => {
@@ -131,6 +186,41 @@ describe('welcome drip content', () => {
     for (const name of ['Счета', 'Kaspi Bot', 'ИИ-агент', 'Kaspi Cashier API', 'Бесплатные инструменты', 'Telegram']) {
       expect(text).toContain(name)
     }
+  })
+
+  it('setup reminder lists exactly the wizard steps that are missing', () => {
+    const mail = (setup: { requisites: boolean; bank: boolean }) => step(5).html(UNSUB, { ...profile, setup }, at(1.1))
+    const both = stripTags(mail({ requisites: false, bank: false }))
+    expect(both).toContain('нет реквизитов компании и банковского счёта')
+    expect(both).toContain('БИН или ИИН')
+    expect(both).toContain('Банк и ИИК')
+    expect(both).toContain('в том же браузере, где откроете кабинет')
+    expect(both).toContain('целиком или частью')
+    expect(both).toContain('За проверенные реквизиты и банковский счёт')
+
+    const bankOnly = stripTags(mail({ requisites: true, bank: false }))
+    expect(bankOnly).toContain('нет банковского счёта')
+    expect(bankOnly).not.toContain('БИН или ИИН')
+    // Бесплатные КП/акт/накладная банк не сохраняют — обещать одну кнопку для банка нельзя.
+    expect(bankOnly).not.toContain('бесплатных инструментах')
+    expect(bankOnly).toContain('За банковский счёт начисляем 100 ₸ в кошелёк, если реквизиты подтверждены по госреестру')
+    expect(mail({ requisites: true, bank: false })).toContain('Выберите банк и вставьте ИИК')
+
+    const reqOnly = stripTags(mail({ requisites: false, bank: true }))
+    expect(reqOnly).toContain('нет реквизитов компании.')
+    // Банк уже есть: мастер шаг «банк» не покажет, письмо его тоже не просит.
+    expect(reqOnly).not.toContain('Банк и ИИК')
+    expect(reqOnly).toContain('За проверенные реквизиты начисляем 100 ₸')
+    expect(mail({ requisites: false, bank: true })).toContain('Введите БИН и нажмите')
+  })
+
+  it('setup reminder goes through /login?next=/dashboard so a logged-out reader lands on the wizard', () => {
+    const h = step(5).html(UNSUB, { ...profile, setup: { requisites: false, bank: false } }, at(1.1))
+    expect(h).toContain('https://invoices.kz/login?next=%2Fdashboard&amp;utm_source=drip&amp;utm_medium=email&amp;utm_campaign=d1s')
+    const href = h.match(/href="(https:\/\/invoices\.kz\/login[^"]+)"/)![1].replace(/&amp;/g, '&')
+    expect(new URL(href).searchParams.get('next')).toBe('/dashboard')
+    expect(stripTags(h)).toContain('Заполнить за минуту')
+    expect(stripTags(h)).toContain('один раз на БИН')
   })
 
   it('no mail advertises the disabled Витрина, and each has at most one emoji and an unsubscribe link', () => {

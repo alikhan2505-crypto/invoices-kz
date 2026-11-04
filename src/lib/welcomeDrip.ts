@@ -34,6 +34,15 @@ export function unsubToken(userId: string): string {
 // не получают внезапную «цепочку» задним числом.
 export const LAUNCH = '2026-10-12T00:00:00Z'
 
+// Шаг 5 (04.11.2026): письмо «через сутки» выбирается по состоянию кабинета.
+// Нет реквизитов или банковского счёта — уходит «До первого счёта осталась
+// минута» со ссылкой на мастер на дашборде, а не «Что ещё умеет invoices.kz».
+// Это замена, а не лишнее письмо: из двух уходит одно (excludes), число писем
+// в цепочке то же (после второго письма один человек уже отписался).
+// Только аккаунтам, зарегистрированным после запуска: тем, кто
+// зарегистрировался раньше, отдельно ничего не шлём (решение основателя).
+export const SETUP_LAUNCH = '2026-11-04T14:00:00Z'
+
 export const INSTANT_STEP = 1
 export const INSTANT_AFTER_MINUTES = 10
 // Старше — «догонять» приветствием не пишем: следующее письмо уже дневное.
@@ -44,11 +53,15 @@ export const MIN_GAP_HOURS = 20
 // Сколько дней шаг остаётся «в окне», если до следующего шага далеко.
 const MAX_WINDOW_DAYS = 2
 
+/** Чего не хватает кабинету для первого счёта; undefined — неизвестно (запрос не удался). */
+export type SetupState = { requisites: boolean; bank: boolean }
+
 export type DripProfile = {
   id: string
   email: string | null
   created_at: string
   trial_expires_at: string | null
+  setup?: SetupState
 }
 
 export type Step = {
@@ -57,6 +70,10 @@ export type Step = {
   afterDays?: number
   subject: string
   html: (unsub: string, p: DripProfile, now?: number) => string
+  // Шаг уходит, только если условие верно (createdMs — регистрация, мс).
+  when?: (setup: SetupState | undefined, createdMs: number) => boolean
+  // Шаги-альтернативы: если любой из них уже отправлен, этот не шлём.
+  excludes?: number[]
 }
 
 export type SentDrip = { step: number; sent_at: string }
@@ -136,9 +153,57 @@ const welcome: Step = {
   },
 }
 
+/** Нужен ли аккаунту шаг 5 вместо шага 4. Неизвестное состояние — не напоминаем. */
+export function needsSetupReminder(setup: SetupState | undefined, createdMs: number): boolean {
+  if (createdMs < new Date(SETUP_LAUNCH).getTime()) return false
+  return !!setup && (!setup.requisites || !setup.bank)
+}
+
+const setupReminder: Step = {
+  n: 5,
+  afterDays: 1,
+  excludes: [4],
+  when: needsSetupReminder,
+  subject: 'До первого счёта осталась минута',
+  html: (unsub, profile) => {
+    const c = 'd1s'
+    const needReq = !profile.setup?.requisites
+    const needBank = !profile.setup?.bank
+    const missing = needReq && needBank
+      ? 'реквизитов компании и банковского счёта'
+      : needReq ? 'реквизитов компании' : 'банковского счёта'
+    // Пункты — ровно те шаги, которые покажет мастер (QuickRequisitesSetup: шаг
+    // «компания» без названия или БИН, шаг «банк» без банковского счёта).
+    const reqItem = item('<b>БИН или ИИН</b>: введите его и нажмите «Проверить». Название подставится из госреестра.', needBank ? 8 : 12)
+    const bankItem = item('<b>Банк и ИИК</b>: выберите банк из списка и вставьте ИИК. Мы сразу проверим, нет ли в нём опечатки.', 12)
+    // Вход через /login?next=: вошедшего /login сразу ведёт на дашборд, а
+    // невошедшего возвращает туда после входа (иначе он попал бы на «домашнюю»
+    // страницу своих продуктов, где мастера нет).
+    return wrap(`
+      ${p(`Здравствуйте! Это Алихан, основатель invoices.kz. Вы зарегистрировались, но выставить счёт пока нельзя: в кабинете нет ${missing}.`)}
+      ${p('Это займёт минуту. На дашборде есть короткий мастер:', 8)}
+      ${needReq ? reqItem : ''}
+      ${needBank ? bankItem : ''}
+      ${needReq ? p('Если вы уже делали счёт, акт, КП или накладную в бесплатных инструментах в том же браузере, где откроете кабинет, название и БИН подставятся одной кнопкой.') : ''}
+      ${p(needReq && needBank
+        ? 'За проверенные реквизиты и банковский счёт начисляем по 100 ₸ в кошелёк, один раз на БИН. Кошельком можно оплатить тариф Про целиком или частью.'
+        : needReq
+          ? 'За проверенные реквизиты начисляем 100 ₸ в кошелёк, один раз на БИН. Кошельком можно оплатить тариф Про целиком или частью.'
+          : 'За банковский счёт начисляем 100 ₸ в кошелёк, если реквизиты подтверждены по госреестру, один раз на БИН. Кошельком можно оплатить тариф Про целиком или частью.', 16)}
+      ${p(button(trackedUrl(`${SITE}/login?next=/dashboard`, c), 'Заполнить за минуту'), 20)}
+      ${p('Если что-то не получается, ответьте на это письмо, я читаю ответы сам.')}
+      ${p('— Алихан, invoices.kz', 0)}
+    `, unsub, needReq
+      ? 'Введите БИН и нажмите «Проверить»: название подставится само.'
+      : 'Выберите банк и вставьте ИИК, и можно выставлять счёт.')
+  },
+}
+
 const services: Step = {
   n: 4,
   afterDays: 1,
+  excludes: [5],
+  when: (setup, createdMs) => !needsSetupReminder(setup, createdMs),
   subject: 'Что ещё умеет invoices.kz',
   html: unsub => {
     const c = 'd1'
@@ -184,8 +249,8 @@ const feedback: Step = {
   `, unsub, 'Одно предложение в ответ — и я починю то, что мешает.'),
 }
 
-// В порядке отправки.
-export const STEPS: Step[] = [welcome, services, tips, feedback]
+// В порядке отправки (setupReminder и services — альтернативы одного дня).
+export const STEPS: Step[] = [welcome, setupReminder, services, tips, feedback]
 
 export const DAILY_STEPS: Step[] = STEPS
   .filter(s => s.afterDays !== undefined)
@@ -195,7 +260,8 @@ export const DAILY_STEPS: Step[] = STEPS
 
 /**
  * Окно дневного шага — [afterDays, конец): до начала следующего шага, но не
- * дольше MAX_WINDOW_DAYS. Окна не пересекаются, поэтому на один прогон крона
+ * дольше MAX_WINDOW_DAYS. Окна разных дней не пересекаются; у шагов одного дня
+ * окно общее, но они альтернативы (when/excludes), поэтому на один прогон крона
  * приходится не больше одного кандидата.
  */
 export function dailyWindow(step: Step): { from: number; to: number } {
@@ -210,8 +276,9 @@ export function dailyWindow(step: Step): { from: number; to: number } {
  * Не шлём, если шаг уже отправлен, если аккаунт вне окна шага («догоняющие»
  * письма недельной давности выглядят как спам) и если любое письмо цепочки
  * ушло меньше MIN_GAP_HOURS назад (в том числе приветствие).
+ * setup — готовность кабинета к счёту; без него выбирается прежний шаг 4.
  */
-export function pickDailyStep(createdAt: string, sent: SentDrip[], now = Date.now()): Step | null {
+export function pickDailyStep(createdAt: string, sent: SentDrip[], now = Date.now(), setup?: SetupState): Step | null {
   // profiles.created_at — timestamp WITHOUT time zone (UTC), приходит без
   // смещения; parseDbTimestamp читает такую строку как UTC, а не как местное
   // время сервера.
@@ -223,7 +290,10 @@ export function pickDailyStep(createdAt: string, sent: SentDrip[], now = Date.no
   const done = new Set(sent.map(s => s.step))
   for (const step of DAILY_STEPS) {
     const { from, to } = dailyWindow(step)
-    if (ageDays >= from && ageDays < to && !done.has(step.n)) return step
+    if (ageDays < from || ageDays >= to || done.has(step.n)) continue
+    if (step.excludes?.some(n => done.has(n))) continue
+    if (step.when && !step.when(setup, created)) continue
+    return step
   }
   return null
 }

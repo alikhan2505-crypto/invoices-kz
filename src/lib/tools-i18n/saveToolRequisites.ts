@@ -50,13 +50,19 @@ export function planToolRequisites(profile: ProfileLike, bankCount: number, req:
   return { needProfile, needBank, profileFill, bank }
 }
 
-/** Есть ли что предложить: профиль вместе с названием и БИН, и/или целый банковский счёт. */
+/**
+ * Есть ли что предложить: профиль вместе с названием и БИН, и/или целый банковский счёт.
+ * Банк — только когда после сохранения у кабинета будут название и БИН (то же условие, что в
+ * saveToolRequisites): иначе карточка обещала бы сохранение, которое ничего не пишет, и при этом
+ * прятала бы мастер (04.11.2026, ревью: банк из бесплатного счёта при пустом или неверном БИН).
+ */
 export function hasToolOffer(plan: ToolRequisitesPlan, profile: ProfileLike): boolean {
   const cur = own(profile)
   const company = plan.profileFill.company_name ?? cur.company_name
   const bin = plan.profileFill.bin_iin ?? cur.bin_iin
-  const profileOffer = plan.needProfile && Object.keys(plan.profileFill).length > 0 && !!company.trim() && !!bin.trim()
-  return profileOffer || !!plan.bank
+  const hasCompany = !!company.trim() && !!bin.trim()
+  const profileOffer = plan.needProfile && Object.keys(plan.profileFill).length > 0 && hasCompany
+  return profileOffer || (!!plan.bank && hasCompany)
 }
 
 export type SaveToolResult =
@@ -92,5 +98,7 @@ export async function saveToolRequisites(sb: SaveClient, userId: string, profile
     if (error) return { ok: false, reason: 'bank' }
     savedBank = true
   }
+  // Ничего не записали — не «успех»: карточка иначе показывалась бы снова и снова.
+  if (!savedProfile && !savedBank) return { ok: false, reason: 'nothing' }
   return { ok: true, savedProfile, savedBank }
 }
