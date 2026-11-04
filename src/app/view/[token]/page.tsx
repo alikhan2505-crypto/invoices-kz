@@ -10,6 +10,7 @@ import { resolveInvoiceKnp, resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
+import { viewKaspiPayDict } from '@/lib/i18n/viewKaspiPay'
 import SignatureSection from '@/components/SignatureSection'
 import { useAppDialog } from '@/components/AppDialog'
 
@@ -78,6 +79,7 @@ export default function PublicInvoice() {
   // is truthy, so `if (confirm(...))` would silently pass.
   const { alert, confirm, dialogElement } = useAppDialog()
   const tFlow = invoiceFlowDict[lang]
+  const tk = viewKaspiPayDict[lang]
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
@@ -337,14 +339,14 @@ export default function PublicInvoice() {
         applyKaspiPayment(refreshedData.payment || null)
       } else {
         setKaspiPhoneError(
-          data.error === 'invalid_phone' ? 'Проверьте номер телефона'
-          : data.error === 'rate_limited' ? 'Слишком много попыток, попробуйте позже'
-          : data.error === 'already_paid' ? 'Счёт уже оплачен'
-          : 'Не удалось отправить запрос, попробуйте ещё раз'
+          data.error === 'invalid_phone' ? tk.errorInvalidPhone
+          : data.error === 'rate_limited' ? tk.errorRateLimited
+          : data.error === 'already_paid' ? tk.errorAlreadyPaid
+          : tk.errorSendFailed
         )
       }
     } catch {
-      setKaspiPhoneError('Не удалось отправить запрос, попробуйте ещё раз')
+      setKaspiPhoneError(tk.errorSendFailed)
     }
     setKaspiPhoneSending(false)
   }
@@ -571,46 +573,46 @@ export default function PublicInvoice() {
         {kaspiPaymentLoading && !kaspiPayment && !kaspiPhoneDeclined && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
           <div className="nav-glass nav-card-accent rounded-2xl p-4 flex items-center gap-2">
             <div className="w-4 h-4 rounded-full animate-spin flex-shrink-0" style={{ border: '2px solid var(--nav-border-soft)', borderTopColor: 'var(--nav-accent)' }} />
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Проверяем возможность оплаты через Kaspi...</span>
+            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{tk.checking}</span>
           </div>
         )}
 
         {kaspiPhoneDeclined && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
-            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>{tk.blockTitle}</div>
             <div className="text-2xl mb-2">🚫</div>
             <p className="text-sm mb-4" style={{ color: 'var(--nav-text-primary)' }}>
-              Запрос отклонён в приложении Kaspi
+              {tk.declined}
             </p>
             <button onClick={retryKaspiPaymentAfterDecline}
               className="w-full block text-center text-white rounded-xl py-3.5 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5"
               style={{ background: '#E4171F' }}>
-              Повторить оплату
+              {tk.retryButton}
             </button>
           </div>
         )}
 
         {kaspiPayment && kaspiPayment.status === 'pending' && !kaspiPayment.payment_link && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
-            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>{tk.blockTitle}</div>
             <div className="text-2xl mb-2">📲</div>
             <p className="text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-              Запрос отправлен на {formatKzPhone(kaspiPhone)}
+              {tk.requestSentTo(formatKzPhone(kaspiPhone))}
             </p>
             <p className="text-xs mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-              Подтвердите оплату в приложении Kaspi — счёт подтвердится автоматически.
+              {tk.confirmInApp}
             </p>
             <button onClick={cancelKaspiPhonePayment}
               className="w-full text-center text-[11px] underline"
               style={{ color: 'var(--nav-text-muted)' }}>
-              Отменить запрос
+              {tk.cancelRequest}
             </button>
           </div>
         )}
 
         {kaspiPayment && kaspiPayment.status === 'pending' && kaspiPayment.payment_link && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5">
-            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>{tk.blockTitle}</div>
             {/* QR крупный (не меньше половины колонки, 200-320 px), подпись под ним с переносом по центру. */}
             <div className="flex flex-col items-center gap-3 mb-4">
               {kaspiQrDataUrl && (
@@ -631,7 +633,7 @@ export default function PublicInvoice() {
               className="w-full block text-center text-white rounded-xl py-3.5 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5"
               style={{ background: '#E4171F' }}
             >
-              Оплатить через Kaspi
+              {tk.payButton}
             </a>
             <div className="text-[11px] text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiButtonCaption}</div>
             <div className="text-xs text-center mt-3 h-4" aria-live="polite" style={{ color: 'var(--nav-text-muted)' }}>
@@ -640,11 +642,11 @@ export default function PublicInvoice() {
                 : kaspiSecondsLeft === null
                   ? ''
                   : kaspiSecondsLeft > 0
-                    ? `QR действителен ещё ${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`
-                    : 'Обновляем код…'}
+                    ? tk.qrValidFor(`${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`)
+                    : tk.refreshingCode}
             </div>
             <div className="text-xs text-center mt-3 mb-1" style={{ color: 'var(--nav-text-muted)' }}>
-              Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
+              {tk.autoConfirm}
             </div>
 
             {/* Same divider-plus-button treatment the wallet widget and
@@ -655,7 +657,7 @@ export default function PublicInvoice() {
               <>
                 <div className="flex items-center gap-2 my-3">
                   <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
-                  <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                  <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>{tk.orDivider}</span>
                   <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
                 </div>
                 {kaspiPhoneOpen ? (
@@ -674,7 +676,7 @@ export default function PublicInvoice() {
                       disabled={kaspiPhoneSending || kaspiPhone.replace(/\D/g, '').length !== 11}
                       className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50"
                       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                      {kaspiPhoneSending ? 'Отправляем…' : 'Отправить запрос'}
+                      {kaspiPhoneSending ? tk.sending : tk.sendRequest}
                     </button>
                   </>
                 ) : (
