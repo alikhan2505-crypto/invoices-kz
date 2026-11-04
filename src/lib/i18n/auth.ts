@@ -34,7 +34,6 @@ export interface AuthContent {
   keepMineButton: string
   /** Вход по коду из письма (включается LOGIN_CODE_ENABLED в src/app/login/page.tsx). */
   codeLabel: string
-  codePlaceholder: string
   codeButton: string
   codeChecking: string
   codeInvalid: string
@@ -121,7 +120,6 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     useFixButton: 'Да, исправить',
     keepMineButton: 'Нет, отправить так',
     codeLabel: 'Код из письма',
-    codePlaceholder: '000000',
     codeButton: 'Войти по коду',
     codeChecking: 'Проверяем',
     codeInvalid: 'Код не подошёл или устарел. Проверьте цифры или запросите письмо ещё раз.',
@@ -206,7 +204,6 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     useFixButton: 'Иә, түзету',
     keepMineButton: 'Жоқ, солай жіберу',
     codeLabel: 'Хаттағы код',
-    codePlaceholder: '000000',
     codeButton: 'Кодпен кіру',
     codeChecking: 'Тексерілуде',
     codeInvalid: 'Код сәйкес келмеді немесе ескірді. Сандарды тексеріңіз немесе хатты қайта сұраңыз.',
@@ -292,7 +289,6 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     useFixButton: 'Yes, fix it',
     keepMineButton: 'No, send as typed',
     codeLabel: 'Code from the email',
-    codePlaceholder: '000000',
     codeButton: 'Sign in with the code',
     codeChecking: 'Checking',
     codeInvalid: 'The code did not match or has expired. Check the digits or request the email again.',

@@ -30,10 +30,12 @@ const FACEBOOK_LOGIN_ENABLED = true
 
 // Вход по коду из письма (03.11.2026): ссылку из письма часто открывают не в том браузере (письмо в почтовом
 // приложении, а регистрация началась во встроенном браузере Instagram), и вход теряется. Код человек вводит в
-// той же вкладке. ВЫКЛЮЧЕНО, пока в Supabase (Authentication → Emails → Magic Link) не вставлен шаблон с кодом
-// из supabase/email-templates/magic-link-with-code.html: без него в письме кода нет, а поле на экране
-// обещало бы его. Когда шаблон вставлен, поменять на true.
-const LOGIN_CODE_ENABLED = false
+// той же вкладке. Включено 04.11.2026: шаблоны с кодом (supabase/email-templates/*-with-code.html) вставлены в
+// Supabase (Magic link or OTP и Confirm sign up). Убираете код из шаблонов — сначала поставьте false.
+const LOGIN_CODE_ENABLED = true
+// Длина кода задаётся в Supabase: Sign In / Providers → Email → Email OTP length (сейчас 8). Поменяли там —
+// поменяйте здесь: кнопка включается и вход идёт сам ровно на этой длине.
+const OTP_LENGTH = 8
 
 // Кривая та же, что у остальных экранов (PageHeader, ProGate).
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -281,9 +283,9 @@ export default function Login() {
     })
   }
 
-  async function verifyCode() {
-    const token = code.replace(/\D/g, '')
-    if (token.length < 6 || codeBusy) return
+  async function verifyCode(value = code) {
+    const token = value.replace(/\D/g, '')
+    if (token.length !== OTP_LENGTH || codeBusy) return
     setCodeBusy(true)
     setCodeError(false)
     try {
@@ -454,11 +456,18 @@ export default function Login() {
               <form className="mt-5 text-left" onSubmit={e => { e.preventDefault(); void verifyCode() }}>
                 <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{t.codeHint}</p>
                 <label htmlFor="login-code" className="sr-only">{t.codeLabel}</label>
-                <input id="login-code" value={code} onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 8)); setCodeError(false) }}
-                  inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" placeholder={t.codePlaceholder}
+                <input id="login-code" value={code} maxLength={OTP_LENGTH} readOnly={codeBusy} aria-busy={codeBusy}
+                  onChange={e => {
+                    const next = e.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH)
+                    setCode(next)
+                    setCodeError(false)
+                    // Вставили или набрали код целиком: входим сразу, без нажатия кнопки.
+                    if (next.length === OTP_LENGTH && next !== code) void verifyCode(next)
+                  }}
+                  inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" placeholder={'0'.repeat(OTP_LENGTH)}
                   className="w-full rounded-xl px-3 py-3 text-center text-lg tracking-[0.4em] outline-none min-h-12 tabular-nums focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                   style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }} />
-                <button type="submit" disabled={codeBusy || code.length < 6}
+                <button type="submit" disabled={codeBusy || code.length !== OTP_LENGTH}
                   className="mt-2 w-full rounded-xl py-3 text-sm font-semibold min-h-12 disabled:opacity-50"
                   style={{ border: '1px solid var(--nav-accent)', color: 'var(--nav-accent)' }}>
                   {codeBusy ? t.codeChecking : t.codeButton}
