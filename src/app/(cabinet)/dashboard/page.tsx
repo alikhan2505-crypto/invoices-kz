@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DashboardTour from '@/components/DashboardTour'
+import GettingStarted from '@/components/GettingStarted'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
@@ -763,6 +764,10 @@ export default function DashboardPage() {
               <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>{tf.extendButton}</button>
             </div>
           )}
+
+          {/* Быстрая настройка: перенос реквизитов из инструмента, мастер «компания → банк» и памятка «Начало работы».
+              Новый аккаунт приходит сразу сюда, поэтому они здесь, а не только в /create. */}
+          {!loading && <GettingStarted invoiceCount={invoices.length} />}
 
           {/* Продукты платформы */}
           <div className="mb-6">
