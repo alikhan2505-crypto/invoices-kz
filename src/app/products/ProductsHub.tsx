@@ -277,7 +277,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
             <Link href="/terms">{FOOTER_COPY[lang].terms}</Link>
             <Link href="/data-deletion">{FOOTER_COPY[lang].dataDeletion}</Link>
             <a href="mailto:mail@invoices.kz">{FOOTER_COPY[lang].contacts}: mail@invoices.kz</a>
-            <a href="https://www.instagram.com/invoices.kz/" target="_blank" rel="noopener noreferrer">Instagram</a>
+            <a href="https://www.instagram.com/invoiceskz/" target="_blank" rel="noopener noreferrer">Instagram</a>
           </nav>
         </footer>
       </div>

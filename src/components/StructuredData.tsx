@@ -40,7 +40,7 @@ export default function StructuredData() {
           },
         ],
         areaServed: { '@type': 'Country', name: 'Kazakhstan' },
-        sameAs: ['https://www.instagram.com/invoices.kz/'],
+        sameAs: ['https://www.instagram.com/invoiceskz/'],
       },
       {
         '@type': 'WebSite',

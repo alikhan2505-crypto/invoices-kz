@@ -461,7 +461,7 @@ export default function CashierApiPage() {
             </a>
           ))}
           <a
-            href="https://www.instagram.com/invoices.kz/"
+            href="https://www.instagram.com/invoiceskz/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-9 items-center text-[12px]"

@@ -161,7 +161,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
           <a href="https://invoices.kz/terms">{foot.terms}</a>
           <a href="https://invoices.kz/data-deletion">{foot.dataDeletion}</a>
           <a href="mailto:mail@invoices.kz">{foot.contacts}: mail@invoices.kz</a>
-          <a href="https://www.instagram.com/invoices.kz/" target="_blank" rel="noopener noreferrer">Instagram</a>
+          <a href="https://www.instagram.com/invoiceskz/" target="_blank" rel="noopener noreferrer">Instagram</a>
         </nav>
       </footer>
     </main>
