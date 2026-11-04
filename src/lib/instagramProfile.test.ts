@@ -36,6 +36,19 @@ describe('fetchInstagramUserHandle', () => {
     expect(never).not.toHaveBeenCalled()
   })
 
+  it('logs the Graph status and error code (never the token or the id) when the lookup is refused', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async () => okJson({ error: { code: 10, type: 'OAuthException', message: 'Permission denied for TOKEN123' } }, false)))
+    expect(await fetchInstagramUserHandle('17841400000000001', 'TOKEN123')).toBeNull()
+    expect(warn).toHaveBeenCalledTimes(1)
+    const logged = warn.mock.calls[0].join(' ')
+    expect(logged).toContain('10')
+    expect(logged).toContain('OAuthException')
+    expect(logged).not.toContain('TOKEN123')
+    expect(logged).not.toContain('17841400000000001')
+    warn.mockRestore()
+  })
+
   it('caps a very long name', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => okJson({ name: 'я'.repeat(300) })))
     expect((await fetchInstagramUserHandle('17841400000000001', 'T'))?.length).toBe(80)

@@ -19,7 +19,12 @@ export async function fetchInstagramUserHandle(igsid: string, accessToken: strin
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(PROFILE_TIMEOUT_MS),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      // Без этой строки отказ по правам был бы немым: имя просто не появлялось бы. Токен и id в лог не пишем.
+      const body = await res.json().catch(() => null) as { error?: { code?: unknown; type?: unknown } } | null
+      console.warn('instagram profile lookup failed: status', res.status, 'code', body?.error?.code ?? '-', 'type', body?.error?.type ?? '-')
+      return null
+    }
     const data = await res.json() as { username?: unknown; name?: unknown }
     const username = typeof data.username === 'string' ? data.username.trim() : ''
     const name = typeof data.name === 'string' ? data.name.trim() : ''

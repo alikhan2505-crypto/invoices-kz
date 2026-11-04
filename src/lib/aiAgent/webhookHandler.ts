@@ -250,7 +250,9 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (storesInboundOnly(replyState)) {
     await handleInboundWithoutReply(supabase, replyState, agent, {
       agentId: conn.agentId, channel: 'instagram', externalThreadId: params.replyTarget,
-      customerHandle: params.fromUsername, text: params.loggedText ?? params.incomingText, externalId: params.externalId,
+      // Тот же разбор имени, что и ниже: иначе путь «Про кончился / бот на паузе» перезаписал бы
+      // уже узнанное имя обратно числовым id.
+      customerHandle: await resolveDmHandle(conn, params), text: params.loggedText ?? params.incomingText, externalId: params.externalId,
       source: params.source,
     })
     return
