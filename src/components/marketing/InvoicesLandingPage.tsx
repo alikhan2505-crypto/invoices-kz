@@ -410,7 +410,7 @@ const COPY: Record<Lang, Copy> = {
     othersTitle: 'invoices.kz-тің басқа өнімдері',
     othersSubtitle: 'Аккаунт та, әмиян да ортақ — қажет болғанда қосыңыз.',
     others: [
-      { key: 'kaspiShop', name: 'Kaspi Bot', pitch: 'Kaspi Дүкеніндегі баға демпингі мен тапсырыстар бір кабинетте', tag: 'Про тарифіне кіреді' },
+      { key: 'kaspiShop', name: 'Kaspi Bot', pitch: 'Kaspi Магазиндегі баға демпингі мен тапсырыстар бір кабинетте', tag: 'Про тарифіне кіреді' },
       { key: 'aiAgent', name: 'AI-агент', pitch: 'Клиенттерге WhatsApp, Instagram және сайтта жауап береді', tag: 'Про тарифіне кіреді' },
       { key: 'kaspiApi', name: 'Kaspi Cashier API', pitch: 'Kaspi Pay төлемдерін сайтыңызда API арқылы қабылдау', tag: 'Төлемнен 2%' },
       { key: 'salon', name: 'Салон', pitch: 'Клиенттерді жазу, шеберлер және салон сайты', tag: 'Өтінім бойынша' },
@@ -722,7 +722,7 @@ export default function InvoicesLandingPage() {
                   }}
                   aria-pressed={lang === l}
                 >
-                  {l === 'kk' ? 'ҚЗ' : l}
+                  {l === 'kk' ? 'ҚАЗ' : l}
                 </button>
               ))}
             </div>

@@ -256,7 +256,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     stampItemTitle: 'Мөр',
     stampItemDesc: 'Компания мөрінің фотосын жүктеңіз',
     trialActivatedMessage: '7 күн тегін кезең іске қосылды!',
-    proFeaturesUnlockedMessage: 'Негізгі тариф мүмкіндіктері ашық',
+    proFeaturesUnlockedMessage: 'Базалық тариф мүмкіндіктері ашық',
     addSignatureButton: '✍️ Қолтаңба қосу',
     skipToAppButton: 'Өткізіп жіберу — қосымшаға өту',
 

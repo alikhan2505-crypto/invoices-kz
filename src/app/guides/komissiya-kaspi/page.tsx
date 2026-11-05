@@ -4,6 +4,7 @@ import GuideShell from '../GuideShell'
 import { HubLinksBlock } from '../_kaspi/blocks'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
+import { formatPercent } from '@/lib/kaspiTariff'
 
 const guide = getGuide('komissiya-kaspi')!
 
@@ -66,7 +67,7 @@ export default function Page() {
             {KASPI_CATEGORY_COMMISSIONS.map(c => (
               <tr key={c.label}>
                 <td>{c.label}</td>
-                <td className="tabular-nums">{c.ratePercent}%</td>
+                <td className="tabular-nums">{formatPercent(c.ratePercent)}</td>
               </tr>
             ))}
           </tbody>

@@ -53,7 +53,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     cabinet: '/kaspi-shop/overview',
     access: 'open',
     soft: '#FF8F7F',
-    audience: { ru: 'Продавцы Kaspi Магазина', kk: 'Kaspi Дүкені сатушылары', en: 'Kaspi Magazin sellers' },
+    audience: { ru: 'Продавцы Kaspi Магазина', kk: 'Kaspi Магазин сатушылары', en: 'Kaspi Magazin sellers' },
     tagline: {
       ru: 'Демпинг цен и заказы Kaspi в одном кабинете',
       kk: 'Kaspi демпингі мен тапсырыстары бір кабинетте',

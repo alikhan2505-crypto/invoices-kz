@@ -1132,8 +1132,8 @@ export default function TopUtilityBar() {
 function LangCycleButton() {
   const { lang, setLang } = useLanguage()
   const next: Record<Lang, Lang> = { ru: 'kk', kk: 'en', en: 'ru' }
-  // Подписи как в остальном продукте: RU / ҚЗ / EN (раньше «РУ» кириллицей).
-  const label: Record<Lang, string> = { ru: 'RU', kk: 'ҚЗ', en: 'EN' }
+  // Подписи: RU / ҚАЗ / EN (раньше «РУ» кириллицей, до 04.11.2026 «ҚЗ»: так по-казахски не сокращают).
+  const label: Record<Lang, string> = { ru: 'RU', kk: 'ҚАЗ', en: 'EN' }
   return (
     <button
       onClick={() => setLang(next[lang])}

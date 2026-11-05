@@ -524,7 +524,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
     binLookupVatYes: (since: string | null) => since ? `ҚҚС төлеуші ${since} бастап` : 'ҚҚС төлеуші',
     binLookupVatNo: 'ҚҚС төлеуші емес',
-    binLookupUnreliable: '⚠️ МКК-нің сенімсіз салық төлеушілер тізімінде тұр',
+    binLookupUnreliable: '⚠️ МКК-нің жосықсыз салық төлеушілер тізімінде тұр',
     binLookupUnreliableReason: (reasons: string) => `МКК тізіміндегі себебі: ${reasons}`,
     binLookupEnforcement: (records: string, active: string) => `Әділет министрлігінің борышкерлер тізілімінде (ашық деректер) атқарушылық өндіріс жазбалары бар: ${records}, оның ішінде аяқталу күні жоқ: ${active}`,
     binLookupEnforcementSource: 'Дереккөз: ҚР Әділет министрлігінің деректері, data.egov.kz',
@@ -684,7 +684,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     repeatInvoiceButtonLabel: 'Шотты қайталау',
     kpDocLabel: 'Коммерциялық ұсыныс',
     avrDocLabel: 'Орындалған жұмыстар актісі',
-    nakladnayaDocLabel: 'Тауарды босатуға арналған жүкқұжат',
+    nakladnayaDocLabel: 'Тауарды беруге арналған жүкқұжат',
     proLockedLabel: 'Про тарифінде қолжетімді',
     proBadge: 'Про',
     basicBadge: 'Базалық',
@@ -728,7 +728,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     enterEmailAddressAlert: 'Email мекенжайын енгізіңіз',
     emailSentMessage: (email: string) => `✅ Шот ${email} мекенжайына жіберілді`,
     whatsappShareMessage: (invoiceNumber: string, amount: string, link: string) =>
-      `Сәлеметсіз бе! Сізге төлеуге арналған ${invoiceNumber} шотын жібердім, сомасы ${amount} ₸.\n\nШотты ашу: ${link}`,
+      `Сәлеметсіз бе! Сізге ${invoiceNumber} төлем шотын жібердім, сомасы ${amount} ₸.\n\nШотты ашу: ${link}`,
     reminderMessage: (clientName: string, invoiceNumber: string, amount: string, link: string) =>
       `Сәлеметсіз бе, ${clientName}!\n\nТөленбеген шот туралы еске саламыз:\n\n📄 Шот: ${invoiceNumber}\n💰 Сомасы: ${amount} ₸\n🔗 Шотты ашу: ${link}\n\nӨтінеміз, төлемді жүзеге асырыңыз. Рақмет!`,
 

@@ -341,7 +341,7 @@ export default function Login() {
                 aria-pressed={lang === l}
                 className="rounded-full px-2.5 min-h-8 text-[11px] font-semibold uppercase transition-colors"
                 style={lang === l ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { color: 'var(--nav-text-secondary)' }}>
-                {l === 'kk' ? 'ҚЗ' : l}
+                {l === 'kk' ? 'ҚАЗ' : l}
               </button>
             ))}
           </div>
@@ -444,7 +444,7 @@ export default function Login() {
               </svg>
             </div>
             <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }} role="status">{t.checkEmailTitle}</p>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.linkSentPrefix}<br /><strong style={{ color: 'var(--nav-text-primary)' }} className="break-all">{email}</strong></p>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.linkSentPrefix}<br /><strong style={{ color: 'var(--nav-text-primary)' }} className="break-all ph-mask">{email}</strong></p>
             {mail && (
               <a href={mail.href} target="_blank" rel="noopener noreferrer"
                 className="mt-5 flex items-center justify-center rounded-xl py-3 text-sm font-semibold min-h-12"

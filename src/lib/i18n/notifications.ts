@@ -366,7 +366,7 @@ export const notificationEventTexts: Record<NotificationEventKey, EventTexts> = 
   },
   kaspi_floor_price: {
     ru: { label: 'Цена упёрлась в минимум', desc: 'Конкурент дешевле, а снижать ниже вашего минимума нельзя. Не чаще раза в сутки на товар.', requires: 'тариф Про' },
-    kk: { label: 'Баға ең төменгі шекке жетті', desc: 'Бәсекелес арзанырақ, ал сіздің ең төменгі бағаңыздан түсіруге болмайды. Бір тауарға тәулігіне бір реттен жиі емес.', requires: 'Про тарифі' },
+    kk: { label: 'Баға ең төменгі шекке жетті', desc: 'Бәсекелес арзанырақ, ал сіздің ең төмен бағаңыздан түсіруге болмайды. Бір тауарға тәулігіне бір реттен жиі емес.', requires: 'Про тарифі' },
     en: { label: 'Price hit your minimum', desc: 'A competitor is cheaper, but the price can’t go below your minimum. At most once a day per product.', requires: 'Pro plan' },
   },
   // ---------- ИИ-агент ----------
@@ -387,7 +387,7 @@ export const notificationEventTexts: Record<NotificationEventKey, EventTexts> = 
   },
   ai_wallet_empty: {
     ru: { label: 'Кошелёк агента пуст', desc: 'Баланса не хватает на ответы ИИ — клиенты получают заготовку. Не чаще раза в сутки.' },
-    kk: { label: 'Агент әмияны бос', desc: 'Баланс ЖИ жауаптарына жетпейді — клиенттер дайын үлгі алады. Тәулігіне бір реттен жиі емес.' },
+    kk: { label: 'Агент әмияны бос', desc: 'Баланс AI жауаптарына жетпейді — клиенттер дайын үлгі алады. Тәулігіне бір реттен жиі емес.' },
     en: { label: 'Agent wallet is empty', desc: 'The balance can’t cover AI replies — customers get a canned message. At most once a day.' },
   },
   ai_training_exit: {

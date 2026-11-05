@@ -193,7 +193,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     signOut: 'Шығу',
     segmentInvoices: 'Шоттар',
     segmentKaspiBot: 'Kaspi Bot',
-    segmentAiAgent: 'ЖИ-агент',
+    segmentAiAgent: 'AI-агент',
   },
   en: {
     walletTitle: 'Wallet',

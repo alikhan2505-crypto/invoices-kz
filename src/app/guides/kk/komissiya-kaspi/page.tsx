@@ -5,6 +5,11 @@ import GuideShell from '../../GuideShell'
 import { HubLinksBlock } from '../../_kaspi/blocks'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
+import { marginDict } from '@/app/tools/margin/dict'
+import { formatPercent } from '@/lib/kaspiTariff'
+
+// Названия санатов те же, что в калькуляторе маржи (вычитка 04.11.2026: в таблице были по-русски).
+const kkCategory = (label: string) => marginDict.kk.categoryNames[label] ?? label
 
 const guide = getGuide('komissiya-kaspi')!
 
@@ -68,8 +73,8 @@ export default function Page() {
           <tbody>
             {KASPI_CATEGORY_COMMISSIONS.map(c => (
               <tr key={c.label}>
-                <td>{c.label}</td>
-                <td className="tabular-nums">{c.ratePercent}%</td>
+                <td>{kkCategory(c.label)}</td>
+                <td className="tabular-nums">{formatPercent(c.ratePercent)}</td>
               </tr>
             ))}
           </tbody>
@@ -78,9 +83,9 @@ export default function Page() {
 
       <p className="note">
         23.10.2026 күні тариф бойынша тексерілді. Кейбір санаттардың ішінде мөлшерлемесі басқа жеке ішкі санаттар
-        бар: «ТВ, Аудио, Видео» санатында «Чехлы для наушников» ішкі санаты 15,5%, қалғаны 12,5%; «Детские
-        товары» (балалар тамағы мен сүт қоспаларын қоса) және «Спорт, туризм» (спорттық тамақтануды қоса) 12,5%
-        күйінде қалады; 7,3% тұратын «Продукты питания» санатына алкоголь де кіреді. Ішкі санатыңыз тізімде
+        бар: «ТД, Аудио, Видео» санатында «Чехлы для наушников» ішкі санаты 15,5%, қалғаны 12,5%; «Балалар
+        тауарлары» (балалар тамағы мен сүт қоспаларын қоса) және «Спорт, туризм» (спорттық тамақтануды қоса) 12,5%
+        күйінде қалады; 7,3% тұратын «Азық-түлік» санатына алкоголь де кіреді. Ішкі санатыңыз тізімде
         болмаса, мөлшерлемені тарифтен алып, қолмен енгізіңіз.
       </p>
 
@@ -93,7 +98,7 @@ export default function Page() {
       <h2>Ең төмен бағаны есептеудегі басты қате</h2>
       <p>
         Бағаның төменгі шегін есептеудің ең жиі тәсілі — шығындарды қосу: өзіндік құн + жеткізу + орау. Былай
-        санауға болмайды. Комиссия мен салық сіздің шығындарыңыздан емес, <strong>сатылым бағасынан</strong>
+        санауға болмайды. Комиссия мен салық сіздің шығындарыңыздан емес, <strong>сатылым бағасынан</strong>{' '}
         алынады. Бағаны көтерсеңіз, одан ұсталатын сома да өседі. Сондықтан нақты шек әрқашан шығындар сомасынан
         жоғары.
       </p>

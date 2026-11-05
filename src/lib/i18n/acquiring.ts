@@ -417,7 +417,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     cashierApiCardText: 'Kaspi Pay Cashier қосу, API-токен, вебхуктер және көшірме енді жеке бөлімде.',
     linkedHeading: 'Басқа өнімдермен байланысты',
     linkedInvoicesTitle: 'Клиенттерге шотты кодсыз шығару',
-    linkedKaspiShopTitle: 'Kaspi Дүкенінде тапсырыстар және баға демпингі',
+    linkedKaspiShopTitle: 'Kaspi Магазинде тапсырыстар және баға демпингі',
     linkedOpen: 'Ашу →',
     kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
     kaspiTopupNoFeeHint: 'Балансқа толығымен, комиссиясыз есептеледі. 2% комиссия бөлек, кейінірек — тек клиент шотыңызды, тапсырысыңызды немесе API-төлемді төлегенде ғана алынады.',

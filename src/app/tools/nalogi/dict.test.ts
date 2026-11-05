@@ -37,6 +37,9 @@ describe('nalogi dictionary', () => {
     const kk = flatten(nalogiDict.kk)
     expect(kk).not.toMatch(/БИН|НДС|КГД|\bИП\b|ИП |ОПВ|ВОСМС|МЗП|МРП|(^|[^А-ЯЁӘҒҚҢӨҰҮҺІа-яё])СО($|[^А-ЯЁӘҒҚҢӨҰҮҺІа-яё])/)
     for (const term of ['ЖК', 'МЗЖ', 'ЖМЗЖ', 'ӘА', 'МӘМС', 'ЕТЖ', 'АЕК', 'ҚҚС']) expect(kk).toContain(term)
+    // Фонд по-казахски МӘСҚ (gfss.kz/kk), русское «ГФСС» в казахском тексте не пишем (вычитка 04.11.2026).
+    expect(kk).not.toContain('ГФСС')
+    expect(kk).toContain('МӘСҚ')
   })
 
   it('has no Cyrillic in the English copy apart from the ₸ sign', () => {
@@ -58,7 +61,7 @@ describe('nalogi dictionary', () => {
 
   it('names the fund in full the first time: ru and kk long names, en long name', () => {
     expect(nalogiDict.ru.soNote.reason).toContain('Государственного фонда социального страхования (ГФСС)')
-    expect(nalogiDict.kk.soNote.reason).toContain('Мемлекеттік әлеуметтік сақтандыру қоры (ГФСС)')
+    expect(nalogiDict.kk.soNote.reason).toContain('Мемлекеттік әлеуметтік сақтандыру қорының (МӘСҚ)')
     expect(nalogiDict.en.soNote.reason).toContain('State Social Insurance Fund (GFSS)')
   })
 

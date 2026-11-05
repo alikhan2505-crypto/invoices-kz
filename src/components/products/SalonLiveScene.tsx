@@ -20,21 +20,21 @@ type Copy = {
 }
 const T: Record<Lang, Copy> = {
   ru: {
-    app: 'Салон · Записи', day: 'Пт, 17 октября', chatWith: 'Алия',
+    app: 'Салон · Записи', day: 'Пт, 16 октября', chatWith: 'Алия',
     inMsg: 'Здравствуйте! Можно на маникюр завтра в 15:00?', outMsg: 'Записали вас к Айгуль на 15:00. Ждём!',
     queue: 'На подтверждение', empty: 'Пока пусто', draftWhat: 'Маникюр · Айгуль · 15:00', draftWho: 'Алия · из WhatsApp',
     approve: 'Подтвердить', other: 'Другое время', booked: 'Записана', visit: '5-й визит', regular: 'Постоянная', remind: 'Напомним за 2 часа',
     services: { mani: 'Маникюр', pedi: 'Педикюр', cut: 'Стрижка', color: 'Окрашивание', brows: 'Брови' },
   },
   kk: {
-    app: 'Салон · Жазылулар', day: 'Жм, 17 қазан', chatWith: 'Әлия',
+    app: 'Салон · Жазылулар', day: 'Жм, 16 қазан', chatWith: 'Әлия',
     inMsg: 'Сәлеметсіз бе! Ертең 15:00-ге маникюрге жазылуға бола ма?', outMsg: 'Сізді Айгүлге 15:00-ге жаздық. Күтеміз!',
     queue: 'Растауды күтуде', empty: 'Әзірге бос', draftWhat: 'Маникюр · Айгүл · 15:00', draftWho: 'Әлия · WhatsApp-тан',
     approve: 'Растау', other: 'Басқа уақыт', booked: 'Жазылды', visit: '5-ші келуі', regular: 'Тұрақты', remind: '2 сағат бұрын еске саламыз',
     services: { mani: 'Маникюр', pedi: 'Педикюр', cut: 'Шаш қию', color: 'Бояу', brows: 'Қас' },
   },
   en: {
-    app: 'Salon · Bookings', day: 'Fri, 17 October', chatWith: 'Aliya',
+    app: 'Salon · Bookings', day: 'Fri, 16 October', chatWith: 'Aliya',
     inMsg: 'Hi! Can I book a manicure tomorrow at 3 pm?', outMsg: 'You are booked with Aigul at 3 pm. See you!',
     queue: 'Awaiting approval', empty: 'Nothing yet', draftWhat: 'Manicure · Aigul · 15:00', draftWho: 'Aliya · via WhatsApp',
     approve: 'Approve', other: 'Other time', booked: 'Booked', visit: '5th visit', regular: 'Regular', remind: 'Reminder 2 h before',

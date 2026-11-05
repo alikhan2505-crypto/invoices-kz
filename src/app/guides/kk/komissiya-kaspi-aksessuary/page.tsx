@@ -34,7 +34,7 @@ export default function Page() {
     <GuideShell guide={guide} lang="kk">
       <h2>Бірыңғай мөлшерлеме жоқ</h2>
       <p>
-        Kaspi.kz-тегі Магазин тарифінде «Аксессуары» санатының {KASPI_ACCESSORIES.length} жолы бар, мөлшерлеме жолға
+        Kaspi.kz-тегі Магазин тарифінде «Аксессуарлар» санатының {KASPI_ACCESSORIES.length} жолы бар, мөлшерлеме жолға
         байланысты: {highCount} жол <strong>ҚҚС-пен {HIGH}</strong> (ҚҚС-сыз {HIGH_NV}), {baseCount} жол{' '}
         <strong>ҚҚС-пен {BASE}</strong> (ҚҚС-сыз {BASE_NV}) бойынша. Kaspi-де «аксессуарлар: осынша пайыз» деген жауап
         жоқ, сондықтан орташа санды алуға болмайды: дәл өз жолыңыздың мөлшерлемесі керек.

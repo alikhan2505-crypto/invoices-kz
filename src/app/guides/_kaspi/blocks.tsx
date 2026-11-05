@@ -76,7 +76,7 @@ const EXAMPLE_COPY = {
     intro: (tiers: KaspiTierId[]) =>
       tiers.length === 1
         ? `Возьмём продажу на ${formatTenge(KASPI_EXAMPLE_AMOUNT)} и опубликованную в тарифе ставку с НДС ${formatPercent(KASPI_TIERS[tiers[0]].withVat)} (${formatPercent(KASPI_TIERS[tiers[0]].withoutVat)} без НДС).`
-        : `Возьмём продажу на ${formatTenge(KASPI_EXAMPLE_AMOUNT)} и три опубликованные в тарифе ставки с НДС.`,
+        : `Возьмём продажу на ${formatTenge(KASPI_EXAMPLE_AMOUNT)} и ${tiers.length === 2 ? 'две' : 'три'} опубликованные в тарифе ставки с НДС.`,
     rows: ['Цена продажи', 'Комиссия Kaspi', 'Остаётся после комиссии'],
     head: 'Показатель',
     note: `Это арифметика по опубликованной ставке с НДС, а не выписка из кабинета. Kaspi показывает комиссию без НДС, а налог начисляет отдельно по своим правилам (источник q4467, ниже), поэтому итоговые суммы в вашем отчёте определяют правила Kaspi: сверьтесь с кабинетом. Из этой суммы ещё не вычтены доставка Kaspi, налог ИП и себестоимость.`,
@@ -91,7 +91,7 @@ const EXAMPLE_COPY = {
     intro: (tiers: KaspiTierId[]) =>
       tiers.length === 1
         ? `${formatTenge(KASPI_EXAMPLE_AMOUNT)} сатылымды және тарифте жарияланған ҚҚС-пен ${formatPercent(KASPI_TIERS[tiers[0]].withVat)} мөлшерлемені (ҚҚС-сыз ${formatPercent(KASPI_TIERS[tiers[0]].withoutVat)}) алайық.`
-        : `${formatTenge(KASPI_EXAMPLE_AMOUNT)} сатылымды және тарифте жарияланған ҚҚС-пен үш мөлшерлемені алайық.`,
+        : `${formatTenge(KASPI_EXAMPLE_AMOUNT)} сатылымды және тарифте жарияланған ҚҚС-пен ${tiers.length === 2 ? 'екі' : 'үш'} мөлшерлемені алайық.`,
     rows: ['Сатылым бағасы', 'Kaspi комиссиясы', 'Комиссиядан кейін қалатыны'],
     head: 'Көрсеткіш',
     note: `Бұл жарияланған ҚҚС-пен мөлшерлеме бойынша арифметика, кабинеттен үзінді емес. Kaspi комиссияны ҚҚС-сыз көрсетеді, ал салықты өз ережелері бойынша бөлек есептейді (дереккөз q4467, төменде), сондықтан есептегі түпкілікті сомаларды Kaspi ережелері анықтайды: кабинетпен салыстырыңыз. Бұл сомадан Kaspi жеткізуі, ЖК салығы және өзіндік құн әлі шығарылмаған.`,
@@ -103,7 +103,7 @@ const EXAMPLE_COPY = {
   },
 } as const
 
-/** Пример на 10 000 ₸ по опубликованной ставке с НДС (одна ставка или все три). */
+/** Пример на 10 000 ₸ по опубликованной ставке с НДС (одна ставка, две или все три). */
 export function ExampleBlock({ lang, tiers }: { lang: GuideLang; tiers: KaspiTierId[] }) {
   const c = EXAMPLE_COPY[lang]
   const examples = tiers.map(t => kaspiExample(t))

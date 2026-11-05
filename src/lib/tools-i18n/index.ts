@@ -250,7 +250,7 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaSignedInTitle: 'Сіз invoices.kz жүйесіне кіріп тұрсыз',
     ctaSignedInBody: 'Жұмысты кабинетте жалғастырыңыз: Kaspi арқылы төленетін шоттар, клиенттер және құжаттар тарихы.',
     ctaSignedInButton: 'Кабинетті ашу',
-    ctaSignedInKaspiBody: 'Kaspi Bot-та тауарларға ең төменгі бағаны белгілеңіз — бот сізді Kaspi-де ұсыныстар тізімінің басында ұстап тұрады және шектен төмен түспейді.',
+    ctaSignedInKaspiBody: 'Kaspi Bot-та тауарларға ең төмен бағаны белгілеңіз — бот сізді Kaspi-де ұсыныстар тізімінің басында ұстап тұрады және шектен төмен түспейді.',
     ctaSignedInKaspiButton: 'Kaspi Bot-ты ашу',
     ctaSignedInKaspiLandingBody: 'Kaspi Bot бағаларыңызды Kaspi-де ұсыныстар тізімінің басында ұстап тұрады және сіз белгілеген шектен төмен түсірмейді. Ол Про тарифіне кіреді.',
     ctaSignedInKaspiLandingButton: 'Kaspi Bot туралы толығырақ',

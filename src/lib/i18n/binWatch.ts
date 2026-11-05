@@ -172,7 +172,7 @@ export const binWatchDict: Record<BinWatchLang, BinWatchTexts> = {
     arrear: amount => `берешек ${amount}`,
     enforcement: (count, active) => `${count} іс, қолданыстағысы ${active}`,
     signals: {
-      unreliable: 'Сенімсіз салық төлеуші',
+      unreliable: 'Жосықсыз салық төлеуші',
       bankrupt: 'Банкроттық',
       liquidating: 'Тарату',
       registryClosed: 'Тізілімдегі мәртебе: таратылған немесе тоқтатылған',
