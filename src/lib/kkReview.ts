@@ -2,24 +2,29 @@
 // 25.10.2026: kk-тексты, написанные ИИ, он вычитывает сам, а до тех пор их
 // нельзя показывать как утверждённые).
 //
-// Что здесь есть:
-//  - страницы (scope 'page'): адреса kk-страниц, на которых показывается плашка
-//    «текст проверяется» (src/components/KkReviewNotice.tsx). Везде стоит под
-//    шапкой (логотип и переключатель языка), над заголовком страницы: в общих
-//    обёртках src/app/guides/GuideShell.tsx, src/app/bik/BikShell.tsx,
-//    src/app/guides/kk/page.tsx и в шапке каждого инструмента (src/app/tools/*/
-//    *Tool.tsx, индекс src/lib/tools-i18n/ToolsIndexView.tsx). Новый
-//    инструмент: поставить плашку сразу после шапки, как в соседних;
-//  - документы и интерфейс (scope 'document' и 'ui'): справочно, без плашки
-//    (у документа свой флаг KK_DOC_UNDER_REVIEW в src/lib/kpI18n.ts, язык
-//    интерфейса переключается кнопкой, а не адресом).
+// 05.11.2026 основатель вычитал все разделы файла «Тексты на вычитку (казахский).md»
+// (инструменты, гайды, банки, документ КП, интерфейс), правки применены (коммит
+// 2f346f16), и сказал снять плашку везде, где текст сверен. Реестр теперь пуст, плашка
+// нигде не показывается, а механизм остался на будущее.
+//
+// Как это работает:
+//  - запись scope 'page' в KK_REVIEW_ENTRIES: адреса kk-страниц, на которых показывается
+//    плашка «текст проверяется» (src/components/KkReviewNotice.tsx). Плашка стоит под
+//    шапкой (логотип и переключатель языка), над заголовком страницы: в общих обёртках
+//    src/app/guides/GuideShell.tsx, src/app/bik/BikShell.tsx, src/app/guides/kk/page.tsx
+//    и в шапке каждого инструмента (src/app/tools/*/*Tool.tsx, индекс
+//    src/lib/tools-i18n/ToolsIndexView.tsx). Новый инструмент: поставить плашку сразу
+//    после шапки, как в соседних;
+//  - записи 'document' и 'ui' справочные, без плашки (у документа КП свой флаг
+//    KK_DOC_UNDER_REVIEW в src/lib/kpI18n.ts, язык интерфейса переключается кнопкой).
+//
+// Новая или заметно переписанная kk-страница: добавить её запись сюда (плашка появится
+// сама), а когда основатель вычитает, убрать запись и перенести адрес в
+// KK_REVIEWED_PATHS, чтобы тест на полноту не считал страницу забытой. Плашка не
+// меняет индексацию (не noindex).
 //
 // Полный список самих строк для чтения лежит вне репозитория:
 // «Вопросы к основателю/Тексты на вычитку (казахский).md».
-//
-// Когда основатель вычитал страницу: убрать её слаг из массива ниже (плашка
-// пропадёт сама) и перенести адрес в KK_REVIEWED_PATHS, чтобы тест на полноту
-// реестра не считал страницу забытой. Не noindex: плашка не меняет индексацию.
 
 export type KkReviewScope = 'page' | 'document' | 'ui'
 
@@ -31,13 +36,13 @@ export interface KkReviewEntry {
   note: string
 }
 
-/** Инструменты /tools/kk/<slug>, ещё не вычитанные. */
-export const KK_REVIEW_TOOL_SLUGS: readonly string[] = [
+/** Инструменты /tools/kk/<slug>, вычитанные основателем 05.11.2026. */
+export const KK_REVIEWED_TOOL_SLUGS: readonly string[] = [
   'avr', 'kontragent', 'kp', 'margin', 'nakladnaya', 'nalogi', 'schet', 'waybills', 'zarplata',
 ]
 
-/** Гайды /guides/kk/<slug>, ещё не вычитанные. */
-export const KK_REVIEW_GUIDE_SLUGS: readonly string[] = [
+/** Гайды /guides/kk/<slug>, вычитанные основателем 05.11.2026. */
+export const KK_REVIEWED_GUIDE_SLUGS: readonly string[] = [
   'dokumenty-ip-kazakhstan',
   'esf-kazakhstan-2026',
   'forma-910-uproshchenka-2026',
@@ -61,47 +66,28 @@ export const KK_REVIEW_GUIDE_SLUGS: readonly string[] = [
   'tarify-dostavki-kaspi-magazin',
 ]
 
-/** Страницы банков /bik/kk/<slug>, ещё не вычитанные. */
-export const KK_REVIEW_BIK_SLUGS: readonly string[] = [
+/** Страницы банков /bik/kk/<slug>, вычитанные основателем 05.11.2026. */
+export const KK_REVIEWED_BIK_SLUGS: readonly string[] = [
   'alatau-city-bank', 'bereke-bank', 'evraziyskiy-bank', 'forte-bank', 'freedom-bank', 'halyk-bank',
   'kaspi-bank', 'kmf-bank', 'shinhan-bank-kazakhstan', 'tsentrkredit', 'vtb-kazakhstan',
 ]
 
 /**
- * Адреса kk-страниц, которые основатель уже вычитал и утвердил. Пока пусто.
- * Нужен только тесту полноты: любая kk-страница из реестров гайдов, инструментов
- * и банков обязана быть либо на проверке, либо здесь (иначе её просто забыли).
+ * Адреса kk-страниц, которые основатель вычитал и утвердил. Нужен тесту полноты: любая
+ * kk-страница из реестров гайдов, инструментов и банков обязана быть либо на проверке
+ * (запись в KK_REVIEW_ENTRIES), либо здесь (иначе её просто забыли).
  */
-export const KK_REVIEWED_PATHS: readonly string[] = []
-
-const NOTE_TOOL = 'kk-ветка словаря dict.ts инструмента, образцы документов sample.ts'
-const NOTE_GUIDE = 'казахская версия статьи целиком (текст страницы, метаданные, вопросы-ответы)'
-const NOTE_BIK = 'казахская версия страницы банка (шаблон из src/app/bik/bikContent.ts)'
-
-export const KK_REVIEW_ENTRIES: readonly KkReviewEntry[] = [
-  { id: 'tools-index', scope: 'page', paths: ['/tools/kk'], note: 'индекс инструментов: карточки и подписи (src/lib/tools-i18n)' },
-  ...KK_REVIEW_TOOL_SLUGS.map((slug): KkReviewEntry => ({ id: `tool-${slug}`, scope: 'page', paths: [`/tools/kk/${slug}`], note: NOTE_TOOL })),
-  { id: 'guides-index', scope: 'page', paths: ['/guides/kk'], note: 'индекс гайдов: названия и описания карточек' },
-  ...KK_REVIEW_GUIDE_SLUGS.map((slug): KkReviewEntry => ({ id: `guide-${slug}`, scope: 'page', paths: [`/guides/kk/${slug}`], note: NOTE_GUIDE })),
-  { id: 'bik-hub', scope: 'page', paths: ['/bik/kk'], note: 'хаб БСК банков (src/app/bik/bikContent.ts)' },
-  ...KK_REVIEW_BIK_SLUGS.map((slug): KkReviewEntry => ({ id: `bik-${slug}`, scope: 'page', paths: [`/bik/kk/${slug}`], note: NOTE_BIK })),
-  {
-    id: 'kp-document',
-    scope: 'document',
-    paths: ['src/lib/kpI18n.ts', 'src/lib/generateKP.ts'],
-    note: 'печатное коммерческое предложение на казахском; рядом с выбором языка в кабинете стоит пометка (флаг KK_DOC_UNDER_REVIEW)',
-  },
-  {
-    id: 'cabinet-ui',
-    scope: 'ui',
-    paths: ['src/lib/i18n'],
-    note: 'казахские строки интерфейса кабинета и лендингов, добавленные с 15.09.2026; плашки нет: язык переключается кнопкой, а не адресом',
-  },
+export const KK_REVIEWED_PATHS: readonly string[] = [
+  '/tools/kk',
+  ...KK_REVIEWED_TOOL_SLUGS.map(slug => `/tools/kk/${slug}`),
+  '/guides/kk',
+  ...KK_REVIEWED_GUIDE_SLUGS.map(slug => `/guides/kk/${slug}`),
+  '/bik/kk',
+  ...KK_REVIEWED_BIK_SLUGS.map(slug => `/bik/kk/${slug}`),
 ]
 
-const REVIEW_PAGE_PATHS: ReadonlySet<string> = new Set(
-  KK_REVIEW_ENTRIES.filter(e => e.scope === 'page').flatMap(e => e.paths),
-)
+/** Что сейчас на проверке. Пусто с 05.11.2026. */
+export const KK_REVIEW_ENTRIES: readonly KkReviewEntry[] = []
 
 /** '/tools/kk/zarplata/?x=1#y' -> '/tools/kk/zarplata'. Корень остаётся '/'. */
 function normalizePath(pathname: string): string {
@@ -110,12 +96,15 @@ function normalizePath(pathname: string): string {
   return trimmed === '' ? '/' : trimmed
 }
 
-/**
- * Страница показывает казахский текст, который ещё не вычитан основателем
- * (для неё нужна плашка «текст проверяется»). Совпадение точное по адресу:
- * русские и английские версии, а также любые другие страницы дают false.
- */
-export function isKkUnderReview(pathname: string | null | undefined): boolean {
-  if (!pathname) return false
-  return REVIEW_PAGE_PATHS.has(normalizePath(pathname))
+/** Проверка «страница на проверке» по заданному реестру (отдельно, чтобы её можно было тестировать). */
+export function makeKkReviewChecker(entries: readonly KkReviewEntry[]): (pathname: string | null | undefined) => boolean {
+  const pages: ReadonlySet<string> = new Set(entries.filter(e => e.scope === 'page').flatMap(e => e.paths))
+  return pathname => (pathname ? pages.has(normalizePath(pathname)) : false)
 }
+
+/**
+ * Страница показывает казахский текст, который ещё не вычитан основателем (для неё нужна
+ * плашка «текст проверяется»). Совпадение точное по адресу: русские и английские версии,
+ * а также любые другие страницы дают false.
+ */
+export const isKkUnderReview = makeKkReviewChecker(KK_REVIEW_ENTRIES)

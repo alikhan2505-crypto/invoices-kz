@@ -3,66 +3,65 @@ import fs from 'fs'
 import path from 'path'
 import {
   isKkUnderReview,
-  KK_REVIEW_BIK_SLUGS,
   KK_REVIEW_ENTRIES,
-  KK_REVIEW_GUIDE_SLUGS,
-  KK_REVIEW_TOOL_SLUGS,
+  KK_REVIEWED_BIK_SLUGS,
+  KK_REVIEWED_GUIDE_SLUGS,
   KK_REVIEWED_PATHS,
+  KK_REVIEWED_TOOL_SLUGS,
+  makeKkReviewChecker,
+  type KkReviewEntry,
 } from './kkReview'
 import { GUIDES } from './guides'
 import { LOCALIZED_TOOL_SLUGS } from './tools-i18n'
 import { BIK_BANK_PAGES } from './bikRegistry'
+import { KK_DOC_UNDER_REVIEW } from './kpI18n'
 
-describe('isKkUnderReview', () => {
-  it('kk-страницы инструментов, гайдов и банков из реестра на проверке', () => {
-    expect(isKkUnderReview('/tools/kk/zarplata')).toBe(true)
-    expect(isKkUnderReview('/tools/kk')).toBe(true)
-    expect(isKkUnderReview('/guides/kk/mrp-2026')).toBe(true)
-    expect(isKkUnderReview('/guides/kk')).toBe(true)
-    expect(isKkUnderReview('/bik/kk')).toBe(true)
-    expect(isKkUnderReview('/bik/kk/halyk-bank')).toBe(true)
-  })
+describe('makeKkReviewChecker', () => {
+  const entries: KkReviewEntry[] = [
+    { id: 'a', scope: 'page', paths: ['/tools/kk/zarplata', '/guides/kk/mrp-2026'], note: '' },
+    { id: 'b', scope: 'ui', paths: ['src/lib/i18n'], note: '' },
+  ]
+  const check = makeKkReviewChecker(entries)
 
-  it('русские и английские версии, кабинет и корень не на проверке', () => {
-    expect(isKkUnderReview('/tools/zarplata')).toBe(false)
-    expect(isKkUnderReview('/tools/en/zarplata')).toBe(false)
-    expect(isKkUnderReview('/guides/mrp-2026')).toBe(false)
-    expect(isKkUnderReview('/bik/halyk-bank')).toBe(false)
-    expect(isKkUnderReview('/profile/documents')).toBe(false)
-    expect(isKkUnderReview('/')).toBe(false)
+  it('страницы из реестра на проверке, остальное нет', () => {
+    expect(check('/tools/kk/zarplata')).toBe(true)
+    expect(check('/guides/kk/mrp-2026')).toBe(true)
+    expect(check('/tools/zarplata')).toBe(false)
+    expect(check('/tools/en/zarplata')).toBe(false)
+    expect(check('/')).toBe(false)
+    expect(check('src/lib/i18n')).toBe(false)
   })
 
   it('точное совпадение: похожий адрес с другим слагом не считается', () => {
-    // 'komissiya-kaspi' в реестре, а 'komissiya-kaspi-xyz' нет: префикс не должен цеплять лишнее
-    expect(isKkUnderReview('/guides/kk/komissiya-kaspi')).toBe(true)
-    expect(isKkUnderReview('/guides/kk/komissiya-kaspi-xyz')).toBe(false)
-    expect(isKkUnderReview('/tools/kk/unknown-tool')).toBe(false)
-    expect(isKkUnderReview('/tools/kk/zarplata/extra')).toBe(false)
+    expect(check('/tools/kk/zarplata-x')).toBe(false)
+    expect(check('/tools/kk/zarplata/extra')).toBe(false)
   })
 
   it('слэш в конце, строка запроса и якорь не мешают', () => {
-    expect(isKkUnderReview('/tools/kk/zarplata/')).toBe(true)
-    expect(isKkUnderReview('/guides/kk/mrp-2026?utm_source=x')).toBe(true)
-    expect(isKkUnderReview('/bik/kk/halyk-bank#faq')).toBe(true)
+    expect(check('/tools/kk/zarplata/')).toBe(true)
+    expect(check('/guides/kk/mrp-2026?utm_source=x')).toBe(true)
+    expect(check('/guides/kk/mrp-2026#faq')).toBe(true)
   })
 
   it('пустой или отсутствующий адрес даёт false', () => {
-    expect(isKkUnderReview(null)).toBe(false)
-    expect(isKkUnderReview(undefined)).toBe(false)
-    expect(isKkUnderReview('')).toBe(false)
+    expect(check(null)).toBe(false)
+    expect(check(undefined)).toBe(false)
+    expect(check('')).toBe(false)
   })
 })
 
 describe('реестр kkReview', () => {
-  const pageEntries = KK_REVIEW_ENTRIES.filter(e => e.scope === 'page')
+  it('с 05.11.2026 все вычитано: плашка нигде не показывается', () => {
+    expect(KK_REVIEW_ENTRIES.length).toBe(0)
+    expect(KK_DOC_UNDER_REVIEW).toBe(false)
+    for (const p of KK_REVIEWED_PATHS) expect(isKkUnderReview(p), p).toBe(false)
+  })
 
-  it('у каждой страницы реестра есть настоящий page.tsx', () => {
-    for (const e of pageEntries) {
-      for (const p of e.paths) {
-        expect(p.startsWith('/')).toBe(true)
-        const file = path.join(process.cwd(), 'src', 'app', ...p.split('/').filter(Boolean), 'page.tsx')
-        expect(fs.existsSync(file), `${p} -> ${file}`).toBe(true)
-      }
+  it('у каждого вычитанного адреса есть настоящий page.tsx', () => {
+    for (const p of KK_REVIEWED_PATHS) {
+      expect(p.startsWith('/')).toBe(true)
+      const file = path.join(process.cwd(), 'src', 'app', ...p.split('/').filter(Boolean), 'page.tsx')
+      expect(fs.existsSync(file), `${p} -> ${file}`).toBe(true)
     }
   })
 
@@ -76,7 +75,7 @@ describe('реестр kkReview', () => {
       const p = `/guides/kk/${g.slug}`
       expect(isKkUnderReview(p) || KK_REVIEWED_PATHS.includes(p), p).toBe(true)
     }
-    expect(KK_REVIEW_GUIDE_SLUGS.length).toBeGreaterThan(0)
+    expect(KK_REVIEWED_GUIDE_SLUGS.length).toBeGreaterThan(0)
   })
 
   it('каждый переведённый инструмент либо на проверке, либо утверждён', () => {
@@ -84,7 +83,7 @@ describe('реестр kkReview', () => {
       const p = `/tools/kk/${slug}`
       expect(isKkUnderReview(p) || KK_REVIEWED_PATHS.includes(p), p).toBe(true)
     }
-    expect(KK_REVIEW_TOOL_SLUGS.length).toBe(LOCALIZED_TOOL_SLUGS.length)
+    expect(KK_REVIEWED_TOOL_SLUGS.length).toBe(LOCALIZED_TOOL_SLUGS.length)
   })
 
   it('каждая страница банка /bik/kk либо на проверке, либо утверждена', () => {
@@ -92,11 +91,11 @@ describe('реестр kkReview', () => {
       const p = `/bik/kk/${b.slug}`
       expect(isKkUnderReview(p) || KK_REVIEWED_PATHS.includes(p), p).toBe(true)
     }
-    expect(KK_REVIEW_BIK_SLUGS.length).toBe(BIK_BANK_PAGES.length)
+    expect(KK_REVIEWED_BIK_SLUGS.length).toBe(BIK_BANK_PAGES.length)
   })
 
-  // Плашка стоит под шапкой, над заголовком страницы (а не над логотипом): тот
-  // же порядок на инструментах, в гайдах и на страницах банков.
+  // Механизм оставлен на будущее: плашка стоит под шапкой, над заголовком страницы (а не над
+  // логотипом): тот же порядок на инструментах, в гайдах и на страницах банков.
   it('плашка везде после шапки и до заголовка h1, общего layout над логотипом нет', () => {
     const root = process.cwd()
     expect(fs.existsSync(path.join(root, 'src', 'app', 'tools', 'kk', 'layout.tsx'))).toBe(false)
@@ -118,8 +117,7 @@ describe('реестр kkReview', () => {
     }
   })
 
-  it('в тексте записей и в реестре нет длинного тире', () => {
-    const text = JSON.stringify(KK_REVIEW_ENTRIES)
-    expect(text.includes('—')).toBe(false)
+  it('в тексте реестра нет длинного тире', () => {
+    expect(JSON.stringify(KK_REVIEW_ENTRIES).includes('—')).toBe(false)
   })
 })
