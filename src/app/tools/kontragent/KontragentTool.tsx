@@ -1,5 +1,5 @@
 'use client'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import KkReviewNotice from '@/components/KkReviewNotice'
@@ -184,6 +184,18 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
       setOutcome({ kind: 'error', message: t.errNetwork })
     }
   }
+
+  // QR «Проверить продавца по БИН» на документе ведёт сюда со ссылкой ?bin=<БИН юрлица> (src/lib/docQr.ts):
+  // подставляем БИН, а проверку запускает человек кнопкой. Автозапуск на загрузке тратил бы его бесплатную
+  // проверку (3 в квартал на IP, общий для офиса за одним адресом) на каждом обновлении страницы и на каждом
+  // заходе робота, который открывает ссылку из PDF (ревью 06.11.2026). Некорректный БИН игнорируем.
+  const qrPrefilled = useRef(false)
+  useEffect(() => {
+    if (qrPrefilled.current) return
+    qrPrefilled.current = true
+    const fromQr = new URLSearchParams(window.location.search).get('bin')
+    if (fromQr && isValidBin(fromQr)) setBin(normalizeBin(fromQr))
+  }, [])
 
   const remaining =
     outcome.kind === 'found' || outcome.kind === 'notFound' || outcome.kind === 'unavailable' ? outcome.remaining : null

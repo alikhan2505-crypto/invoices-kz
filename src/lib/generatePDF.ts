@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
+import { docQrHtml } from './docQr'
 import { amountInWordsKzt } from './amountWords'
 import { resizeToFit } from './imageResize'
 import { escapeHtml, escapeAttr } from './htmlEscape'
@@ -315,6 +316,8 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
                 mix-blend-mode:multiply;"
         />` : ''}
       </div>
+
+      ${docQrHtml(data.showWatermark && !data.kaspiPayLink, 'schet', p?.bin_iin)}
 
       ${data.kaspiPayLink && qrDataUrl ? `
         <div style="margin-top:32px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;display:flex;align-items:center;gap:16px;">

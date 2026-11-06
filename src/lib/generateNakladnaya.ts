@@ -34,6 +34,7 @@ import { amountInWordsKzt } from './amountWords'
 import { resizeToFit } from './imageResize'
 import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
+import { docQrHtml } from './docQr'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 import { formatQty } from '@/lib/tools-i18n/rowNumbers'
 
@@ -173,8 +174,9 @@ ${logoBase64 ? `
 </div>
 ` : ''}
 
-<!-- Шапка справа -->
-<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+<!-- Шапка справа (слева QR «Проверить продавца» на бесплатных документах) -->
+<div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+  ${docQrHtml(data.showWatermark, 'nakladnaya', data.profile?.bin_iin, { compact: true }) || '<span></span>'}
   <div style="text-align:center;font-size:9px;line-height:1.5;">
     Приложение 26<br>
     к приказу Министра финансов<br>

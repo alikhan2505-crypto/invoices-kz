@@ -47,6 +47,7 @@ export interface KPData {
 import { resizeToFit } from './imageResize'
 import { docFitScript, docShareButtonHtml, docShareScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
+import { docQrHtml } from './docQr'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 import { kpStrings, kpUnitLabel, kpFileName, isKpLang, type KpLang } from './kpI18n'
 
@@ -497,6 +498,8 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         </div>
 
       </div>
+
+      ${docQrHtml(data.showWatermark, 'kp', data.profile?.bin_iin, { lang: lang, inset: 36 })}
 
       <!-- Footer -->
       <div class="footer">
