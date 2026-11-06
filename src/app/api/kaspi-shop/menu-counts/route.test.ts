@@ -75,6 +75,14 @@ describe('GET /api/kaspi-shop/menu-counts', () => {
     expect(body).toEqual({ orders: 5, refunds: null, pendingProducts: 2, sessionExpired: false })
   })
 
+  it('a failed orders/refunds call is null for that number even if it carries counts', async () => {
+    getOrderCounters.mockResolvedValue({ counts: { [WORKING_ORDER_STATUSES[0]]: 5 }, sessionExpired: false, failed: true })
+    getRefundCounts.mockResolvedValue({ counts: [{ tab: 'NEW', tabTitle: 'n', total: 2 }], sessionExpired: false, failed: true })
+    getPendingCountOrNull.mockResolvedValue({ count: 2, sessionExpired: false })
+    const body = await (await GET(req())).json()
+    expect(body).toEqual({ orders: null, refunds: null, pendingProducts: 2, sessionExpired: false })
+  })
+
   it('reports sessionExpired when the orders call says so', async () => {
     getOrderCounters.mockResolvedValue({ counts: {}, sessionExpired: true })
     getRefundCounts.mockResolvedValue({ counts: [], sessionExpired: true })

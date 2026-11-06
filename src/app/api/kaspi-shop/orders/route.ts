@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listOrders } from '@/lib/kaspiShop/cabinetApi'
+import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,7 +29,12 @@ export async function GET(req: NextRequest) {
   if (notPro) return notPro
 
   const status = req.nextUrl.searchParams.get('status') || 'NEW'
-  const page = Number(req.nextUrl.searchParams.get('page')) || 0
+  if (!ORDER_STATUS_TABS.some(t => t.value === status)) {
+    return NextResponse.json({ error: 'Некорректный статус' }, { status: 400 })
+  }
+  // Номер страницы: целое от 0 (мусор вроде -3 или 2.5 раньше уходил в Kaspi как есть).
+  const pageRaw = Number(req.nextUrl.searchParams.get('page'))
+  const page = Number.isInteger(pageRaw) && pageRaw >= 0 && pageRaw <= 1000 ? pageRaw : 0
   const cityId = req.nextUrl.searchParams.get('cityId') || ''
   const orderCode = req.nextUrl.searchParams.get('orderCode') || ''
 
@@ -37,8 +43,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const { orders, total, sessionExpired } = await listOrders(connection.sessionCookies, connection.merchantId, status, page, cityId, orderCode)
-  if (sessionExpired) await markSessionExpired(connection.id)
+  const { orders, total, sessionExpired, failed, error } = await listOrders(connection.sessionCookies, connection.merchantId, status, page, cityId, orderCode)
+  if (sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 502 })
+  }
+  // Сбой Kaspi (не-2xx, таймаут, неверная форма) -- это 502, а НЕ пустой список: иначе
+  // страница рисует «Заказов в этом статусе нет», а счётчик вкладки при этом показывает заказы.
+  if (failed) {
+    return NextResponse.json({ error: `Kaspi не отдал список заказов${error ? ` (${error})` : ''}. Повторите через минуту.`, sessionExpired: false }, { status: 502 })
+  }
 
   // Opportunistic image backfill for the storefront (/shop/[slug]) --
   // Kaspi's catalog/offer-details endpoints have never carried an image

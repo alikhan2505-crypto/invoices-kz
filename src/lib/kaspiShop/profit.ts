@@ -46,6 +46,9 @@ export type ProfitSummary = {
   netProfit: number
   truncated: boolean
   sessionExpired: boolean
+  // См. FinanceSummary.upstreamFailed: Kaspi не ответил на страницу заказов, выручка и
+  // прибыль неполные или неизвестны.
+  upstreamFailed: boolean
 }
 
 const REVENUE_STATUSES = ['KASPI_DELIVERY_TRANSMITTED', 'ARCHIVED']
@@ -64,6 +67,7 @@ export async function computeProfitSummary(
   const allOrders: Order[] = []
   let truncated = false
   let sessionExpired = false
+  let upstreamFailed = false
 
   statusLoop: for (const status of REVENUE_STATUSES) {
     let page = 0
@@ -73,6 +77,10 @@ export async function computeProfitSummary(
       const result = await listOrdersFn(sessionCookies, merchantId, status, page)
       if (result.sessionExpired) {
         sessionExpired = true
+        break statusLoop
+      }
+      if (result.failed) {
+        upstreamFailed = true
         break statusLoop
       }
       allOrders.push(...result.orders)
@@ -161,5 +169,6 @@ export async function computeProfitSummary(
     netProfit,
     truncated,
     sessionExpired,
+    upstreamFailed,
   }
 }

@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })
   }
 
-  const { counts, sessionExpired } = await getOrderCounters(connection.sessionCookies, connection.merchantId)
-  if (sessionExpired) await markSessionExpired(connection.id)
-  return NextResponse.json({ counts, sessionExpired })
+  const { counts, sessionExpired, failed, error } = await getOrderCounters(connection.sessionCookies, connection.merchantId)
+  if (sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 502 })
+  }
+  // Пустой counts при сбое раньше уходил как 200: Обзор показывал «0 в работе».
+  if (failed) {
+    return NextResponse.json({ error: `Kaspi не отдал счётчики заказов${error ? ` (${error})` : ''}`, sessionExpired: false }, { status: 502 })
+  }
+  return NextResponse.json({ counts, sessionExpired: false })
 }

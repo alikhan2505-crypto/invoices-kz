@@ -17,6 +17,8 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
+const MAX_CONFIRM_ORDERS = 200
+
 // The real cabinet's «Я упаковал, сформировать накладные»: confirms the
 // selected orders are packed, which is the action that actually generates
 // their накладные (Kaspi processes it asynchronously, ~5 minutes) and moves
@@ -37,9 +39,18 @@ export async function POST(req: NextRequest) {
   if (orders.length === 0) {
     return NextResponse.json({ error: 'orders обязателен и не должен быть пустым' }, { status: 400 })
   }
-  const parsed = orders.map(o => ({ orderCode: String(o?.orderCode ?? ''), quantity: Number(o?.quantity) || 0 }))
+  // Потолок на один запрос и жёсткая проверка полей: подтверждение упаковки двигает заказы
+  // в Передачу и запускает у Kaspi генерацию накладных, поэтому мусор сюда не пускаем.
+  if (orders.length > MAX_CONFIRM_ORDERS) {
+    return NextResponse.json({ error: `Не больше ${MAX_CONFIRM_ORDERS} заказов за один раз` }, { status: 400 })
+  }
+  const parsed = orders.map(o => ({ orderCode: typeof o?.orderCode === 'string' ? o.orderCode.trim() : '', quantity: Number(o?.quantity) }))
   if (parsed.some(o => !o.orderCode)) {
     return NextResponse.json({ error: 'Каждый заказ должен иметь orderCode' }, { status: 400 })
+  }
+  // quantity 0 раньше принималось и уходило в Kaspi (заказ без позиций).
+  if (parsed.some(o => !Number.isInteger(o.quantity) || o.quantity < 1)) {
+    return NextResponse.json({ error: 'У каждого заказа количество должно быть целым числом от 1' }, { status: 400 })
   }
 
   const connection = await loadConnection(user.id)
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest) {
   const result = await confirmPacking(connection.sessionCookies, connection.merchantId, parsed)
   if (result.sessionExpired) {
     await markSessionExpired(connection.id)
-    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 400 })
   }
   if (!result.success) {
     return NextResponse.json({ error: `Kaspi отклонил подтверждение упаковки: ${result.message}` }, { status: 502 })

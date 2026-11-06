@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { listCatalog, fetchCityNames, fetchOffersDetails, extractOfferPointInfo, totalStock } from './cabinetApi'
+import { listCatalogWithStatus, fetchCityNames, fetchOffersDetailsChecked, extractOfferPointInfo, totalStock } from './cabinetApi'
 import { saveConnection, loadConnectionByMerchant } from './connection'
 
 const supabase = createClient(
@@ -45,9 +45,9 @@ export async function finalizeConnection(
     }
   }
 
-  const imported = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
+  const result = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
   await seedCityNames(connection.id, sessionCookies, merchantId)
-  return { importedProducts: imported }
+  return { importedProducts: result.imported }
 }
 
 async function seedCityNames(connectionId: string, sessionCookies: string, merchantId: string) {
@@ -85,26 +85,57 @@ async function forEachConcurrent<T>(items: T[], limit: number, fn: (item: T) => 
   await Promise.all(workers)
 }
 
+// Итог импорта каталога. complete=true только если каталог прочитан до конца
+// и каждый товар записан: «Каталог обновлён: 0» при мёртвой сессии или обрыве
+// Kaspi был ложным успехом (аудит K22). Все поля вызывающий (роут sync) читает явно.
+export type ImportCatalogResult = {
+  imported: number
+  // Сколько товаров вернул Kaspi (для «обновлено N из M»).
+  total: number
+  // Товаров, которые не удалось записать в нашу базу.
+  skipped: number
+  complete: boolean
+  sessionExpired: boolean
+  // Города точек не обновлены (details ответили не на все товары): каталог при
+  // этом записан, старые point_city_codes сохранены.
+  pointCitiesPartial: boolean
+  error?: string
+}
+
 // The catalog-import loop, shared by finalizeConnection (connect-time) and
 // the on-demand «Обновить каталог» sync (2026-08-21: a product restored to
 // sale AFTER connect-time import was otherwise invisible in Демпинг until a
 // full reconnect). Never throws -- the connection itself being valid is not
-// contingent on a clean import.
-export async function importCatalogProducts(connectionId: string, userId: string, sessionCookies: string, merchantId: string): Promise<number> {
+// contingent on a clean import; a failure is reported in the result instead.
+export async function importCatalogProducts(connectionId: string, userId: string, sessionCookies: string, merchantId: string): Promise<ImportCatalogResult> {
   let imported = 0
+  let skipped = 0
+  let total = 0
+  let pointCitiesPartial = false
   try {
-    const offers = await listCatalog(sessionCookies, merchantId, true)
+    const list = await listCatalogWithStatus(sessionCookies, merchantId, true)
+    const offers = list.offers
+    total = offers.length
+    if (list.sessionExpired) {
+      return { imported: 0, total: 0, skipped: 0, complete: false, sessionExpired: true, pointCitiesPartial: false, error: list.error }
+    }
+    // Полный провал на первой странице: записывать нечего, а «0 товаров» говорить нельзя.
+    // Обрыв посередине импортирует то, что прочитано (повторный запуск безопасен: записи
+    // ищутся по kaspi_master_sku), но результат помечен как неполный.
 
-    // Point-city codes per sku, one batched details request for the whole
-    // catalog (the endpoint takes an sku array natively). Used as the
-    // automatic competitor-check cities when tracked cities aren't picked
-    // manually. Best-effort: a failed details fetch leaves the column
-    // empty and the check falls back to the legacy reference city.
+    // Point-city codes per sku, details in chunks of 50 (the endpoint takes an
+    // sku array natively). Used as the automatic competitor-check cities when
+    // tracked cities aren't picked manually. Best-effort, но СТРОГО по sku:
+    // point_city_codes существующего товара перезаписывается, только если кусок
+    // details с этим sku ответил (аудит K23: один сбой обнулял поле у всех товаров
+    // и возвращал авто-выбор городов к Алматы).
     const pointCitiesBySku = new Map<string, string[]>()
     try {
-      const detailsItems = await fetchOffersDetails(sessionCookies, merchantId, offers.map(o => o.sku))
-      for (const item of detailsItems) {
+      const details = await fetchOffersDetailsChecked(sessionCookies, merchantId, offers.map(o => o.sku))
+      if (!details.ok) pointCitiesPartial = true
+      for (const item of details.items) {
         if (typeof item.sku !== 'string') continue
+        if (!details.okSkus.has(item.sku)) continue
         const cityIds = Array.from(new Set(
           extractOfferPointInfo(item, merchantId)
             .map(i => i.cityId)
@@ -113,6 +144,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
         pointCitiesBySku.set(item.sku, cityIds)
       }
     } catch (err: any) {
+      pointCitiesPartial = true
       console.error('kaspi-shop importCatalogProducts: details batch failed (non-fatal, point cities skipped)', err.message)
     }
 
@@ -142,6 +174,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
         .maybeSingle()
       if (lookupError) {
         console.error('kaspi-shop finalizeConnection: failed to check for an existing row for', offer.sku, lookupError.message)
+        skipped += 1
         return
       }
 
@@ -155,7 +188,8 @@ export async function importCatalogProducts(connectionId: string, userId: string
             store_id: offer.points[0] || '',
             kaspi_brand: offer.brandName || offer.brandCode || null,
             kaspi_category: offer.masterCategory,
-            point_city_codes: pointCitiesBySku.get(offer.sku) || [],
+            // Только если details ответили по этому sku; иначе поле не трогаем.
+            ...(pointCitiesBySku.has(offer.sku) ? { point_city_codes: pointCitiesBySku.get(offer.sku) } : {}),
             // offers here always come from listCatalog(..., true) below --
             // being present in this refresh reconfirms Kaspi still lists it
             // as available, self-healing a product restored via Kaspi's own
@@ -170,6 +204,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           .eq('id', existing.id)
         if (updateError) {
           console.error('kaspi-shop finalizeConnection: failed to refresh existing offer', offer.sku, updateError.message)
+          skipped += 1
           return
         }
         imported += 1
@@ -201,6 +236,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
         .single()
       if (productError || !product) {
         console.error('kaspi-shop finalizeConnection: failed to import offer', offer.sku, productError?.message)
+        skipped += 1
         return
       }
 
@@ -230,15 +266,22 @@ export async function importCatalogProducts(connectionId: string, userId: string
       for (const offer of group) {
         try { await importOne(offer) } catch (err: any) {
           console.error('kaspi-shop importCatalogProducts: offer import threw', offer.sku, err?.message)
+          skipped += 1
         }
       }
     })
+    return {
+      imported, total, skipped,
+      complete: list.complete && skipped === 0,
+      sessionExpired: false,
+      pointCitiesPartial,
+      error: list.complete ? undefined : list.error,
+    }
   } catch (err: any) {
     // The connection itself is already saved and valid -- a partial or
     // failed catalog import is a recoverable follow-up, not a reason to
     // report the whole import call as failed.
     console.error('kaspi-shop importCatalogProducts: catalog import failed', err.message)
+    return { imported, total, skipped, complete: false, sessionExpired: false, pointCitiesPartial, error: err?.message || 'Не удалось обновить каталог' }
   }
-
-  return imported
 }

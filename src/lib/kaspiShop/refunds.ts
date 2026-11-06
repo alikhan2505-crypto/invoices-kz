@@ -24,6 +24,27 @@ function stripHtml(text: string): string {
   return text.replace(/<[^>]*>/g, '')
 }
 
+// Любой вызов Kaspi: таймаут и перехват сетевой ошибки, чтобы зависший или упавший
+// запрос был явным failed, а не исключением на всю страницу и не пустым «нулём»
+// (аудит K35). 401 и 403 читаются как мёртвая сессия.
+const REFUND_TIMEOUT_MS = 15_000
+
+type RefundFetch = { res: Response } | { failed: true; sessionExpired: boolean; error: string }
+
+async function refundFetch(fetchFn: typeof fetch, url: string, sessionCookies: string): Promise<RefundFetch> {
+  let res: Response
+  try {
+    res = await fetchFn(url, { headers: { ...COMMON_HEADERS, 'cookie': sessionCookies }, signal: AbortSignal.timeout(REFUND_TIMEOUT_MS) })
+  } catch (err) {
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    return { failed: true, sessionExpired: false, error: timedOut ? 'Kaspi не ответил вовремя' : (err instanceof Error ? err.message : 'Неизвестная ошибка') }
+  }
+  if (!res.ok) {
+    return { failed: true, sessionExpired: res.status === 401 || res.status === 403, error: `Kaspi ответил HTTP ${res.status}` }
+  }
+  return { res }
+}
+
 export const REFUND_TABS = ['NEW', 'ON_DELIVERY', 'WAITING_DECISION', 'DISPUTE', 'CLOSED'] as const
 export type RefundTab = typeof REFUND_TABS[number]
 
@@ -38,13 +59,12 @@ export async function getRefundCounts(
   sessionCookies: string,
   merchantId: string,
   fetchFn: typeof fetch = fetch
-): Promise<{ counts: RefundCount[]; sessionExpired: boolean }> {
-  const res = await fetchFn(`https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refunds-count?merchantId=${encodeURIComponent(merchantId)}`, {
-    headers: { ...COMMON_HEADERS, 'cookie': sessionCookies },
-  })
-  if (!res.ok) return { counts: [], sessionExpired: res.status === 401 || res.status === 403 }
-  const json = await res.json().catch(() => null)
-  return { counts: Array.isArray(json) ? json : [], sessionExpired: false }
+): Promise<{ counts: RefundCount[]; sessionExpired: boolean; failed?: boolean; error?: string }> {
+  const r = await refundFetch(fetchFn, `https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refunds-count?merchantId=${encodeURIComponent(merchantId)}`, sessionCookies)
+  if ('failed' in r) return { counts: [], sessionExpired: r.sessionExpired, failed: true, error: r.error }
+  const json = await r.res.json().catch(() => null)
+  if (!Array.isArray(json)) return { counts: [], sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+  return { counts: json, sessionExpired: false, failed: false }
 }
 
 export type RefundListItem = {
@@ -68,16 +88,15 @@ export async function listRefunds(
   tab: RefundTab,
   page: number,
   fetchFn: typeof fetch = fetch
-): Promise<{ refunds: RefundListItem[]; total: number; sessionExpired: boolean }> {
+): Promise<{ refunds: RefundListItem[]; total: number; sessionExpired: boolean; failed?: boolean; error?: string }> {
   if (!REFUND_TABS.includes(tab)) {
     throw new Error(`Invalid tab "${tab}" -- must be one of ${REFUND_TABS.join(', ')}`)
   }
-  const res = await fetchFn(`https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refunds-by-tab?merchantId=${encodeURIComponent(merchantId)}&tab=${tab}&p=${page}&s=10`, {
-    headers: { ...COMMON_HEADERS, 'cookie': sessionCookies },
-  })
-  if (!res.ok) return { refunds: [], total: 0, sessionExpired: res.status === 401 || res.status === 403 }
-  const json = await res.json().catch(() => null)
-  const items = Array.isArray(json?.data) ? json.data : []
+  const r = await refundFetch(fetchFn, `https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refunds-by-tab?merchantId=${encodeURIComponent(merchantId)}&tab=${tab}&p=${page}&s=10`, sessionCookies)
+  if ('failed' in r) return { refunds: [], total: 0, sessionExpired: r.sessionExpired, failed: true, error: r.error }
+  const json = await r.res.json().catch(() => null)
+  if (!Array.isArray(json?.data)) return { refunds: [], total: 0, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+  const items = json.data
   return {
     refunds: items.map((r: any) => ({
       refundId: r.refundId,
@@ -92,6 +111,7 @@ export async function listRefunds(
     })),
     total: Number(json?.total) || 0,
     sessionExpired: false,
+    failed: false,
   }
 }
 
@@ -131,13 +151,11 @@ export async function getRefundDetails(
   refundId: string,
   applicationNumber: string,
   fetchFn: typeof fetch = fetch
-): Promise<{ detail: RefundDetail | null; sessionExpired: boolean }> {
-  const res = await fetchFn(`https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refund-details?merchantId=${encodeURIComponent(merchantId)}&refundId=${encodeURIComponent(refundId)}&code=${encodeURIComponent(applicationNumber)}`, {
-    headers: { ...COMMON_HEADERS, 'cookie': sessionCookies },
-  })
-  if (!res.ok) return { detail: null, sessionExpired: res.status === 401 || res.status === 403 }
-  const json = await res.json().catch(() => null)
-  if (!json) return { detail: null, sessionExpired: false }
+): Promise<{ detail: RefundDetail | null; sessionExpired: boolean; failed?: boolean; error?: string }> {
+  const r = await refundFetch(fetchFn, `https://mc.shop.kaspi.kz/refund/api/v1/merchant-cabinet/load-refund-details?merchantId=${encodeURIComponent(merchantId)}&refundId=${encodeURIComponent(refundId)}&code=${encodeURIComponent(applicationNumber)}`, sessionCookies)
+  if ('failed' in r) return { detail: null, sessionExpired: r.sessionExpired, failed: true, error: r.error }
+  const json = await r.res.json().catch(() => null)
+  if (!json || typeof json !== 'object') return { detail: null, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
   return {
     detail: {
       refundId: json.refundId,
@@ -163,5 +181,6 @@ export async function getRefundDetails(
       imageUrls: Array.isArray(json.imageUrls) ? json.imageUrls : [],
     },
     sessionExpired: false,
+    failed: false,
   }
 }

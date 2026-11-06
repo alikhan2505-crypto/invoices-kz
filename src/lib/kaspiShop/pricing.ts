@@ -22,6 +22,12 @@ export type RepriceResult = {
 // UI control for v1 -- see docs/superpowers/specs/2026-08-15-kaspi-shop-max-pump-design.md.
 export const PUMP_TRIGGER_CYCLES = 3
 
+// Положительное конечное число (цена в тенге). NaN, Infinity, 0 и минус --
+// не цена: такие значения из базы или из ответа Kaspi движок не использует.
+function isPrice(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0
+}
+
 // Given the set of competitor prices already visible for one city (after
 // excluded cities/merchants have been filtered out by the caller -- this
 // function has no opinion on which competitors count, only what price to
@@ -29,20 +35,47 @@ export const PUMP_TRIGGER_CYCLES = 3
 // one of four strategies. Kaspi Shop v1 (2026-08-11) only had
 // undercut_leader against a single lowest price; v2 (2026-08-12) adds the
 // rest to match what competitor repricers (Northline, PriceFeed) expose.
+//
+// Инварианты результата (аудит Kaspi 06.11.2026, K6/K16/K17), в КАЖДОЙ ветке:
+//  - price -- конечное число > 0, никогда NaN;
+//  - price >= floorPrice (пол -- «ниже не опускаться»);
+//  - price <= maxPrice, если maxPrice задан и больше пола (потолок жёсткий:
+//    и против конкурента-«заглушки» за 99 999 ₸, и при удержании цены, и при
+//    памп/восстановлении). Потолок не выше пола (maxPrice <= floorPrice) --
+//    ошибка настройки, её сервер больше не принимает; такой потолок
+//    игнорируется, чтобы не прижать цену к полу насовсем.
+// Мусорные входы (NaN, 0, минус) отбрасываются: цены конкурентов -- из
+// списка, ownCurrentPrice -- как «нет текущей цены», undercutStep -- как 0.
+// Если сам пол не положительное число, цену менять нельзя: возвращаем
+// текущую (а при её отсутствии -- 1), checkCycle такой товар до расчёта не
+// пускает и в Kaspi ничего не отправляет.
 export function computeRepriceCandidate({
-  competitorPrices,
-  undercutStep,
-  floorPrice,
-  maxPrice,
+  competitorPrices: rawCompetitorPrices,
+  undercutStep: rawStep,
+  floorPrice: rawFloor,
+  maxPrice: rawMax,
   strategy = 'undercut_leader',
-  ownCurrentPrice,
+  ownCurrentPrice: rawOwn,
   noCompetitorStreak = 0,
 }: RepriceInput): RepriceResult {
+  const competitorPrices = rawCompetitorPrices.filter(isPrice)
+  const undercutStep = Number.isFinite(rawStep) && rawStep > 0 ? rawStep : 0
+  const ownCurrentPrice = isPrice(rawOwn) ? rawOwn : undefined
+  const streakBefore = Number.isFinite(noCompetitorStreak) ? noCompetitorStreak : 0
+
+  if (!isPrice(rawFloor)) {
+    // Без пола нет безопасного ответа -- держим то, что есть.
+    return { price: ownCurrentPrice ?? 1, heldAtFloor: false, newStreak: competitorPrices.length === 0 ? streakBefore + 1 : 0 }
+  }
+  const floorPrice = rawFloor
+  const ceiling = isPrice(rawMax) && rawMax > floorPrice ? rawMax : undefined
+  const capped = (price: number): number => (ceiling !== undefined ? Math.min(price, ceiling) : price)
+
   if (competitorPrices.length === 0) {
     // Every no-competitor cycle advances the streak, regardless of which
     // of the three cases below fires -- this is what Макс-памп counts
     // against PUMP_TRIGGER_CYCLES.
-    const newStreak = noCompetitorStreak + 1
+    const newStreak = streakBefore + 1
 
     // Auto-recovery from the floor ("автовыход из ямы минимальной цены")
     // takes priority over pumping: if we're still sitting at (or,
@@ -53,17 +86,17 @@ export function computeRepriceCandidate({
     // price history yet (first-ever check) still falls through to the plain
     // floor default below, not a recovery step.
     if (ownCurrentPrice !== undefined && ownCurrentPrice <= floorPrice) {
-      const recovered = ownCurrentPrice + undercutStep
+      // Текущая цена НИЖЕ пола (пол подняли или цену сбили руками): сразу
+      // на пол, а не ползком по шагу -- «ниже минимума» не должно держаться
+      // несколько циклов. Ровно на полу -- шаг вверх, как раньше.
+      const recovered = ownCurrentPrice < floorPrice ? floorPrice : ownCurrentPrice + undercutStep
       // Cap the recovery step at maxPrice too, same as the pump branch
       // below, so a tight maxPrice/floorPrice gap (undercutStep larger than
       // the room between them) can't strand the price permanently above the
       // seller's own ceiling -- the pump branch only ever climbs further
       // from there, nothing else brings it back down (final-review finding
-      // M1). Only applied when maxPrice is actually above the floor --
-      // capping against a misconfigured maxPrice at or below the floor
-      // would incorrectly drag the recovery price back down instead.
-      const price = maxPrice !== undefined && maxPrice > floorPrice ? Math.min(recovered, maxPrice) : recovered
-      return { price, heldAtFloor: false, newStreak }
+      // M1).
+      return { price: capped(recovered), heldAtFloor: false, newStreak }
     }
 
     // Макс-памп: sustained absence of competition (not just one blip)
@@ -72,18 +105,19 @@ export function computeRepriceCandidate({
     if (
       ownCurrentPrice !== undefined &&
       newStreak >= PUMP_TRIGGER_CYCLES &&
-      maxPrice !== undefined &&
-      ownCurrentPrice < maxPrice
+      ceiling !== undefined &&
+      ownCurrentPrice < ceiling
     ) {
-      return { price: Math.min(ownCurrentPrice + undercutStep, maxPrice), heldAtFloor: false, newStreak }
+      return { price: Math.min(ownCurrentPrice + undercutStep, ceiling), heldAtFloor: false, newStreak }
     }
 
     // No competitors to react to and not yet pumping -- hold at whatever
     // we're already at (or the floor if we have no current price to hold
     // at). Not flagged as heldAtFloor: that signal means "a competitor is
     // forcing us down to the floor", which isn't true when there's no
-    // competitor at all.
-    return { price: ownCurrentPrice ?? floorPrice, heldAtFloor: false, newStreak }
+    // competitor at all. Если текущая цена выше потолка (потолок опустили),
+    // держим потолок, а не старую цену.
+    return { price: capped(ownCurrentPrice ?? floorPrice), heldAtFloor: false, newStreak }
   }
 
   const sorted = [...competitorPrices].sort((a, b) => a - b)
@@ -108,13 +142,15 @@ export function computeRepriceCandidate({
     const tier = sorted.length > 1 ? sorted[1] : sorted[0]
     candidate = tier + undercutStep
   }
+  // Цены Kaspi -- целые тенге; дробный шаг не должен давать дробную цену.
+  candidate = Math.round(candidate)
 
   // A real competitor is present -- the pump/no-competitor streak always
   // resets here, this is the automatic "retreat" Макс-памп needs.
   if (candidate < floorPrice) {
     return { price: floorPrice, heldAtFloor: true, newStreak: 0 }
   }
-  return { price: candidate, heldAtFloor: false, newStreak: 0 }
+  return { price: capped(candidate), heldAtFloor: false, newStreak: 0 }
 }
 
 export type CompetitorOffer = { merchantId: string; price: number; merchantName?: string | null }

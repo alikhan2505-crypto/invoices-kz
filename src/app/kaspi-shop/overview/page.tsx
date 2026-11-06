@@ -50,6 +50,11 @@ export default function KaspiShopOverview() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   // Заказы не удалось получить из Kaspi (ответ с ошибкой, обрыв): без этого 0 и «нет заказов» выглядели как правда.
   const [ordersFailed, setOrdersFailed] = useState(false)
+  // Список «Заказы в работе» не получен (счётчики есть, а страницы заказов отдали сбой): пустая таблица
+  // не должна читаться как «заказов нет».
+  const [ordersListFailed, setOrdersListFailed] = useState(false)
+  // Прибыль не посчитана, потому что Kaspi не отдал заказы: «—» с причиной, а не 0 ₸.
+  const [profitFailed, setProfitFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -83,17 +88,22 @@ export default function KaspiShopOverview() {
 
       // The rest is read live from the Kaspi cabinet (a few seconds).
       fetch('/api/kaspi-shop/orders/counters', { headers })
-        .then((r) => (r.ok ? r.json() : null))
-        .then(async (d) => {
+        // Сбой приходит как 502 с телом {error, sessionExpired}: читаем тело и при !ok тоже.
+        .then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => null) }))
+        .then(async ({ ok, d }) => {
           if (!alive) return
           if (d?.sessionExpired) setSessionExpired(true)
-          if (!d) setOrdersFailed(true)
-          const c: Record<string, number> = d?.counts ?? {}
+          const c: Record<string, number> = ok && d?.counts ? d.counts : {}
+          // Пустой набор счётчиков, как и ответ с ошибкой, это «не знаем», а не «0 в работе» (аудит K36).
+          const failed = !ok || Object.keys(c).length === 0
+          if (failed) setOrdersFailed(true)
           setCounts(c)
+          if (failed) { setOrders([]); return }
           const active = WORKING_STATUSES.filter((s) => (c[s] ?? 0) > 0)
           const pages = await Promise.all(active.map((s) =>
             fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(s)}&page=0`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           ))
+          if (pages.some((p) => !p) && alive) setOrdersListFailed(true)
           const merged: OrderRow[] = pages.flatMap((p, i) => ((p?.orders ?? []) as OrderRow[]).map((o) => ({ ...o, tab: active[i] })))
           merged.sort((a, b) => new Date(b.creationTime).getTime() - new Date(a.creationTime).getTime())
           if (alive) setOrders(merged.slice(0, 5))
@@ -105,6 +115,8 @@ export default function KaspiShopOverview() {
         .then((d) => {
           if (!alive) return
           if (!d || d.sessionExpired) { setProfit(null); return }
+          // Kaspi не ответил на страницу заказов: выручка и прибыль неполные или неизвестны.
+          if (d.upstreamFailed) { setProfitFailed(true); setProfit(null); return }
           setProfit({ net: Number(d.netProfit) || 0, revenue: Number(d.totalRevenue) || 0, missingCogs: Number(d.productsWithoutCogsCount) || 0 })
         })
         .catch(() => { if (alive) setProfit(null) })
@@ -156,7 +168,7 @@ export default function KaspiShopOverview() {
             {kpi('Заказов в работе', ordersUnavailable ? '—' : inWork === null ? null : String(inWork),
               sessionExpired ? 'сессия Kaspi истекла' : ordersFailed ? 'не удалось получить из Kaspi' : counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
             {kpi('Дешевле конкурентов', winning === null || products === null ? null : `${winning} из ${products.length}`, atFloor === null ? '' : `упёрлись в минимум: ${atFloor}`)}
-            {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : 'после комиссии и расходов')}
+            {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : profitFailed ? 'не удалось получить заказы из Kaspi' : 'после комиссии и расходов')}
           </div>
 
           {/* xl+: таблица заказов слева, ссылки на соседние продукты колонкой справа (380px).
@@ -182,7 +194,7 @@ export default function KaspiShopOverview() {
                   )}
                   {orders !== null && orders.length === 0 && (
                     <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>
-                      {ordersUnavailable ? 'Заказы сейчас недоступны: нет связи с Kaspi' : 'Сейчас нет заказов в работе'}
+                      {ordersUnavailable || ordersListFailed ? 'Заказы сейчас недоступны: нет связи с Kaspi' : 'Сейчас нет заказов в работе'}
                     </td></tr>
                   )}
                   {orders?.map((o) => (
@@ -195,6 +207,11 @@ export default function KaspiShopOverview() {
                       <td className="px-4 py-3" style={{ color: 'var(--nav-text-secondary)' }}>{statusLabel(o.tab)}</td>
                     </tr>
                   ))}
+                  {orders !== null && orders.length > 0 && ordersListFailed && (
+                    <tr style={{ borderTop: '1px solid var(--nav-border)' }}><td colSpan={4} className="px-4 py-3 text-center text-xs" style={{ color: 'var(--nav-critical)' }}>
+                      Список неполный: часть заказов Kaspi не отдал
+                    </td></tr>
+                  )}
                 </tbody>
               </table>
             </div>

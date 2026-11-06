@@ -20,6 +20,10 @@ export type FinanceSummary = {
   bySize: AttributeSlice[]
   truncated: boolean
   sessionExpired: boolean
+  // Kaspi не ответил (не-2xx, таймаут, неверная форма) хотя бы на одной странице
+  // заказов: суммы выше посчитаны по неполным данным или не посчитаны вовсе, и
+  // экран обязан сказать об этом, а не показывать 0 ₸ / «заказов нет» (аудит K35).
+  upstreamFailed: boolean
 }
 
 export type BehavioralAnalytics = {
@@ -154,6 +158,7 @@ export async function computeFinanceSummary(
   const allOrders: Order[] = []
   let truncated = false
   let sessionExpired = false
+  let upstreamFailed = false
 
   statusLoop: for (const status of REVENUE_STATUSES) {
     let page = 0
@@ -165,6 +170,12 @@ export async function computeFinanceSummary(
         // A dead session won't recover mid-loop -- stop paginating
         // entirely rather than burning MAX_PAGES_PER_STATUS more 401s.
         sessionExpired = true
+        break statusLoop
+      }
+      if (result.failed) {
+        // Сбой страницы НЕ превращается в «заказов нет» и не затирает totalForStatus нулём:
+        // всё, что набрано, помечено как неполное. Дальше не листаем (Kaspi уже не отвечает).
+        upstreamFailed = true
         break statusLoop
       }
       allOrders.push(...result.orders)
@@ -198,5 +209,5 @@ export async function computeFinanceSummary(
   const abc = computeAbc(inWindow)
   const { byColor, bySize } = computeAttributeSlices(inWindow)
 
-  return { totalRevenue, orderCount, averageOrderValue, byDay, behavioral, abc, byColor, bySize, truncated, sessionExpired }
+  return { totalRevenue, orderCount, averageOrderValue, byDay, behavioral, abc, byColor, bySize, truncated, sessionExpired, upstreamFailed }
 }

@@ -11,6 +11,8 @@ import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
+import { planCityStockSaves, sameCityPriceMismatches } from '@/lib/kaspiShop/pointStockPlan'
+import { apiErrorMessage } from '@/lib/kaspiShop/dempingForm'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -75,6 +77,10 @@ type StockModalState = {
   model: string
   entries: StockEntry[]
   edits: Record<string, { price: string; stockCount: string }>
+  // что показали при загрузке: по нему определяем, какие точки реально изменены
+  initial: Record<string, { price: string; stockCount: string }>
+  // предупреждения плана сохранения (точки города получат одну цену)
+  warnings: string[]
   saving: boolean
   saved: boolean
 }
@@ -214,8 +220,23 @@ export default function KaspiShopProductAvailability() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+    // Сбой запроса не равен «не подключён»: при не-ok ответе или обрыве сети
+    // показываем ошибку с «Повторить», а не уводим подключённого продавца на
+    // обязательное окно подключения (аудит Kaspi 2026-11-06, K12).
+    let connRes: Response
+    try {
+      connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+    } catch {
+      setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
+      setLoading(false)
+      return
+    }
     const connData = await connRes.json().catch(() => null)
+    if (!connRes.ok) {
+      setLoadError(apiErrorMessage(connRes.status, connData, 'Не удалось проверить подключение к Kaspi. Попробуйте ещё раз.'))
+      setLoading(false)
+      return
+    }
     if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
 
     setLoadError('')
@@ -238,9 +259,15 @@ export default function KaspiShopProductAvailability() {
   }
 
   async function openStockModal(offer: Offer) {
-    setStockModal({ offer, loading: true, error: '', masterSku: null, model: '', entries: [], edits: {}, saving: false, saved: false })
+    setStockModal({ offer, loading: true, error: '', masterSku: null, model: '', entries: [], edits: {}, initial: {}, warnings: [], saving: false, saved: false })
     const headers = await authHeader()
-    const res = await fetch(`/api/kaspi-shop/offer-stocks?sku=${encodeURIComponent(offer.sku)}`, { headers })
+    let res: Response
+    try {
+      res = await fetch(`/api/kaspi-shop/offer-stocks?sku=${encodeURIComponent(offer.sku)}`, { headers })
+    } catch {
+      setStockModal(prev => prev ? { ...prev, loading: false, error: 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' } : prev)
+      return
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setStockModal(prev => prev ? { ...prev, loading: false, error: data.error || 'Не удалось загрузить данные точек' } : prev)
@@ -259,30 +286,50 @@ export default function KaspiShopProductAvailability() {
       masterSku: data.masterSku ?? null,
       model: data.model || offer.title,
       entries, edits,
+      initial: JSON.parse(JSON.stringify(edits)),
     } : prev)
+  }
+
+  // Цена в Kaspi хранится на ГОРОД, а модалка правит точки (склады). Поэтому
+  // уходят только реально изменённые точки, а у всех точек одного города цена в
+  // запросе одна и та же: раньше вторая точка города молча откатывала цену
+  // первой, а нетронутые точки отправлялись заново и тратили бюджет изменений
+  // (аудит Kaspi 2026-11-06, K24). Логика группировки: lib/kaspiShop/pointStockPlan.ts.
+  function currentStockPlan(m: StockModalState) {
+    return planCityStockSaves(m.entries.map(e => ({
+      storeCode: e.storeCode,
+      cityId: e.cityId,
+      cityName: e.cityName,
+      initialPrice: m.initial[e.storeCode]?.price ?? '',
+      price: m.edits[e.storeCode]?.price ?? '',
+      initialStock: m.initial[e.storeCode]?.stockCount ?? '',
+      stockCount: m.edits[e.storeCode]?.stockCount ?? '',
+    })))
   }
 
   async function saveStockModal() {
     if (!stockModal || stockModal.saving) return
-    const payloadEntries = stockModal.entries
-      .filter(e => e.cityId)
-      .map(e => ({
-        storeCode: e.storeCode,
-        cityId: e.cityId,
-        price: Number(stockModal.edits[e.storeCode]?.price),
-        stockCount: stockModal.edits[e.storeCode]?.stockCount.trim() === '' ? null : Number(stockModal.edits[e.storeCode]?.stockCount),
-      }))
-      .filter(e => Number.isFinite(e.price) && e.price > 0)
-    if (payloadEntries.length === 0) {
-      setStockModal(prev => prev ? { ...prev, error: 'Нет точек с городом и ценой — сохранять нечего.' } : prev)
+    const plan = currentStockPlan(stockModal)
+    if (plan.errors.length > 0) {
+      setStockModal(prev => prev ? { ...prev, error: plan.errors.join(' '), warnings: plan.warnings } : prev)
       return
     }
-    setStockModal(prev => prev ? { ...prev, saving: true, error: '' } : prev)
+    if (plan.entries.length === 0) {
+      setStockModal(prev => prev ? { ...prev, error: 'Вы ничего не изменили: отправлять нечего.', warnings: [] } : prev)
+      return
+    }
+    setStockModal(prev => prev ? { ...prev, saving: true, error: '', warnings: plan.warnings } : prev)
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/offer-stocks', {
-      method: 'POST', headers,
-      body: JSON.stringify({ sku: stockModal.offer.sku, masterSku: stockModal.masterSku, model: stockModal.model, entries: payloadEntries }),
-    })
+    let res: Response
+    try {
+      res = await fetch('/api/kaspi-shop/offer-stocks', {
+        method: 'POST', headers,
+        body: JSON.stringify({ sku: stockModal.offer.sku, masterSku: stockModal.masterSku, model: stockModal.model, entries: plan.entries }),
+      })
+    } catch {
+      setStockModal(prev => prev ? { ...prev, saving: false, error: 'Нет связи с сервером. Изменения могли не отправиться, откройте окно заново и проверьте.' } : prev)
+      return
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok || !data.ok) {
       const failMsg = (data.results || []).filter((r: any) => !r.ok).map((r: any) => `${r.storeCode}: ${r.message}`).join('; ')
@@ -839,7 +886,7 @@ export default function KaspiShopProductAvailability() {
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block">
                       <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена, ₸</span>
-                      <input type="number" disabled={!e.cityId}
+                      <input type="text" autoComplete="off" disabled={!e.cityId}
                         className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
                         style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
                         inputMode="decimal" value={stockModal.edits[e.storeCode]?.price ?? ''}
@@ -857,7 +904,17 @@ export default function KaspiShopProductAvailability() {
                 </div>
               ))}
 
-              {stockModal.error && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-critical)' }}>{stockModal.error}</div>}
+              {/* Цена в Kaspi одна на город: если у точек одного города сейчас разные цены,
+                  говорим, что после сохранения у всех будет одна (K24). */}
+              {sameCityPriceMismatches(stockModal.entries.map(e => ({ cityId: e.cityId, cityName: e.cityName, price: stockModal.edits[e.storeCode]?.price ?? '' }))).map(m => (
+                <div key={m.cityId} data-testid="city-price-warning" className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-warning)' }}>
+                  {`${m.cityName}: у точек разные цены (${m.prices.map(n => n.toLocaleString('ru-KZ')).join(' и ')} ₸), а в Kaspi цена одна на весь город. Укажите одинаковую: иначе применится только одна из них.`}
+                </div>
+              ))}
+              {stockModal.warnings.map(w => (
+                <div key={w} className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-warning)' }}>{w}</div>
+              ))}
+              {stockModal.error && <div className="text-xs mt-2 mb-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{stockModal.error}</div>}
               {stockModal.saved && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-success)' }}>Отправлено — Kaspi применит изменения в течение часа.</div>}
 
               {stockModal.entries.some(e => e.cityId) && (

@@ -21,20 +21,30 @@ export async function GET(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const balance = await getKaspiShopWalletBalance(user.id)
-  const { data: connection } = await supabase
-    .from('kaspi_shop_connections')
-    .select('paused, session_status, company_name, tracked_city_codes, city_lookup_cache')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
-  return NextResponse.json({
-    balance,
-    connected: !!connection,
-    paused: connection?.paused ?? false,
-    sessionStatus: connection?.session_status ?? null,
-    companyName: connection?.company_name ?? null,
-    trackedCityCodes: connection?.tracked_city_codes ?? [],
-    cityLookupCache: connection?.city_lookup_cache ?? {},
-  })
+  // Сбой базы не должен превращаться ни в «не подключён» (страница Демпинг по
+  // connected:false показывает обязательное окно подключения живому продавцу),
+  // ни в необработанное исключение без тела: отвечаем честным 500 с JSON, а
+  // страница показывает ошибку с кнопкой «Повторить» (аудит Kaspi 2026-11-06, K12).
+  try {
+    const balance = await getKaspiShopWalletBalance(user.id)
+    const { data: connection, error: connectionError } = await supabase
+      .from('kaspi_shop_connections')
+      .select('paused, session_status, company_name, tracked_city_codes, city_lookup_cache')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (connectionError) throw new Error(connectionError.message)
+    return NextResponse.json({
+      balance,
+      connected: !!connection,
+      paused: connection?.paused ?? false,
+      sessionStatus: connection?.session_status ?? null,
+      companyName: connection?.company_name ?? null,
+      trackedCityCodes: connection?.tracked_city_codes ?? [],
+      cityLookupCache: connection?.city_lookup_cache ?? {},
+    })
+  } catch (err: any) {
+    console.error('kaspi-shop wallet GET failed:', err?.message)
+    return NextResponse.json({ error: 'Не удалось загрузить баланс и подключение. Попробуйте ещё раз.' }, { status: 500 })
+  }
 }

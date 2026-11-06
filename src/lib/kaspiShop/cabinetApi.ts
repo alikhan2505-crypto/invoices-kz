@@ -22,11 +22,31 @@ export function authHeaders(sessionCookies: string): Record<string, string> {
 // kaspi_shop_connections.session_status, which forces a full phone+OTP
 // reconnect -- expensive to be wrong about, cheap to double-check. One retry
 // after a short pause is enough to filter that case out before committing.
+//
+// 403 is treated like 401 (аудит 2026-11-06): на этих кабинетных адресах Kaspi
+// отвечает 403 так же, как 401, когда cookies больше не годятся, и остальной
+// код модуля (listCatalogWithStatus, confirmPacking) уже читает их одинаково.
+// Каждая попытка получает свой AbortSignal.timeout: зависший ответ Kaspi не
+// держит функцию Vercel до её лимита.
+const CABINET_TIMEOUT_MS = 20_000
+
+export function isAuthFailureStatus(status: number): boolean {
+  return status === 401 || status === 403
+}
+
 async function fetchWithRetryOn401(url: string, init: RequestInit, fetchFn: typeof fetch): Promise<Response> {
-  const res = await fetchFn(url, init)
-  if (res.status !== 401) return res
+  const attempt = () => fetchFn(url, { ...init, signal: init.signal ?? AbortSignal.timeout(CABINET_TIMEOUT_MS) })
+  const res = await attempt()
+  if (!isAuthFailureStatus(res.status)) return res
   await new Promise(r => setTimeout(r, 500))
-  return fetchFn(url, init)
+  return attempt()
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.name === 'TimeoutError' || err.name === 'AbortError' ? 'Kaspi не ответил вовремя' : err.message
+  }
+  return 'Неизвестная ошибка'
 }
 
 // Confirmed live 2026-08-13: this is the same call the real cabinet's own
@@ -82,28 +102,36 @@ export async function getMerchantInfo(sessionCookies: string, merchantId: string
 // real names instead of raw Kaspi city codes; never throws -- returns {} on
 // any non-ok response or unexpected shape, since a cache refresh must never
 // block saving the seller's city selection.
-export async function fetchCityNames(sessionCookies: string, _merchantId: string): Promise<Record<string, string>> {
+export async function fetchCityNames(sessionCookies: string, merchantId: string): Promise<Record<string, string>> {
+  return (await fetchCityNamesChecked(sessionCookies, merchantId)).names
+}
+
+// Тот же запрос, но с признаком «ответ получен и в нём есть города»: кэш точек
+// (merchantPoints.ts) не должен навсегда запоминать точки без названий городов
+// только потому, что getCities один раз ответил ошибкой.
+export async function fetchCityNamesChecked(sessionCookies: string, _merchantId: string, fetchFn: typeof fetch = fetch): Promise<{ names: Record<string, string>; ok: boolean }> {
   try {
-    const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getCities', {
+    const res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getCities', {
       method: 'POST',
       headers: authHeaders(sessionCookies),
+      signal: AbortSignal.timeout(CABINET_TIMEOUT_MS),
       body: JSON.stringify({
         operationName: 'getCities',
         variables: {},
         query: `query getCities { cities { id name } }`,
       }),
     })
-    if (!res.ok) return {}
+    if (!res.ok) return { names: {}, ok: false }
     const json = await res.json().catch(() => null)
     const cities = json?.data?.cities
-    if (!Array.isArray(cities)) return {}
+    if (!Array.isArray(cities)) return { names: {}, ok: false }
     const result: Record<string, string> = {}
     for (const c of cities) {
       if (c?.id && c?.name) result[String(c.id)] = String(c.name)
     }
-    return result
+    return { names: result, ok: Object.keys(result).length > 0 }
   } catch {
-    return {}
+    return { names: {}, ok: false }
   }
 }
 
@@ -139,16 +167,62 @@ export async function fetchOfferDetails(sessionCookies: string, merchantId: stri
 // (the very first capture posted {sku:["..."]}), so a whole page of offers
 // costs one request instead of one per product.
 export async function fetchOffersDetails(sessionCookies: string, merchantId: string, skus: string[]): Promise<Record<string, any>[]> {
-  if (skus.length === 0) return []
-  const res = await fetch(`https://mc.shop.kaspi.kz/offers/api/v1/offer/details?m=${encodeURIComponent(merchantId)}`, {
-    method: 'POST',
-    headers: authHeaders(sessionCookies),
-    body: JSON.stringify({ sku: skus }),
-  })
-  if (!res.ok) return []
-  const json = await res.json().catch(() => null)
-  const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
-  return arr.filter((item: any) => item && typeof item === 'object')
+  return (await fetchOffersDetailsChecked(sessionCookies, merchantId, skus)).items
+}
+
+// Сколько sku уходит в один запрос details. Раньше весь каталог (до сотен
+// товаров) шёл ОДНИМ POST: один сбой или слишком большое тело обнуляло данные
+// по всем товарам сразу (аудит K23).
+export const DETAILS_CHUNK_SIZE = 50
+
+export type OffersDetailsResult = {
+  items: Record<string, any>[]
+  // sku, чей кусок запроса Kaspi принял (ответ 2xx и разобранный массив). Если sku
+  // тут нет, мы НЕ знаем его точек: вызывающий не должен затирать то, что уже
+  // записано, пустым значением.
+  okSkus: Set<string>
+  // true только если ответили все куски.
+  ok: boolean
+  sessionExpired: boolean
+  error?: string
+}
+
+export async function fetchOffersDetailsChecked(
+  sessionCookies: string,
+  merchantId: string,
+  skus: string[],
+  fetchFn: typeof fetch = fetch,
+): Promise<OffersDetailsResult> {
+  const result: OffersDetailsResult = { items: [], okSkus: new Set(), ok: true, sessionExpired: false }
+  if (skus.length === 0) return result
+  for (let i = 0; i < skus.length; i += DETAILS_CHUNK_SIZE) {
+    const chunk = skus.slice(i, i + DETAILS_CHUNK_SIZE)
+    try {
+      const res = await fetchFn(`https://mc.shop.kaspi.kz/offers/api/v1/offer/details?m=${encodeURIComponent(merchantId)}`, {
+        method: 'POST',
+        headers: authHeaders(sessionCookies),
+        signal: AbortSignal.timeout(CABINET_TIMEOUT_MS),
+        body: JSON.stringify({ sku: chunk }),
+      })
+      if (isAuthFailureStatus(res.status)) {
+        // Мёртвая сессия не оживёт на следующем куске.
+        result.ok = false
+        result.sessionExpired = true
+        result.error = 'Сессия кабинета Kaspi истекла'
+        return result
+      }
+      if (!res.ok) { result.ok = false; result.error = `Kaspi ответил HTTP ${res.status}`; continue }
+      const json = await res.json().catch(() => null)
+      const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : null)
+      if (!arr) { result.ok = false; result.error = 'Kaspi вернул неожиданный ответ'; continue }
+      result.items.push(...arr.filter((item: any) => item && typeof item === 'object'))
+      for (const sku of chunk) result.okSkus.add(sku)
+    } catch (err) {
+      result.ok = false
+      result.error = errorMessage(err)
+    }
+  }
+  return result
 }
 
 export type OfferPointInfo = {
@@ -225,21 +299,58 @@ export function extractOfferPointInfo(details: any, merchantId: string): OfferPo
 // established 401 pattern (see getOrderCounters) -- previously a dead
 // session silently produced an EMPTY catalog, which read as "0 товаров"
 // in the UI instead of "переподключитесь" (bitten live 2026-08-21).
-export async function listCatalogWithStatus(sessionCookies: string, merchantId: string, available = true): Promise<{ offers: CatalogOffer[]; sessionExpired: boolean }> {
+// Результат чтения каталога. complete=true означает «дошли до последней
+// страницы и каждая ответила нормально». Любой сбой (не-2xx, неожиданная форма,
+// таймаут, потолок страниц) даёт complete=false + failed=true: пустой или
+// короткий список тогда НЕ значит «товаров нет» (аудит K22: «Каталог обновлён: 0»,
+// «Все товары в продаже» при обрыве).
+export type CatalogListResult = {
+  offers: CatalogOffer[]
+  sessionExpired: boolean
+  complete: boolean
+  failed: boolean
+  error?: string
+}
+
+// Потолок страниц: если Kaspi вдруг перестанет учитывать p, цикл не бесконечен
+// (500 страниц по 100 = 50 000 товаров, далеко за любым реальным каталогом).
+export const CATALOG_MAX_PAGES = 500
+
+export async function listCatalogWithStatus(
+  sessionCookies: string,
+  merchantId: string,
+  available = true,
+  fetchFn: typeof fetch = fetch,
+): Promise<CatalogListResult> {
   const offers: CatalogOffer[] = []
   const pageSize = 100
-  let page = 0
-  while (true) {
+  const seen = new Set<string>()
+  const failedResult = (error: string, sessionExpired = false): CatalogListResult =>
+    ({ offers, sessionExpired, complete: false, failed: true, error })
+
+  for (let page = 0; page < CATALOG_MAX_PAGES; page++) {
     const url = `https://mc.shop.kaspi.kz/bff/offer-view/list?m=${encodeURIComponent(merchantId)}&p=${page}&l=${pageSize}&a=${available}`
-    const res = await fetch(url, { headers: authHeaders(sessionCookies) })
-    if (res.status === 401 || res.status === 403) {
-      return { offers, sessionExpired: true }
+    let res: Response
+    try {
+      res = await fetchFn(url, { headers: authHeaders(sessionCookies), signal: AbortSignal.timeout(CABINET_TIMEOUT_MS) })
+    } catch (err) {
+      return failedResult(errorMessage(err))
     }
-    if (!res.ok) break
+    if (isAuthFailureStatus(res.status)) {
+      return failedResult('Сессия кабинета Kaspi истекла', true)
+    }
+    if (!res.ok) return failedResult(`Kaspi ответил HTTP ${res.status}`)
     const json = await res.json().catch(() => null)
     const data = json?.data
-    if (!Array.isArray(data) || data.length === 0) break
+    if (!Array.isArray(data)) return failedResult('Kaspi вернул неожиданный ответ')
+    if (data.length === 0) return { offers, sessionExpired: false, complete: true, failed: false }
+    // Kaspi проигнорировал p и отдаёт ту же страницу снова: дальше листать нечего,
+    // а полным такой список считать нельзя.
+    if (page > 0 && data.every((item: any) => typeof item?.sku === 'string' && seen.has(item.sku))) {
+      return failedResult('Kaspi не переключает страницы каталога')
+    }
     for (const item of data) {
+      if (typeof item?.sku === 'string') seen.add(item.sku)
       offers.push({
         sku: item.sku,
         masterSku: item.masterSku ?? null,
@@ -261,10 +372,9 @@ export async function listCatalogWithStatus(sessionCookies: string, merchantId: 
           : [],
       })
     }
-    if (data.length < pageSize) break
-    page += 1
+    if (data.length < pageSize) return { offers, sessionExpired: false, complete: true, failed: false }
   }
-  return { offers, sessionExpired: false }
+  return failedResult(`Каталог длиннее ${CATALOG_MAX_PAGES} страниц, остановились на потолке`)
 }
 
 export async function listCatalog(sessionCookies: string, merchantId: string, available = true): Promise<CatalogOffer[]> {
@@ -286,33 +396,53 @@ export type MerchantPoint = { storeCode: string; cityId: string | null; cityName
 // extractPointCity's comment). Callers should cache this (it scans the
 // whole catalog) -- see merchantPoints.ts's getCachedMerchantPoints.
 export async function getMerchantPoints(sessionCookies: string, merchantId: string): Promise<MerchantPoint[]> {
+  return (await getMerchantPointsDetailed(sessionCookies, merchantId)).points
+}
+
+// То же, но с признаком полноты: complete=true только если оба каталога дочитаны
+// до конца, details ответили на всё и справочник городов получен. Кэш точек
+// (merchantPoints.ts) пишется только при complete (аудит, минор по Заказам:
+// частичный результат запоминался навсегда, и список городов оставался пустым).
+export async function getMerchantPointsDetailed(
+  sessionCookies: string,
+  merchantId: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ points: MerchantPoint[]; complete: boolean; sessionExpired: boolean }> {
   const [activeRes, removedRes] = await Promise.all([
-    listCatalogWithStatus(sessionCookies, merchantId, true),
-    listCatalogWithStatus(sessionCookies, merchantId, false),
+    listCatalogWithStatus(sessionCookies, merchantId, true, fetchFn),
+    listCatalogWithStatus(sessionCookies, merchantId, false, fetchFn),
   ])
   const allOffers = [...activeRes.offers, ...removedRes.offers]
+  let complete = activeRes.complete && removedRes.complete
+  const sessionExpired = activeRes.sessionExpired || removedRes.sessionExpired
 
   const codes = new Set<string>()
   for (const offer of allOffers) for (const code of offer.points) codes.add(code)
 
   const cityByCode = new Map<string, string>()
   try {
-    const detailsItems = await fetchOffersDetails(sessionCookies, merchantId, allOffers.map(o => o.sku))
-    for (const item of detailsItems) {
+    const details = await fetchOffersDetailsChecked(sessionCookies, merchantId, allOffers.map(o => o.sku), fetchFn)
+    if (!details.ok) complete = false
+    for (const item of details.items) {
       for (const info of extractOfferPointInfo(item, merchantId)) {
         codes.add(info.storeCode)
         if (info.cityId) cityByCode.set(info.storeCode, info.cityId)
       }
     }
   } catch (err: any) {
+    complete = false
     console.error('kaspi-shop getMerchantPoints: details batch failed (non-fatal, points show no city)', err.message)
   }
 
-  const cityCatalog = await fetchCityNames(sessionCookies, merchantId)
-  return Array.from(codes).map(storeCode => {
+  const cityCatalog = await fetchCityNamesChecked(sessionCookies, merchantId, fetchFn)
+  if (!cityCatalog.ok) complete = false
+  const points = Array.from(codes).map(storeCode => {
     const cityId = cityByCode.get(storeCode) || null
-    return { storeCode, cityId, cityName: cityId ? (cityCatalog[cityId] || null) : null }
+    return { storeCode, cityId, cityName: cityId ? (cityCatalog.names[cityId] || null) : null }
   })
+  // Нет ни одной точки: это не «у магазина нет точек», а пустой результат, который нельзя запоминать.
+  if (points.length === 0) complete = false
+  return { points, complete, sessionExpired }
 }
 
 // Real query/variables/response shape confirmed live 2026-08-13 (see
@@ -425,6 +555,8 @@ export type OrderDetail = {
   customerFirstName: string
   customerLastName: string
   cityName: string | null
+  // Город покупателя (куда едет заказ); cityName выше это город точки продавца.
+  destinationCityName?: string | null
   plannedDeliveryDate: string | null
   items: OrderItem[]
 }
@@ -457,30 +589,65 @@ const GET_ORDER_DETAILS_QUERY = `query getOrderDetails($merchantUid: String!, $o
   }
 }`
 
-export async function getOrderDetail(sessionCookies: string, merchantId: string, orderCode: string): Promise<OrderDetail | null> {
-  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderDetails', {
-    method: 'POST',
-    headers: authHeaders(sessionCookies),
-    body: JSON.stringify({
-      operationName: 'getOrderDetails',
-      variables: { merchantUid: merchantId, orderCode, skipCustomerPhone: true },
-      query: GET_ORDER_DETAILS_QUERY,
-    }),
-  })
-  if (!res.ok) return null
-  const json = await res.json().catch(() => null)
-  const d = json?.data?.merchant?.orderDetail
-  if (!d) return null
-  return {
-    code: d.code,
-    status: d.status,
-    creationTime: d.creationTime,
-    totalPrice: Number(d.totalPrice) || 0,
-    customerFirstName: d.customer?.firstName ?? '',
-    customerLastName: d.customer?.lastName ?? '',
-    cityName: d.destination?.city?.name ?? d.warehouse?.city?.name ?? null,
-    plannedDeliveryDate: d.delivery?.plannedDeliveryDate ?? null,
-    items: mapOrderItems(d.entries),
+// order=null здесь значит «Kaspi ответил, такого заказа нет». Сбой запроса
+// (не-2xx, таймаут, неверная форма) и мёртвая сессия различаются флагами, чтобы
+// маршрут не отвечал «Заказ не найден» на протухшую сессию (аудит, минор по Заказам).
+export type OrderDetailResult = {
+  order: OrderDetail | null
+  sessionExpired: boolean
+  failed: boolean
+  error?: string
+}
+
+export async function getOrderDetail(
+  sessionCookies: string,
+  merchantId: string,
+  orderCode: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<OrderDetailResult> {
+  try {
+    const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderDetails', {
+      method: 'POST',
+      headers: authHeaders(sessionCookies),
+      body: JSON.stringify({
+        operationName: 'getOrderDetails',
+        variables: { merchantUid: merchantId, orderCode, skipCustomerPhone: true },
+        query: GET_ORDER_DETAILS_QUERY,
+      }),
+    }, fetchFn)
+    if (isAuthFailureStatus(res.status)) {
+      return { order: null, sessionExpired: true, failed: true, error: 'Сессия кабинета Kaspi истекла' }
+    }
+    if (!res.ok) return { order: null, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+    const json = await res.json().catch(() => null)
+    const merchant = json?.data?.merchant
+    if (!merchant || typeof merchant !== 'object') {
+      return { order: null, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+    }
+    const d = merchant.orderDetail
+    if (!d) return { order: null, sessionExpired: false, failed: false }
+    return {
+      sessionExpired: false,
+      failed: false,
+      order: {
+        code: d.code,
+        status: d.status,
+        creationTime: d.creationTime,
+        totalPrice: Number(d.totalPrice) || 0,
+        customerFirstName: d.customer?.firstName ?? '',
+        customerLastName: d.customer?.lastName ?? '',
+        // Один источник города на всех экранах: город ТОЧКИ продавца (warehouse), как в
+        // списке заказов и в Excel (extractPointCity). Раньше здесь первым шёл город
+        // покупателя (destination), и заказ на Астану со склада в Шымкенте на странице
+        // заказа был «Астана», а в Excel «Шымкент». Город покупателя вынесен отдельно.
+        cityName: d.warehouse?.city?.name ?? d.destination?.city?.name ?? null,
+        destinationCityName: d.destination?.city?.name ?? null,
+        plannedDeliveryDate: d.delivery?.plannedDeliveryDate ?? null,
+        items: mapOrderItems(d.entries),
+      },
+    }
+  } catch (err) {
+    return { order: null, sessionExpired: false, failed: true, error: errorMessage(err) }
   }
 }
 
@@ -489,7 +656,7 @@ export async function getOrderDetail(sessionCookies: string, merchantId: string,
 // than fetching every status's full order list just to show counts.
 export type OrderCounts = Record<string, number>
 
-// sessionExpired is specifically res.status === 401 -- Kaspi's real
+// sessionExpired is res.status 401/403 (after one retry) -- Kaspi's real
 // signal that mc-session/mc-sid are no longer valid, distinct from any
 // other upstream failure (network error, unexpected shape). Callers use
 // this to write kaspi_shop_connections.session_status via
@@ -497,7 +664,9 @@ export type OrderCounts = Record<string, number>
 // that column by /api/kaspi-shop/wallet) reflects reality promptly
 // instead of only updating when the repricer's own price-push cron
 // happens to hit the same 401 (which never runs for a paused connection).
-export type OrderCountersResult = { counts: OrderCounts; sessionExpired: boolean }
+// failed (аудит K36): любой сбой, включая мёртвую сессию -- пустой counts при
+// failed это «не знаем», а не «заказов нет».
+export type OrderCountersResult = { counts: OrderCounts; sessionExpired: boolean; failed?: boolean; error?: string }
 
 const GET_ORDER_COUNTERS_QUERY = `query getOrderCounters($merchantUid: String!) {
   merchant(id: $merchantUid) {
@@ -506,26 +675,30 @@ const GET_ORDER_COUNTERS_QUERY = `query getOrderCounters($merchantUid: String!) 
 }`
 
 export async function getOrderCounters(sessionCookies: string, merchantId: string, fetchFn: typeof fetch = fetch): Promise<OrderCountersResult> {
-  const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
-    method: 'POST',
-    headers: authHeaders(sessionCookies),
-    body: JSON.stringify({
-      operationName: 'getOrderCounters',
-      variables: { merchantUid: merchantId },
-      query: GET_ORDER_COUNTERS_QUERY,
-    }),
-  }, fetchFn)
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => '')
-    console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
-    return { counts: {}, sessionExpired: res.status === 401 }
+  try {
+    const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
+      method: 'POST',
+      headers: authHeaders(sessionCookies),
+      body: JSON.stringify({
+        operationName: 'getOrderCounters',
+        variables: { merchantUid: merchantId },
+        query: GET_ORDER_COUNTERS_QUERY,
+      }),
+    }, fetchFn)
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '')
+      console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
+      return { counts: {}, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+    }
+    const json = await res.json().catch(() => null)
+    const counts = json?.data?.merchant?.orders?.counts
+    if (!Array.isArray(counts)) return { counts: {}, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+    const result: OrderCounts = {}
+    for (const c of counts) result[c.tab] = c.count
+    return { counts: result, sessionExpired: false, failed: false }
+  } catch (err) {
+    return { counts: {}, sessionExpired: false, failed: true, error: errorMessage(err) }
   }
-  const json = await res.json().catch(() => null)
-  const counts = json?.data?.merchant?.orders?.counts
-  if (!Array.isArray(counts)) return { counts: {}, sessionExpired: false }
-  const result: OrderCounts = {}
-  for (const c of counts) result[c.tab] = c.count
-  return { counts: result, sessionExpired: false }
 }
 
 // Sum of a catalog offer's real per-point stock. Kaspi reports stock per
@@ -535,7 +708,11 @@ export function totalStock(offer: { availabilities: { stockCount: number | null 
   return offer.availabilities.reduce((sum, a) => sum + (a.stockCount ?? 0), 0)
 }
 
-export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boolean }
+// failed (аудит K3/K35): страница НЕ получена (не-2xx, таймаут, неверная форма,
+// мёртвая сессия). Тогда orders=[] и total=0 -- это «не знаем», а не «заказов нет»;
+// ни одна часть системы не должна показывать это как честный ноль или считать
+// выручку по такому ответу.
+export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boolean; failed?: boolean; error?: string }
 
 // size MUST stay at 10 -- confirmed live 2026-08-13: the real cabinet's own
 // SPA always requests size:10, and requesting size:50 (an earlier,
@@ -561,50 +738,56 @@ export async function listOrders(
   // confirmed shape captured live 2026-08-13, see
   // docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md).
   const searching = orderCode.trim().length > 0
-  const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
-    method: 'POST',
-    headers: authHeaders(sessionCookies),
-    body: JSON.stringify({
-      operationName: 'getOrders',
-      variables: {
-        merchantUid: merchantId,
-        size: PAGE_SIZE,
-        page,
-        input: { presetFilter: status, orderCode: '', cityId },
-        advancedInput: { orderCode: searching ? orderCode.trim() : '', phoneNumber: '', productCode: '' },
-        withAdvancedOrders: searching,
-      },
-      query: GET_ORDERS_QUERY,
-    }),
-  }, fetchFn)
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => '')
-    console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))
-    return { orders: [], total: 0, sessionExpired: res.status === 401 }
-  }
-  const json = await res.json().catch(() => null)
-  // @skip/@include on the two branches means only one of orders/advancedOrders
-  // is present in the response, depending on withAdvancedOrders above.
-  const page_ = searching ? json?.data?.merchant?.orders?.advancedOrders : json?.data?.merchant?.orders?.orders
-  const orders = page_?.orders
-  if (!Array.isArray(orders)) {
-    console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))
-    return { orders: [], total: 0, sessionExpired: false }
-  }
-  return {
-    total: Number(page_.total) || 0,
-    sessionExpired: false,
-    orders: orders.map((o: any) => ({
-      code: o.code,
-      status: o.status,
-      customerFirstName: o.customer?.firstName ?? '',
-      customerLastName: o.customer?.lastName ?? '',
-      totalPrice: Number(o.totalPrice) || 0,
-      creationTime: o.creationTime,
-      ...extractPointCity(o.warehouse),
-      plannedDeliveryDate: o.delivery?.plannedDeliveryDate ?? null,
-      items: mapOrderItems(o.entries),
-    })),
+  try {
+    const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
+      method: 'POST',
+      headers: authHeaders(sessionCookies),
+      body: JSON.stringify({
+        operationName: 'getOrders',
+        variables: {
+          merchantUid: merchantId,
+          size: PAGE_SIZE,
+          page,
+          input: { presetFilter: status, orderCode: '', cityId },
+          advancedInput: { orderCode: searching ? orderCode.trim() : '', phoneNumber: '', productCode: '' },
+          withAdvancedOrders: searching,
+        },
+        query: GET_ORDERS_QUERY,
+      }),
+    }, fetchFn)
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '')
+      console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))
+      return { orders: [], total: 0, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+    }
+    const json = await res.json().catch(() => null)
+    // @skip/@include on the two branches means only one of orders/advancedOrders
+    // is present in the response, depending on withAdvancedOrders above.
+    const page_ = searching ? json?.data?.merchant?.orders?.advancedOrders : json?.data?.merchant?.orders?.orders
+    const orders = page_?.orders
+    if (!Array.isArray(orders)) {
+      console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))
+      return { orders: [], total: 0, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+    }
+    return {
+      total: Number(page_.total) || 0,
+      sessionExpired: false,
+      failed: false,
+      orders: orders.map((o: any) => ({
+        code: o.code,
+        status: o.status,
+        customerFirstName: o.customer?.firstName ?? '',
+        customerLastName: o.customer?.lastName ?? '',
+        totalPrice: Number(o.totalPrice) || 0,
+        creationTime: o.creationTime,
+        ...extractPointCity(o.warehouse),
+        plannedDeliveryDate: o.delivery?.plannedDeliveryDate ?? null,
+        items: mapOrderItems(o.entries),
+      })),
+    }
+  } catch (err) {
+    console.error('kaspi-shop listOrders: request threw', err instanceof Error ? err.message : err)
+    return { orders: [], total: 0, sessionExpired: false, failed: true, error: errorMessage(err) }
   }
 }
 
@@ -625,13 +808,20 @@ export async function confirmPacking(
   orders: { orderCode: string; quantity: number }[],
   fetchFn: typeof fetch = fetch
 ): Promise<ConfirmPackingResult> {
-  const res = await fetchFn(`https://mc.shop.kaspi.kz/mc/api/order/cargo/assembled?_m=${encodeURIComponent(merchantId)}`, {
-    method: 'POST',
-    headers: authHeaders(sessionCookies),
-    body: JSON.stringify({
-      cargos: orders.map(o => ({ orderCode: o.orderCode, newCargoSpace: 1, quantity: o.quantity })),
-    }),
-  })
+  let res: Response
+  try {
+    res = await fetchFn(`https://mc.shop.kaspi.kz/mc/api/order/cargo/assembled?_m=${encodeURIComponent(merchantId)}`, {
+      method: 'POST',
+      headers: authHeaders(sessionCookies),
+      signal: AbortSignal.timeout(CABINET_TIMEOUT_MS),
+      body: JSON.stringify({
+        cargos: orders.map(o => ({ orderCode: o.orderCode, newCargoSpace: 1, quantity: o.quantity })),
+      }),
+    })
+  } catch (err) {
+    // Таймаут не значит «не сработало»: Kaspi мог принять запрос. Просим проверить вкладку.
+    return { success: false, sessionExpired: false, message: `${errorMessage(err)}. Проверьте вкладки «Упаковка» и «Передача», прежде чем повторять` }
+  }
   if (res.status === 401 || res.status === 403) return { success: false, sessionExpired: true }
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')

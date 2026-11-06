@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
+import { getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from '@/lib/kaspiShop/wallet'
+import { isSessionActive } from '@/lib/kaspiShop/checkCycle'
+import { claimWindowSlot, releaseWindowSlot, windowKey } from '@/lib/windowLimits'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +30,15 @@ const GITHUB_OWNER = 'alikhan2505-crypto'
 const GITHUB_REPO = 'invoices-kz'
 const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 
+// Не чаще одного запуска «Применить сейчас» за окно на продавца (аудит Kaspi
+// 06.11.2026, K14): каждый запуск -- реальные 5 ₸ за каждый включённый товар,
+// и раньше API можно было дёргать подряд. Счётчик -- общий windowLimits
+// (строки tool_kontragent_checks со своим ключом, без новых колонок). Окна
+// фиксированные, выровненные по эпохе: на границе окна два нажатия подряд
+// пройдут, дальше -- не чаще раза в окно.
+const APPLY_NOW_COOLDOWN_MS = 10 * 60_000
+const APPLY_NOW_PREFIX = 'kaspiapply'
+
 // "Применить сейчас" on /kaspi-shop. IMPORTANT: this route does NOT fetch
 // competitor prices itself, and never will from Vercel -- Kaspi returns a
 // persistent HTTP 429/403 to the offer-fetch endpoint from Vercel's IP
@@ -36,14 +49,16 @@ const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 // set. So instead of re-implementing a fetch here that's architecturally
 // guaranteed to fail, this route does the two things that ARE safe to do
 // from Vercel:
-//   1. Resets last_checked_at on the target product(s) to null, which makes
-//      isCheckDue() report them as due right away instead of waiting out
-//      their configured check_frequency_minutes.
-//   2. Dispatches the SAME "Kaspi Shop price check" workflow the 10-minute
+//   1. Dispatches the SAME "Kaspi Shop price check" workflow the 10-minute
 //      schedule already runs, via workflow_dispatch -- exact same pattern
 //      as /api/kaspi-shop/niches/request/route.ts (KASPI_SHOP_GITHUB_PAT is
 //      already configured for that route; reused here rather than adding a
 //      second secret for the same purpose).
+//   2. Only AFTER a successful dispatch resets last_checked_at on the target
+//      product(s) to null, which makes isCheckDue() report them as due right
+//      away instead of waiting out their configured check_frequency_minutes.
+//      (Раньше сброс шёл первым: при ненастроенном PAT или отказе GitHub
+//      цены в базе уже были сброшены, а проверка так и не запускалась.)
 // The workflow then runs getDueTrackedProducts -> real Kaspi fetch ->
 // applyPriceCheckResult for these products (and any other due products
 // platform-wide, which is correct: it's the same idempotent per-product
@@ -52,6 +67,9 @@ const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 // asynchronously in GitHub Actions, this route itself finishes in well
 // under a second -- no maxDuration override needed, matching
 // niches/request/route.ts (which also doesn't set one).
+//
+// Ответ: { ok, count, cost, queued } -- сколько товаров реально встанет в
+// проверку и сколько это стоит; страница показывает это продавцу.
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -64,51 +82,113 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({} as any))
   const productId: string | undefined = body?.productId
+  if (productId !== undefined && !isUuid(productId)) {
+    return NextResponse.json({ error: 'productId должен быть id товара' }, { status: 400 })
+  }
+
+  // Мёртвая сессия: бот такие подключения не проверяет и денег не берёт --
+  // запускать нечего, честно говорим об этом.
+  const { data: sessionRow, error: sessionError } = await supabase
+    .from('kaspi_shop_connections')
+    .select('session_status')
+    .eq('id', connection.id)
+    .maybeSingle()
+  if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 })
+  if (!isSessionActive(sessionRow?.session_status)) {
+    return NextResponse.json({ error: 'Сессия Kaspi истекла -- переподключите магазин, цены не обновляются' }, { status: 400 })
+  }
 
   // Page-level button (no productId) targets ALL of the ACTIVE store's
   // enabled tracked products, matching Northline's page-level "apply now"
   // scope rather than a single row. Scoped by connection_id, not user_id --
   // with multi-store support a user-wide query would also reset the OTHER
   // store's products. A per-row trigger can still pass productId.
+  // Снятые с продажи (available_for_sale = false) бот не проверяет, их в счёт не берём.
   let query = supabase
     .from('kaspi_shop_tracked_products')
-    .select('id')
+    .select('id, available_for_sale')
     .eq('connection_id', connection.id)
     .eq('enabled', true)
   if (productId) query = query.eq('id', productId)
-  const { data: targets, error: selectError } = await query
+  const { data: found, error: selectError } = await query
   if (selectError) return NextResponse.json({ error: selectError.message }, { status: 500 })
-  if (!targets || targets.length === 0) {
+  const targets = (found || []).filter((t: any) => t.available_for_sale !== false)
+  if (targets.length === 0) {
     return NextResponse.json({ error: 'Нет активных товаров для проверки' }, { status: 400 })
   }
-
   const ids = targets.map((t: any) => t.id)
-  const { error: resetError } = await supabase
-    .from('kaspi_shop_tracked_products')
-    .update({ last_checked_at: null })
-    .in('id', ids)
-  if (resetError) return NextResponse.json({ error: resetError.message }, { status: 500 })
+  const cost = ids.length * KASPI_SHOP_CREDIT_PRICE_TENGE
+
+  let balance: number
+  try {
+    balance = await getKaspiShopWalletBalance(user.id)
+  } catch (err: any) {
+    console.error('kaspi-shop apply-now: wallet balance read failed for user', user.id, ':', err?.message)
+    return NextResponse.json({ error: 'Не удалось проверить баланс, попробуйте ещё раз' }, { status: 500 })
+  }
+  if (balance < KASPI_SHOP_CREDIT_PRICE_TENGE) {
+    return NextResponse.json({ error: 'На балансе не хватает средств на проверку -- пополните баланс' }, { status: 400 })
+  }
 
   const token = process.env.KASPI_SHOP_GITHUB_PAT
   if (!token) {
     return NextResponse.json({ error: 'Проверка сейчас недоступна: KASPI_SHOP_GITHUB_PAT не настроен' }, { status: 500 })
   }
 
-  const dispatchRes = await fetch(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ ref: 'main' }),
+  // Занимаем слот ДО запуска (параллельные нажатия не проскакивают) и
+  // возвращаем, если запуск не состоялся.
+  const now = Date.now()
+  const bucket = Math.floor(now / APPLY_NOW_COOLDOWN_MS)
+  const slotKey = windowKey(APPLY_NOW_PREFIX, `${user.id}|${productId ?? 'all'}`, bucket)
+  const claim = await claimWindowSlot(supabase, slotKey, 1)
+  if (!claim.ok) {
+    if (claim.reason === 'limit') {
+      const retryAfterSeconds = Math.max(1, Math.ceil(((bucket + 1) * APPLY_NOW_COOLDOWN_MS - now) / 1000))
+      return NextResponse.json(
+        { error: `Проверку можно запускать не чаще раза в ${APPLY_NOW_COOLDOWN_MS / 60_000} минут. Повторите через ${Math.ceil(retryAfterSeconds / 60)} мин.`, retryAfterSeconds },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+      )
     }
-  )
-  if (!dispatchRes.ok) {
+    // Счётчик не читается: за этот запуск продавец платит деньгами, поэтому
+    // при неисправном лимите не запускаем.
+    return NextResponse.json({ error: 'Не удалось проверить лимит запуска, попробуйте через минуту' }, { status: 503 })
+  }
+
+  // Сначала запуск проверки...
+  let dispatchOk = false
+  try {
+    const dispatchRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main' }),
+      }
+    )
+    dispatchOk = dispatchRes.ok
+  } catch (err: any) {
+    console.error('kaspi-shop apply-now: workflow dispatch threw:', err?.message)
+  }
+  if (!dispatchOk) {
+    await releaseWindowSlot(supabase, slotKey)
     return NextResponse.json({ error: 'Не удалось запустить проверку' }, { status: 502 })
   }
 
-  return NextResponse.json({ ok: true, queued: ids.length }, { status: 202 })
+  // ...и только потом сброс last_checked_at: проверка уже запущена, товары
+  // становятся due «прямо сейчас».
+  const { error: resetError } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .update({ last_checked_at: null })
+    .in('id', ids)
+  if (resetError) {
+    await releaseWindowSlot(supabase, slotKey)
+    return NextResponse.json({ error: resetError.message }, { status: 500 })
+  }
+
+  const affordable = Math.floor(balance / KASPI_SHOP_CREDIT_PRICE_TENGE)
+  return NextResponse.json({ ok: true, count: ids.length, cost, queued: ids.length, affordable }, { status: 202 })
 }

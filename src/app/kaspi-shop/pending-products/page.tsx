@@ -22,6 +22,10 @@ type PendingProduct = {
   imageUrl: string | null
 }
 
+// Раздел «Нераспознанные товары» в кабинете Kaspi: привязать карточку к каталогу или создать
+// новую можно только там (аудит K27: страница была тупиком, карточки читались без единого действия).
+const KASPI_PENDING_URL = 'https://kaspi.kz/mc/#/products/pending'
+
 const TABS = [
   { key: 'CHECK', label: 'Без привязки', enabled: true },
   { key: 'PENDING', label: 'Требуют доработок', enabled: false },
@@ -37,7 +41,8 @@ export default function KaspiShopPendingProducts() {
   const [page, setPage] = useState(1)
   const [products, setProducts] = useState<PendingProduct[]>([])
   const [hasMore, setHasMore] = useState(false)
-  const [count, setCount] = useState(0)
+  // null: Kaspi не отдал счётчик (число «Всего» неизвестно), это не 0.
+  const [count, setCount] = useState<number | null>(null)
   const [listLoading, setListLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
@@ -72,12 +77,13 @@ export default function KaspiShopPendingProducts() {
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/pending-products?page=${forPage}`, { headers })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (data.sessionExpired) setSessionExpired(true)
+      // Сбой Kaspi приходит как 502 с текстом: это ошибка с «Повторить», а не «товаров нет».
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить товары'); setProducts([]); setHasMore(false); return }
       setProducts(data.products || [])
       setHasMore(!!data.hasMore)
-      setCount(data.count || 0)
-      if (data.sessionExpired) setSessionExpired(true)
+      setCount(typeof data.count === 'number' ? data.count : null)
     } catch {
       setLoadError('Не удалось загрузить товары. Проверьте соединение и попробуйте ещё раз.')
       setProducts([])
@@ -95,7 +101,7 @@ export default function KaspiShopPendingProducts() {
       <SiteNav />
 
       <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
-        <PageHeader title="Нераспознанные товары" subtitle={count > 0 ? `Всего: ${count}` : undefined} />
+        <PageHeader title="Нераспознанные товары" subtitle={count !== null && count > 0 ? `Всего: ${count}` : undefined} />
         {sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
@@ -123,10 +129,23 @@ export default function KaspiShopPendingProducts() {
         {listLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем товары...</div>
         ) : products.length === 0 ? (
+          // При сбое загрузки пустой список не «товаров нет»: причину показывает красная плашка выше.
+          loadError ? null : (
           <div className="nav-glass rounded-2xl p-8 text-center">
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Нераспознанных товаров нет.</div>
           </div>
+          )
         ) : (
+          <>
+          <div className="nav-glass rounded-2xl p-4 mb-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm min-w-[220px] flex-1" style={{ color: 'var(--nav-text-secondary)' }}>
+              Kaspi не смог привязать эти карточки к каталогу. Выберите для каждой существующую карточку или создайте новую в кабинете Kaspi.
+            </p>
+            <a href={KASPI_PENDING_URL} target="_blank" rel="noopener noreferrer"
+              className="text-xs font-semibold rounded-lg px-3 py-2 flex-shrink-0" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              Открыть в кабинете Kaspi
+            </a>
+          </div>
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
             {products.map(p => (
               <div key={p.code} className="nav-glass rounded-2xl p-3 flex items-center gap-3">
@@ -145,6 +164,7 @@ export default function KaspiShopPendingProducts() {
               </div>
             ))}
           </div>
+          </>
         )}
 
         {(page > 1 || hasMore) && (

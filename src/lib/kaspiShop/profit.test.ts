@@ -291,3 +291,21 @@ describe('computeProfitSummary', () => {
     expect(fakeListOrders).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('computeProfitSummary upstream failure', () => {
+  const noAds = { amount: 0, otherAmount: 0, configured: false }
+
+  it('a Kaspi failure on the first page is upstreamFailed, not zero revenue with no flag', async () => {
+    const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: false, failed: true, orders: [] }))
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], noAds, null, fakeListOrders as any)
+    expect(summary.upstreamFailed).toBe(true)
+    expect(summary.sessionExpired).toBe(false)
+    expect(fakeListOrders).toHaveBeenCalledTimes(1)
+  })
+
+  it('a healthy run reports upstreamFailed false', async () => {
+    const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: false, orders: [] }))
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], noAds, null, fakeListOrders as any)
+    expect(summary.upstreamFailed).toBe(false)
+  })
+})

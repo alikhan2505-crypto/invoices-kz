@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
-import { loadConnection } from '@/lib/kaspiShop/connection'
+import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { importCatalogProducts } from '@/lib/kaspiShop/finalizeConnection'
 
 const supabaseAuth = createClient(
@@ -31,6 +31,23 @@ export async function POST(req: NextRequest) {
   if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
   if (!connection.sessionCookies) return NextResponse.json({ error: 'Сессия кабинета Kaspi не активна — переподключитесь' }, { status: 400 })
 
-  const imported = await importCatalogProducts(connection.id, user.id, connection.sessionCookies, connection.merchantId)
-  return NextResponse.json({ ok: true, imported })
+  const result = await importCatalogProducts(connection.id, user.id, connection.sessionCookies, connection.merchantId)
+  if (result.sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 502 })
+  }
+  // Раньше любой сбой Kaspi давал {ok:true, imported:0} и экран писал «Каталог обновлён: 0».
+  // Теперь неполный импорт (ответ Kaspi оборвался, часть товаров не записана) это 502 с цифрами.
+  if (!result.complete) {
+    const done = result.imported > 0
+      ? `Обновлено ${result.imported}${result.total > 0 ? ` из ${result.total}` : ''} товар(ов), остальное не получено`
+      : 'Каталог не обновлён'
+    return NextResponse.json({
+      error: `${done}${result.error ? ` (${result.error})` : ''}. Повторите через минуту.`,
+      imported: result.imported,
+      total: result.total,
+      partial: true,
+    }, { status: 502 })
+  }
+  return NextResponse.json({ ok: true, imported: result.imported, total: result.total, pointCitiesPartial: result.pointCitiesPartial })
 }

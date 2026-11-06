@@ -17,6 +17,11 @@ import { connectErrorMessage, connectUiText } from '@/lib/kaspiShop/connectMessa
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
+import {
+  CHECK_PRICE_TENGE, apiErrorMessage, applyNowConfirmText, applyNowSuccessText, estimateDailyCost,
+  formatTenge, lowBalanceWarning, periodLabel, pluralProducts, runwayHours, runwayLabel,
+  suggestionBlockReason, validateBulkSettings, validateProductSettings,
+} from '@/lib/kaspiShop/dempingForm'
 
 type Product = {
   id: string
@@ -30,6 +35,8 @@ type Product = {
   own_current_price: number
   floor_price: number
   max_price: number | null
+  // Себестоимость из раздела «Прибыль»: нужна ИИ-подбору цены.
+  cogs_amount?: number | null
   undercut_step: number
   check_frequency_minutes: number
   enabled: boolean
@@ -52,6 +59,25 @@ function competitorTooltip(snapshot: Product['competitor_snapshot']): string | u
     .map(o => `${o.merchantName || 'Продавец'} — ${o.price.toLocaleString('ru-KZ')} ₸${o.merchantId ? ` (ID ${o.merchantId})` : ''}`)
     .join('\n')
 }
+
+type EditValues = { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string; stockCount: string }
+
+// Форма настроек товара из сохранённого товара. Вызывается при каждом открытии
+// панели и после успешного сохранения: раньше форма заполнялась один раз, и
+// несохранённые правки показывались при повторном открытии как будто сохранённые.
+function editFromProduct(p: Product): EditValues {
+  return {
+    floorPrice: String(p.floor_price),
+    maxPrice: p.max_price !== null ? String(p.max_price) : '',
+    undercutStep: String(p.undercut_step),
+    strategy: p.demping_strategy || 'undercut_leader',
+    excludedCities: (p.excluded_city_codes || []).join(', '),
+    excludedMerchants: (p.excluded_merchant_ids || []).join(', '),
+    stockCount: String(p.stock_count ?? 0),
+  }
+}
+
+type OtherStore = { id: string; companyName: string }
 
 const STRATEGY_LABELS: Record<string, string> = {
   undercut_leader: 'Быть 1-м',
@@ -243,6 +269,18 @@ export default function KaspiShop() {
   // dismissible since the user already has at least one working store.
   const [addingStore, setAddingStore] = useState(false)
   const [loadError, setLoadError] = useState('')
+  // true только после УСПЕШНОГО ответа /wallet. Пока он false, «не подключён»
+  // не выводим: упавший запрос не должен показывать подключённому продавцу
+  // обязательное окно «Подключите Kaspi Магазин» (аудит Kaspi 2026-11-06, K12).
+  const [connectionKnown, setConnectionKnown] = useState(false)
+  // Список товаров реально пришёл (пустой список после сбоя не равен «товаров нет»).
+  const [productsLoaded, setProductsLoaded] = useState(false)
+  // Другие магазины пользователя: из окна переподключения можно уйти в них.
+  const [otherStores, setOtherStores] = useState<OtherStore[]>([])
+  const [reconnectDismissed, setReconnectDismissed] = useState(false)
+  // «+ Добавить магазин» при истёкшей сессии активного: это новый магазин, а не переподключение.
+  const [addingNew, setAddingNew] = useState(false)
+  const [switchError, setSwitchError] = useState('')
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
   const [sessionStatus, setSessionStatus] = useState<string | null>(null)
@@ -270,6 +308,7 @@ export default function KaspiShop() {
   const [topupAmount, setTopupAmount] = useState<number | null>(null)
   const [topupCustom, setTopupCustom] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
+  const [topupError, setTopupError] = useState('')
   const [topupPending, setTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
   const [walletOpen, setWalletOpen] = useState(false)
   // Audit finding (2026-09-02): GET /api/kaspi-shop/wallet/history already
@@ -303,7 +342,19 @@ export default function KaspiShop() {
   const [bulkError, setBulkError] = useState('')
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string; stockCount: string }>>({})
+  const [suggestError, setSuggestError] = useState('')
+  const [suggestion, setSuggestion] = useState<{ id: string; floorPrice: number; undercutStep: number; reasoning: string } | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
+  const [editValues, setEditValues] = useState<Record<string, EditValues>>({})
+  // Открытая панель настроек: load() не должен затирать правки, которые человек
+  // сейчас вводит, поэтому читает id отсюда, а не из замыкания.
+  const expandedIdRef = useRef<string | null>(null)
+  useEffect(() => { expandedIdRef.current = expandedId }, [expandedId])
+  // Таймеры опроса после «Применить сейчас»; снимаем при уходе со страницы.
+  const applyTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => () => { applyTimers.current.forEach(clearTimeout) }, [])
   const [trackedCities, setTrackedCities] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([])
   const [citiesSaving, setCitiesSaving] = useState(false)
@@ -318,8 +369,13 @@ export default function KaspiShop() {
     // that navigation entirely (real bug found 2026-09-03: the button did
     // nothing when clicked from Демпинг itself, only worked when arriving
     // fresh from another page).
-    if (searchParams.get('addStore') === '1') {
+    const addStore = searchParams.get('addStore')
+    if (addStore === '1' || addStore === 'new') {
       setAddingStore(true)
+      // '1' при истёкшей сессии активного магазина = «переподключить»;
+      // 'new' = добавить другой магазин (переключатель при истёкшем активном).
+      setAddingNew(addStore === 'new')
+      setReconnectDismissed(false)
       window.history.replaceState(null, '', '/kaspi-shop')
     }
   }, [searchParams])
@@ -359,7 +415,7 @@ export default function KaspiShop() {
     return (data.cities || []).map((c: any) => ({ code: c.code, name: String(c.name) }))
   }
 
-  async function load() {
+  async function load(opts: { refreshEdit?: string } = {}) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
@@ -368,50 +424,67 @@ export default function KaspiShop() {
     setLoadError('')
     try {
       const headers = await authHeader()
-      const [productsRes, walletRes, cities] = await Promise.all([
+      const [productsRes, walletRes, cities, connectionsRes] = await Promise.all([
         fetch('/api/kaspi-shop/products', { headers }),
         fetch('/api/kaspi-shop/wallet', { headers }),
-        fetchAvailableCities(headers),
+        // Города и список магазинов вторичны: их сбой не должен ронять страницу.
+        fetchAvailableCities(headers).catch(() => null),
+        fetch('/api/kaspi-shop/connections', { headers }).catch(() => null),
       ])
+      // Любой не-ok ответ - это ошибка загрузки с кнопкой «Повторить», а не
+      // «магазин не подключён» и не «товаров нет».
+      let failure = ''
       if (productsRes.ok) {
         const data = await productsRes.json()
         const list: Product[] = data.products || []
         setProducts(list)
+        setProductsLoaded(true)
         setStats(data.stats || null)
         setEditValues(prev => {
           const next = { ...prev }
           for (const p of list) {
-            if (!next[p.id]) {
-              next[p.id] = {
-                floorPrice: String(p.floor_price),
-                maxPrice: p.max_price !== null ? String(p.max_price) : '',
-                undercutStep: String(p.undercut_step),
-                strategy: p.demping_strategy || 'undercut_leader',
-                excludedCities: (p.excluded_city_codes || []).join(', '),
-                excludedMerchants: (p.excluded_merchant_ids || []).join(', '),
-                stockCount: String(p.stock_count ?? 0),
-              }
-            }
+            // Новые товары заполняем всегда; открытую панель не трогаем (там
+            // идёт ввод), кроме товара, который только что сохранили.
+            if (!next[p.id] || p.id === opts.refreshEdit || p.id !== expandedIdRef.current) next[p.id] = editFromProduct(p)
           }
           return next
         })
+      } else {
+        const data = await productsRes.json().catch(() => ({}))
+        failure = apiErrorMessage(productsRes.status, data, 'Не удалось загрузить товары. Попробуйте ещё раз.')
       }
       if (walletRes.ok) {
         const data = await walletRes.json()
         setBalance(data.balance ?? 0)
         setConnected(!!data.connected)
+        setConnectionKnown(true)
         setPaused(!!data.paused)
         setSessionStatus(data.sessionStatus ?? null)
         setCompanyName(data.companyName ?? null)
         setTrackedCities(data.trackedCityCodes || [])
+      } else {
+        const data = await walletRes.json().catch(() => ({}))
+        failure = failure || apiErrorMessage(walletRes.status, data, 'Не удалось загрузить баланс и подключение. Попробуйте ещё раз.')
+      }
+      if (connectionsRes && connectionsRes.ok) {
+        const data = await connectionsRes.json().catch(() => null)
+        const list: { id: string; companyName: string; isActive: boolean }[] = Array.isArray(data?.connections) ? data.connections : []
+        setOtherStores(list.filter(c => !c.isActive).map(c => ({ id: c.id, companyName: c.companyName })))
       }
       if (cities) setAvailableCities(cities)
+      if (failure) setLoadError(failure)
     } catch (e: any) {
       console.error('Kaspi Shop load error:', e.message)
       setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // «Повторить» в плашке ошибки: показываем загрузку, чтобы нажатие было заметно.
+  async function retryLoad() {
+    setLoading(true)
+    await load()
   }
 
   async function startConnect() {
@@ -454,7 +527,7 @@ export default function KaspiShop() {
       // Reconnecting an expired session already knows which store it's for --
       // tells the API to auto-pick the already-connected merchant instead of
       // showing the same picker used for genuinely adding a new store.
-      const isReconnect = connected && sessionStatus === 'session_expired'
+      const isReconnect = connected && sessionStatus === 'session_expired' && !addingNew
       r = await postConnectStep(
         '/api/kaspi-shop/connect/otp',
         headers,
@@ -497,6 +570,7 @@ export default function KaspiShop() {
     }
     setConnected(true)
     setAddingStore(false)
+    setAddingNew(false)
     window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     load()
   }
@@ -513,39 +587,89 @@ export default function KaspiShop() {
     setMerchantChoices(null)
     setConnected(true)
     setAddingStore(false)
+    setAddingNew(false)
     window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     load()
   }
 
+  // Переход в другой подключённый магазин прямо из окна переподключения: при
+  // истёкшей сессии оно закрывает и боковое меню, и переключатель магазинов.
+  async function switchStore(connectionId: string) {
+    setSwitchError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/connections/switch', { method: 'POST', headers, body: JSON.stringify({ connectionId }) })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSwitchError(apiErrorMessage(res.status, data, 'Не удалось переключить магазин.'))
+        return
+      }
+      window.location.href = '/kaspi-shop'
+    } catch {
+      setSwitchError('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.')
+    }
+  }
+
+  // Закрытие окна подключения. При истёкшей сессии его можно закрыть, только
+  // если есть другой магазин, куда перейти (кнопку показываем при otherStores).
+  function closeConnectDialog(dismissReconnect: boolean) {
+    setAddingStore(false)
+    setAddingNew(false)
+    setPhone(''); setOtpToken(null); setResumeToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null)
+    setConnectError(''); setConnectErrorDetail(''); setSwitchError('')
+    if (dismissReconnect) setReconnectDismissed(true)
+  }
+
   async function togglePause() {
-    const next = !paused
+    const previous = paused
+    const next = !previous
     setPaused(next)
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/settings', { method: 'POST', headers, body: JSON.stringify({ paused: next }) })
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/settings', { method: 'POST', headers, body: JSON.stringify({ paused: next }) })
+      if (!res.ok) {
+        // Откатываем переключатель: иначе кнопка показывала «На паузе», а на
+        // сервере бот продолжал работать (и списывать деньги).
+        setPaused(previous)
+        const data = await res.json().catch(() => ({}))
+        await alert(apiErrorMessage(res.status, data, 'Не удалось переключить паузу.'))
+      }
+    } catch {
+      setPaused(previous)
+      await alert('Нет связи с сервером. Пауза не изменена, попробуйте ещё раз.')
+    }
   }
 
   async function saveTrackedCities(codes: string[]) {
     const previous = trackedCities
     setTrackedCities(codes)
     setCitiesSaving(true)
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/settings/cities', { method: 'PATCH', headers, body: JSON.stringify({ trackedCityCodes: codes }) })
-    if (!res.ok) {
-      // Revert the optimistic chip toggle -- without this a chip stayed
-      // selected in the UI even when the save failed (e.g. not connected,
-      // or the new >15 cap rejected it), silently diverging from what's
-      // actually stored server-side.
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/settings/cities', { method: 'PATCH', headers, body: JSON.stringify({ trackedCityCodes: codes }) })
+      if (!res.ok) {
+        // Revert the optimistic chip toggle -- without this a chip stayed
+        // selected in the UI even when the save failed (e.g. not connected,
+        // or the new >15 cap rejected it), silently diverging from what's
+        // actually stored server-side.
+        setTrackedCities(previous)
+        const data = await res.json().catch(() => ({}))
+        await alert(apiErrorMessage(res.status, data, 'Не удалось сохранить города.'))
+      } else {
+        // The PATCH may have just seeded city_lookup_cache for the first
+        // time (a fresh connect's best-effort seed can still miss, e.g. a
+        // session that was expired at connect time and only later renewed) --
+        // re-read availableCities so newly-available names show up now,
+        // instead of only after a manual page reload.
+        const refreshed = await fetchAvailableCities(headers).catch(() => null)
+        if (refreshed) setAvailableCities(refreshed)
+      }
+    } catch {
       setTrackedCities(previous)
-    } else {
-      // The PATCH may have just seeded city_lookup_cache for the first
-      // time (a fresh connect's best-effort seed can still miss, e.g. a
-      // session that was expired at connect time and only later renewed) --
-      // re-read availableCities so newly-available names show up now,
-      // instead of only after a manual page reload.
-      const refreshed = await fetchAvailableCities(headers)
-      if (refreshed) setAvailableCities(refreshed)
+      await alert('Нет связи с сервером. Города не сохранены, попробуйте ещё раз.')
+    } finally {
+      setCitiesSaving(false)
     }
-    setCitiesSaving(false)
   }
 
   function toggleTrackedCity(code: string) {
@@ -555,8 +679,18 @@ export default function KaspiShop() {
 
   async function disconnect() {
     if (!(await confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.'))) return
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        await alert(apiErrorMessage(res.status, data, 'Не удалось отключить магазин.'))
+        return
+      }
+    } catch {
+      await alert('Нет связи с сервером. Магазин не отключён, попробуйте ещё раз.')
+      return
+    }
     window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     // A remaining store (if any) auto-activates server-side on disconnect --
     // reload so this page picks up its data instead of showing an empty
@@ -567,70 +701,161 @@ export default function KaspiShop() {
   async function startTopup(amountTenge: number) {
     if (amountTenge < 500) return
     setToppingUp(true)
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/wallet/topup', { method: 'POST', headers, body: JSON.stringify({ amountTenge }) })
-    const data = await res.json()
-    setToppingUp(false)
-    if (!res.ok) return
-    setTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
-    pollTopupStatus(data.topup_id)
+    setTopupError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/wallet/topup', { method: 'POST', headers, body: JSON.stringify({ amountTenge }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setTopupError(apiErrorMessage(res.status, data, 'Не удалось создать платёж. Попробуйте ещё раз.'))
+        return
+      }
+      setTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
+      pollTopupStatus(data.topup_id)
+    } catch {
+      setTopupError('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.')
+    } finally {
+      setToppingUp(false)
+    }
   }
 
   function pollTopupStatus(topupId: string) {
     let attempts = 0
     const interval = setInterval(async () => {
       attempts++
-      const headers = await authHeader()
-      const res = await fetch(`/api/kaspi-shop/wallet/topup-status?topup_id=${topupId}`, { headers })
-      const data = await res.json()
-      if (data.status === 'paid') { clearInterval(interval); setTopupPending(null); load() }
-      else if (data.status === 'expired' || attempts >= 30) { clearInterval(interval); setTopupPending(null) }
+      try {
+        const headers = await authHeader()
+        const res = await fetch(`/api/kaspi-shop/wallet/topup-status?topup_id=${topupId}`, { headers })
+        const data = await res.json().catch(() => ({}))
+        if (data.status === 'paid') { clearInterval(interval); setTopupPending(null); load() }
+        else if (data.status === 'expired' || attempts >= 30) { clearInterval(interval); setTopupPending(null) }
+      } catch {
+        // сеть мигнула: следующий опрос через 5 секунд попробует снова
+        if (attempts >= 30) { clearInterval(interval); setTopupPending(null) }
+      }
     }, 5000)
   }
 
+  // Переключатель «Активно/Пауза» на карточке: сразу меняем вид, но если сервер
+  // отказал (403, 400, 500), возвращаем как было и говорим почему. Раньше ответ
+  // не читался вовсе, и карточка врала о состоянии правила.
   async function toggleProduct(id: string, enabled: boolean) {
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/products', { method: 'PATCH', headers, body: JSON.stringify({ id, enabled: !enabled }) })
-    load()
+    if (togglingIds.has(id)) return
+    setTogglingIds(prev => new Set(prev).add(id))
+    const revert = () => setProducts(prev => prev.map(p => (p.id === id ? { ...p, enabled } : p)))
+    setProducts(prev => prev.map(p => (p.id === id ? { ...p, enabled: !enabled } : p)))
+    let ok = false
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products', { method: 'PATCH', headers, body: JSON.stringify({ id, enabled: !enabled }) })
+      if (res.ok) {
+        ok = true
+      } else {
+        const data = await res.json().catch(() => ({}))
+        revert()
+        await alert(apiErrorMessage(res.status, data, 'Не удалось переключить товар.'))
+      }
+    } catch {
+      revert()
+      await alert('Нет связи с сервером. Состояние товара не изменено, попробуйте ещё раз.')
+    } finally {
+      setTogglingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+    }
+    if (ok) load()
   }
 
   async function deleteProduct(id: string) {
     if (!(await confirm('Удалить товар из демпинга? Правило и его настройки будут удалены у нас — сам товар на Kaspi это не трогает.'))) return
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/products', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSettingsError(apiErrorMessage(res.status, data, 'Не удалось удалить товар.'))
+        return
+      }
+    } catch {
+      setSettingsError('Нет связи с сервером. Товар не удалён, попробуйте ещё раз.')
+      return
+    }
     setExpandedId(null)
     load()
   }
 
+  // Сохранение настроек товара. Панель закрывается только после ответа ok;
+  // при отказе сервера она остаётся открытой с его сообщением, а после успеха
+  // форма заполняется заново из перечитанного товара (раньше load() не трогал
+  // уже существующие значения, и форма показывала несохранённое как сохранённое).
   async function saveProductSettings(id: string) {
     const v = editValues[id]
-    if (!v) return
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/products', {
-      method: 'PATCH', headers,
-      body: JSON.stringify({
-        id,
-        floor_price: Number(v.floorPrice),
-        max_price: v.maxPrice.trim() === '' ? null : Number(v.maxPrice),
-        undercut_step: Number(v.undercutStep),
-        demping_strategy: v.strategy,
-        excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
-        excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
-      }),
-    })
-    await res.json().catch(() => ({}))
-    setExpandedId(null)
-    load()
+    if (!v || savingSettings) return
+    // Пустой минимум больше не уходит как 0, запятая и пробелы понимаются.
+    const checked = validateProductSettings(v)
+    if (!checked.ok) { setSettingsError(checked.error); return }
+    setSavingSettings(true)
+    setSettingsError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products', {
+        method: 'PATCH', headers,
+        body: JSON.stringify({
+          id,
+          floor_price: checked.floor,
+          max_price: checked.max,
+          undercut_step: checked.step,
+          demping_strategy: v.strategy,
+          excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
+          excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSettingsError(apiErrorMessage(res.status, data, 'Не удалось сохранить настройки.'))
+        return
+      }
+      setExpandedId(null)
+      await load({ refreshEdit: id })
+    } catch {
+      setSettingsError('Нет связи с сервером. Настройки не сохранены, попробуйте ещё раз.')
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
-  async function suggestPricing(id: string) {
-    setSuggestingFor(id)
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/products/suggest-pricing', { method: 'POST', headers, body: JSON.stringify({ productId: id }) })
-    const data = await res.json()
-    setSuggestingFor(null)
-    if (!res.ok) return
-    setEditValues(prev => ({ ...prev, [id]: { ...prev[id], floorPrice: String(data.floorPrice), undercutStep: String(data.undercutStep) } }))
+  // ИИ-подбор: только оценка. Нужны себестоимость и цена конкурента (кнопка
+  // неактивна без них), ответ показывается вместе с пояснением модели и
+  // оговоркой «это оценка»; ошибки видны, а не глотаются.
+  async function suggestPricing(p: Product) {
+    const blocked = suggestionBlockReason(p, (cityPrices[p.id] || []).some(c => c.competitorPrice !== null))
+    if (blocked) { setSuggestError(blocked); return }
+    setSuggestingFor(p.id)
+    setSuggestError('')
+    setSuggestion(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products/suggest-pricing', { method: 'POST', headers, body: JSON.stringify({ productId: p.id }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSuggestError(apiErrorMessage(res.status, data, 'ИИ-подбор не сработал. Попробуйте ещё раз.'))
+        return
+      }
+      const floor = Number(data.floorPrice)
+      const step = Number(data.undercutStep)
+      if (!Number.isFinite(floor) || floor <= 0 || !Number.isFinite(step) || step < 0) {
+        setSuggestError('ИИ вернул непонятный ответ. Попробуйте ещё раз.')
+        return
+      }
+      if (typeof p.cogs_amount === 'number' && p.cogs_amount > 0 && floor < p.cogs_amount) {
+        setSuggestError(`ИИ предложил минимум ${formatTenge(floor)}, это ниже себестоимости ${formatTenge(p.cogs_amount)}. Попробуйте ещё раз.`)
+        return
+      }
+      setEditValues(prev => ({ ...prev, [p.id]: { ...(prev[p.id] || editFromProduct(p)), floorPrice: String(floor), undercutStep: String(step) } }))
+      setSuggestion({ id: p.id, floorPrice: floor, undercutStep: step, reasoning: typeof data.reasoning === 'string' ? data.reasoning : '' })
+    } catch {
+      setSuggestError('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.')
+    } finally {
+      setSuggestingFor(null)
+    }
   }
 
   // Forces an immediate check-cycle run instead of waiting out each
@@ -638,23 +863,39 @@ export default function KaspiShop() {
   // /api/kaspi-shop/apply-now's route comment for why this can't complete
   // synchronously (real Kaspi fetches only work from GitHub Actions, not
   // Vercel). The route responds as soon as it has queued the run, so this
-  // polls the product list a couple of times afterwards rather than
-  // expecting fresh numbers in the response itself.
+  // polls the product list a few times afterwards rather than expecting
+  // fresh numbers in the response itself. Каждая проверка стоит 5 ₸ за товар,
+  // поэтому перед запуском человек видит «N товаров × 5 ₸ = X ₸» и
+  // подтверждает; а запуск у большого списка идёт минутами, не «в течение минуты».
   async function applyNow() {
     if (applyingNow) return
+    const planned = stats?.activeCount ?? 0
+    if (planned === 0) return
+    if (!(await confirm(applyNowConfirmText(planned, balance)))) return
     setApplyingNow(true)
     setApplyNowMessage('')
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/apply-now', { method: 'POST', headers, body: JSON.stringify({}) })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setApplyNowMessage(data.error || 'Не удалось запустить проверку')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/apply-now', { method: 'POST', headers, body: JSON.stringify({}) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setApplyNowMessage(apiErrorMessage(res.status, data, 'Не удалось запустить проверку'))
+        setApplyingNow(false)
+        return
+      }
+      setApplyNowMessage(applyNowSuccessText(data))
+      applyTimers.current.forEach(clearTimeout)
+      applyTimers.current = [
+        setTimeout(() => { load() }, 15_000),
+        // Кнопка снова доступна через минуту: двойное нажатие подряд списало бы деньги дважды.
+        setTimeout(() => { load(); setApplyingNow(false) }, 60_000),
+        setTimeout(() => { load() }, 150_000),
+        setTimeout(() => { load(); setApplyNowMessage('') }, 300_000),
+      ]
+    } catch {
+      setApplyNowMessage('Нет связи с сервером. Проверка не запущена, деньги не списаны.')
       setApplyingNow(false)
-      return
     }
-    setApplyNowMessage(`Запущено для ${data.queued} товар(ов) — цены обновятся в течение минуты`)
-    setTimeout(load, 15000)
-    setTimeout(() => { load(); setApplyingNow(false); setApplyNowMessage('') }, 35000)
   }
 
   // On-demand catalog re-import -- same dedup-safe import as connect time,
@@ -664,16 +905,21 @@ export default function KaspiShop() {
     if (syncingCatalog) return
     setSyncingCatalog(true)
     setApplyNowMessage('')
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/catalog/sync', { method: 'POST', headers })
-    const data = await res.json().catch(() => ({}))
-    setSyncingCatalog(false)
-    if (!res.ok) {
-      setApplyNowMessage(data.error || 'Не удалось обновить каталог')
-      return
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/catalog/sync', { method: 'POST', headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setApplyNowMessage(apiErrorMessage(res.status, data, 'Не удалось обновить каталог'))
+        return
+      }
+      setApplyNowMessage(`Каталог обновлён: ${data.imported} товар(ов)`)
+      load()
+    } catch {
+      setApplyNowMessage('Нет связи с сервером. Каталог не обновлён, попробуйте ещё раз.')
+    } finally {
+      setSyncingCatalog(false)
     }
-    setApplyNowMessage(`Каталог обновлён: ${data.imported} товар(ов)`)
-    load()
   }
 
   function openBulkAdd() {
@@ -711,25 +957,34 @@ export default function KaspiShop() {
   })()
 
   async function submitBulkAdd() {
+    if (bulkSubmitting) return
+    // Запятая и пробелы понимаются, пустой минимум не уходит как 0.
+    const checked = validateBulkSettings({ floorPrice: bulkFloorPrice, maxPrice: bulkMaxPrice, undercutStep: bulkUndercutStep, frequency: bulkFrequency })
+    if (!checked.ok) { setBulkError(checked.error); return }
     setBulkSubmitting(true)
     setBulkError('')
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/products/bulk', {
-      method: 'POST', headers,
-      body: JSON.stringify({
-        productIds: Array.from(bulkSelected),
-        floorPrice: Number(bulkFloorPrice),
-        maxPrice: bulkMaxPrice.trim() === '' ? null : Number(bulkMaxPrice),
-        undercutStep: Number(bulkUndercutStep),
-        dempingStrategy: bulkStrategy,
-        checkFrequencyMinutes: Number(bulkFrequency),
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    setBulkSubmitting(false)
-    if (!res.ok) { setBulkError(data.error || 'Не удалось применить настройки'); return }
-    setBulkOpen(false)
-    load()
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products/bulk', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          productIds: Array.from(bulkSelected),
+          floorPrice: checked.floor,
+          maxPrice: checked.max,
+          undercutStep: checked.step,
+          dempingStrategy: bulkStrategy,
+          checkFrequencyMinutes: checked.frequency,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setBulkError(apiErrorMessage(res.status, data, 'Не удалось применить настройки')); return }
+      setBulkOpen(false)
+      load()
+    } catch {
+      setBulkError('Нет связи с сервером. Настройки не применены, попробуйте ещё раз.')
+    } finally {
+      setBulkSubmitting(false)
+    }
   }
 
   if (loading) return <LoadingSpinner />
@@ -749,6 +1004,17 @@ export default function KaspiShop() {
   const activeCount = products.filter(p => p.enabled).length
   // «Работает» при нуле включённых товаров вводило в заблуждение: бот ничего не делает (аудит 02.11.2026).
   const idleNoProducts = !paused && activeCount === 0
+  // Реальный расход на проверки (K15): 5 ₸ за проверку, а период на деле около
+  // 20 минут при настройке «15»: запуски идут раз в 10 минут. Считаем по
+  // включённым товарам; плашка «баланс заканчивается» строится из этой же оценки.
+  const costEstimate = estimateDailyCost(products)
+  const balanceWarning = lowBalanceWarning(balance, costEstimate, paused)
+  // То же для окна «Добавить несколько»: выбранные товары будут включены с общей частотой.
+  const bulkFreq = Number(bulkFrequency.replace(/[\s ]/g, '').replace(',', '.'))
+  const bulkEstimate = Number.isInteger(bulkFreq) && bulkFreq >= 5
+    ? estimateDailyCost(Array.from(bulkSelected).map(() => ({ enabled: true, check_frequency_minutes: bulkFreq })))
+    : null
+  const bulkRunway = bulkEstimate ? runwayHours(balance, bulkEstimate.dailyCost) : null
 
   // Which cities this product's demping actually covers: manually tracked
   // cities win; with none picked, auto mode checks the product's own point
@@ -776,7 +1042,7 @@ export default function KaspiShop() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={load} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={retryLoad} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
@@ -789,7 +1055,38 @@ export default function KaspiShop() {
         // needsReconnect usages inside it), same idea
         // KaspiShopStoreSwitcher's own session_expired button already relies
         // on (?addStore=1 opens this same dialog).
-        const needsReconnect = connected && sessionStatus === 'session_expired'
+        const needsReconnect = connected && sessionStatus === 'session_expired' && !addingNew
+        // Запрос баланса и подключения не удался: «не подключён» не утверждаем,
+        // окно подключения не показываем - только плашка ошибки выше с «Повторить».
+        if (!connectionKnown) return null
+        // Окно переподключения можно закрыть, если есть другой магазин: иначе оно
+        // перекрывало и меню, и переключатель магазинов (K46).
+        const canDismissReconnect = needsReconnect && otherStores.length > 0
+        if (needsReconnect && reconnectDismissed && canDismissReconnect && !addingStore) {
+          return (
+            <div className="nav-glass rounded-2xl p-5 lg:p-6 max-w-xl">
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+                {`Сессия магазина «${companyName || 'Kaspi'}» истекла`}
+              </div>
+              <p className="text-[13px] mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
+                Товары и настройки сохранены, но данные скрыты, пока вы не войдёте в этот магазин ещё раз. Можно переподключить его или открыть другой магазин.
+              </p>
+              {switchError && <div className="text-xs mb-3" role="alert" style={{ color: 'var(--nav-critical)' }}>{switchError}</div>}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setReconnectDismissed(false)}
+                  className="rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                  Переподключить
+                </button>
+                {otherStores.map(s => (
+                  <button key={s.id} onClick={() => switchStore(s.id)}
+                    className="nav-glass rounded-xl px-4 py-2.5 text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                    {`Открыть «${s.companyName}»`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        }
         return (!connected || addingStore || needsReconnect) ? (
           /* Centered connect dialog (2026-08-20, founder): the connect form
              used to render as a full-width inline card flush to the top-left,
@@ -803,8 +1100,8 @@ export default function KaspiShop() {
               className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84dvh] overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
-              {connected && !needsReconnect && (
-                <button onClick={() => { setAddingStore(false); setPhone(''); setOtpToken(null); setResumeToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null); setConnectError(''); setConnectErrorDetail('') }}
+              {((connected && !needsReconnect) || canDismissReconnect) && (
+                <button aria-label="Закрыть" onClick={() => closeConnectDialog(needsReconnect)}
                   className="absolute top-5 right-5 text-lg leading-none" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
               )}
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
@@ -868,6 +1165,23 @@ export default function KaspiShop() {
                   )}
                 </div>
               )}
+              {/* Истёкшая сессия активного магазина, но есть другой: можно открыть его,
+                  не переподключая этот (K46). */}
+              {canDismissReconnect && !otpToken && !merchantChoices && (
+                <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                  <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>Или откройте другой магазин:</div>
+                  {switchError && <div className="text-xs mb-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{switchError}</div>}
+                  <div className="flex flex-col gap-2">
+                    {otherStores.map(s => (
+                      <button key={s.id} onClick={() => switchStore(s.id)}
+                        className="w-full text-left nav-glass rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:border-[color:var(--nav-accent)]"
+                        style={{ color: 'var(--nav-text-primary)' }}>
+                        {s.companyName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Выход из обязательного окна: пока магазин не подключён (или
                   сессия истекла), закрыть его нечем, кроме этой кнопки.
                   Возвращаемся в кабинет счетов с плашкой «вернуться в Kaspi Bot». */}
@@ -911,6 +1225,17 @@ export default function KaspiShop() {
                 numbers, not buried in per-product rows. */}
             <motion.div data-tour="kaspi-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
               className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 lg:col-span-2">
+        {balanceWarning && (
+          <div role="alert" className="rounded-2xl p-4 lg:p-5 mb-4" style={{ border: '1px solid var(--nav-critical)' }}>
+            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-critical)' }}>
+              {balanceWarning.level === 'empty' ? 'Бот остановлен: нет денег на балансе' : 'Баланс заканчивается'}
+            </div>
+            <p className={`text-[13px] ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
+              {balanceWarning.message}{' '}
+              <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2 font-semibold" style={{ color: 'var(--nav-accent)' }}>Пополнить баланс</button>
+            </p>
+          </div>
+        )}
         {untouchedFloorCount > 0 && (
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-critical)' }}>
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
@@ -943,6 +1268,11 @@ export default function KaspiShop() {
                   </div>
                 </div>
               </div>
+              {costEstimate.count > 0 && (
+                <p data-testid="running-cost" className="text-[12px] mt-5 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+                  {`Каждая проверка цены стоит ${CHECK_PRICE_TENGE} ₸. Реальный период проверки ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)} (запуски идут раз в 10 минут). Ориентировочно ${formatTenge(costEstimate.dailyCost)} в сутки на ${costEstimate.count} ${pluralProducts(costEstimate.count)}.`}
+                </p>
+              )}
             </motion.div>
 
             <div data-tour="kaspi-cities" className="nav-glass rounded-2xl p-4">
@@ -1013,9 +1343,13 @@ export default function KaspiShop() {
                 </button>
               </div>
             </div>
-            {applyNowMessage && (
-              <div className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
-            )}
+            {applyNowMessage ? (
+              <div role="status" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
+            ) : stats && stats.activeCount > 0 ? (
+              <div data-testid="apply-now-cost" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
+                {`«Применить сейчас»: ${stats.activeCount} ${pluralProducts(stats.activeCount)} × ${CHECK_PRICE_TENGE} ₸ = ${formatTenge(stats.activeCount * CHECK_PRICE_TENGE)}, списывается при запуске.`}
+              </div>
+            ) : null}
 
             {stats && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -1046,11 +1380,18 @@ export default function KaspiShop() {
                           the card inline to full width. */}
                       <div role="button" tabIndex={0} onClick={() => {
                         setExpandedId(p.id)
+                        // Форма всегда открывается с сохранёнными значениями: правки,
+                        // которые не сохранили в прошлый раз, не должны выдавать себя за сохранённые.
+                        setEditValues(prev => ({ ...prev, [p.id]: editFromProduct(p) }))
+                        setSettingsError('')
+                        setSuggestError('')
+                        setSuggestion(null)
                         if (!cityPrices[p.id] && trackedCities.length > 0) {
                           authHeader().then(headers =>
                             fetch(`/api/kaspi-shop/products/city-prices?id=${p.id}`, { headers })
                               .then(res => res.ok ? res.json() : { cities: [] })
                               .then(data => setCityPrices(prev => ({ ...prev, [p.id]: data.cities || [] })))
+                              .catch(() => { /* «Загрузка…» остаётся только пока идёт запрос; без данных покажем пусто */ setCityPrices(prev => ({ ...prev, [p.id]: [] })) })
                           )
                         }
                       }} className="w-full text-left p-4 cursor-pointer">
@@ -1104,7 +1445,9 @@ export default function KaspiShop() {
                 })}
               </AnimatePresence>
 
-              {products.length === 0 && (
+              {/* Пустой список после сбоя запроса не равен «товаров нет»: ошибка и
+                  «Повторить» уже показаны плашкой выше. */}
+              {products.length === 0 && productsLoaded && (
                 <div className="nav-glass rounded-2xl p-8 text-center col-span-full">
                   <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
@@ -1120,7 +1463,8 @@ export default function KaspiShop() {
               {(() => {
                 const p = products.find(x => x.id === expandedId)
                 if (!p) return null
-                const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '', stockCount: String(p.stock_count ?? 0) }
+                const v = editValues[p.id] || editFromProduct(p)
+                const suggestBlock = suggestionBlockReason(p, (cityPrices[p.id] || []).some(c => c.competitorPrice !== null))
                 return (
                   <motion.div key="productSettings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30"
@@ -1142,17 +1486,17 @@ export default function KaspiShop() {
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }} title="Бот никогда не опустит цену ниже этого значения. Если конкурент ушёл ниже — бот остановится на минимуме и пришлёт уведомление, а когда конкурент вернётся выше, сам поднимет цену обратно.">Минимальная цена ⓘ</span>
-                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
-                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
-                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} inputMode="decimal" />
                                 </label>
                               </div>
@@ -1223,16 +1567,34 @@ export default function KaspiShop() {
                                   )}
                                 </div>
                               )}
+                              {settingsError && (
+                                <div className="text-xs mb-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{settingsError}</div>
+                              )}
                               <div className="flex gap-2">
-                                <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
+                                <button onClick={() => suggestPricing(p)} disabled={suggestingFor === p.id || !!suggestBlock}
                                   className="flex-1 text-xs nav-glass rounded-lg px-3 py-2 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
                                   <SparkleIcon /> {suggestingFor === p.id ? 'Думаем...' : 'ИИ-подбор цены'}
                                 </button>
-                                <button onClick={() => saveProductSettings(p.id)}
-                                  className="flex-1 text-xs rounded-lg px-3 py-2 font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                                  Сохранить
+                                <button onClick={() => saveProductSettings(p.id)} disabled={savingSettings}
+                                  className="flex-1 text-xs rounded-lg px-3 py-2 font-medium disabled:opacity-60" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                                  {savingSettings ? 'Сохраняем...' : 'Сохранить'}
                                 </button>
                               </div>
+                              {suggestBlock && (
+                                <div className="text-[11px] mt-2" data-testid="suggest-block" style={{ color: 'var(--nav-text-muted)' }}>{suggestBlock}</div>
+                              )}
+                              {suggestError && (
+                                <div className="text-xs mt-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{suggestError}</div>
+                              )}
+                              {suggestion && suggestion.id === p.id && (
+                                <div className="rounded-lg px-3 py-2 mt-2 text-[11px] leading-relaxed" data-testid="suggest-result" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                                  <div className="font-semibold mb-0.5" style={{ color: 'var(--nav-text-primary)' }}>
+                                    {`Оценка ИИ: минимум ${formatTenge(suggestion.floorPrice)}, шаг ${formatTenge(suggestion.undercutStep)}`}
+                                  </div>
+                                  {suggestion.reasoning && <div className="mb-1">{suggestion.reasoning}</div>}
+                                  Это оценка, а не расчёт и не гарантия. Цифры подставлены в поля выше, но ещё не сохранены: сверьте их со своей маржой и нажмите «Сохранить».
+                                </div>
+                              )}
                               <button onClick={() => deleteProduct(p.id)}
                                 className="mt-3 text-[11px] font-semibold rounded-lg px-3 py-2 flex items-center gap-1.5 transition-colors"
                                 style={{ color: 'var(--nav-critical)', border: '1px solid var(--nav-critical)' }}>
@@ -1280,6 +1642,7 @@ export default function KaspiShop() {
                 className="w-full rounded-xl py-2.5 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {toppingUp ? 'Готовим QR...' : 'Пополнить'}
               </button>
+              {topupError && <div className="text-xs mt-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{topupError}</div>}
               {topupPending && (
                 <div className="rounded-xl p-3 mt-3" style={{ background: 'var(--nav-accent-soft)' }}>
                   <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
@@ -1322,7 +1685,7 @@ export default function KaspiShop() {
             <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
               transition={{ duration: 0.3, ease: EASE }}
               onClick={e => e.stopPropagation()}
-              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-lg p-5 max-h-[86dvh] flex flex-col"
+              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-lg p-5 max-h-[86dvh] flex flex-col overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
 
@@ -1372,21 +1735,21 @@ export default function KaspiShop() {
               ) : (
                 <>
                   <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>Применится ко всем {bulkSelected.size} выбранным товарам.</div>
-                  {bulkError && <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{bulkError}</div>}
+                  {bulkError && <div className="text-xs mb-3" role="alert" style={{ color: 'var(--nav-critical)' }}>{bulkError}</div>}
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
-                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                         value={bulkFloorPrice} onChange={e => setBulkFloorPrice(e.target.value)} inputMode="decimal" />
                     </label>
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
-                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
                         value={bulkMaxPrice} onChange={e => setBulkMaxPrice(e.target.value)} inputMode="decimal" />
                     </label>
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
-                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                         value={bulkUndercutStep} onChange={e => setBulkUndercutStep(e.target.value)} inputMode="decimal" />
                     </label>
                   </div>
@@ -1400,12 +1763,25 @@ export default function KaspiShop() {
                     </label>
                     <label className="block">
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Частота проверки, мин</span>
-                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                         value={bulkFrequency} onChange={e => setBulkFrequency(e.target.value)} inputMode="numeric" pattern="[0-9]*" />
                     </label>
                     <div className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                       {STRATEGY_DESCRIPTIONS[bulkStrategy] || ''} {STRATEGY_COMMON_NOTE}
                     </div>
+                    {bulkEstimate && (
+                      <div data-testid="bulk-cost" className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                        <div className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+                          {`Расход: ориентировочно ${formatTenge(bulkEstimate.dailyCost)} в сутки`}
+                        </div>
+                        {`${bulkEstimate.count} ${pluralProducts(bulkEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ за проверку. Реальный период проверки ${periodLabel(bulkEstimate.minPeriod, bulkEstimate.maxPeriod)}: запуски идут раз в 10 минут. Деньги списываются с баланса (сейчас ${formatTenge(balance)}), когда он закончится, бот остановится.`}
+                        {bulkRunway !== null && bulkRunway < 24 && (
+                          <div className="font-semibold mt-1" style={{ color: 'var(--nav-critical)' }}>
+                            {`Баланса хватит ${runwayLabel(bulkRunway)}. Пополните баланс до запуска.`}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setBulkStep('select')}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
+import { validateBulkSettings, partitionBulkRows } from '@/lib/kaspiShop/productSettings'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,8 +25,6 @@ async function requireUser(req: NextRequest) {
 // Northline's cap on a single bulk-add batch -- matched here for parity
 // (see the founder's competitor research this feature is based on).
 const MAX_BULK_ITEMS = 100
-
-const VALID_STRATEGIES = new Set(['undercut_leader', 'match_leader', 'stay_above_leader', 'be_second'])
 
 // "Добавить несколько" backend. IMPORTANT DEVIATION from a literal
 // catalog-search-and-insert flow: src/lib/kaspiShop/finalizeConnection.ts
@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
+  }
   const productIds: unknown = body.productIds
   if (!Array.isArray(productIds) || productIds.length === 0) {
     return NextResponse.json({ error: 'productIds обязателен и должен быть непустым списком' }, { status: 400 })
@@ -74,42 +77,37 @@ export async function POST(req: NextRequest) {
   if (productIds.length > MAX_BULK_ITEMS) {
     return NextResponse.json({ error: `Максимум ${MAX_BULK_ITEMS} товаров за один раз` }, { status: 400 })
   }
-  if (!productIds.every(id => typeof id === 'string' && id.length > 0)) {
+  if (!productIds.every(id => isUuid(id))) {
     return NextResponse.json({ error: 'productIds должен быть списком id' }, { status: 400 })
   }
 
-  // Mirrors the floorPrice validation in POST /api/kaspi-shop/products
-  // (Number(...) first, then validate the RESULT, so a non-numeric input
-  // like "abc" can't slip past a NaN comparison) and the max_price >
-  // floor_price cross-check in PATCH /api/kaspi-shop/products -- not
-  // factored into a shared helper since PATCH's version deliberately only
-  // fires when both fields are present in that same partial-update request,
-  // a condition that doesn't apply here (every field below is always
-  // present together, since this is one shared config for the whole batch).
-  const floorPriceNum = Number(body.floorPrice)
-  if (!Number.isFinite(floorPriceNum) || floorPriceNum <= 0) {
-    return NextResponse.json({ error: 'floorPrice должен быть числом больше нуля' }, { status: 400 })
-  }
-  let maxPriceNum: number | null = null
-  if (body.maxPrice !== undefined && body.maxPrice !== null && body.maxPrice !== '') {
-    maxPriceNum = Number(body.maxPrice)
-    if (!Number.isFinite(maxPriceNum)) {
-      return NextResponse.json({ error: 'maxPrice должен быть числом' }, { status: 400 })
-    }
-    if (maxPriceNum <= floorPriceNum) {
-      return NextResponse.json({ error: 'max_price должен быть больше floor_price' }, { status: 400 })
-    }
-  }
-  const undercutStepNum = Number(body.undercutStep)
-  if (!Number.isFinite(undercutStepNum) || undercutStepNum < 0) {
-    return NextResponse.json({ error: 'undercutStep должен быть числом не меньше нуля' }, { status: 400 })
-  }
-  const dempingStrategy = typeof body.dempingStrategy === 'string' && VALID_STRATEGIES.has(body.dempingStrategy)
-    ? body.dempingStrategy
-    : 'undercut_leader'
-  const checkFrequencyMinutesNum = body.checkFrequencyMinutes != null ? Number(body.checkFrequencyMinutes) : 15
-  if (!Number.isFinite(checkFrequencyMinutesNum) || checkFrequencyMinutesNum <= 0) {
-    return NextResponse.json({ error: 'checkFrequencyMinutes должен быть числом больше нуля' }, { status: 400 })
+  // Все денежные поля проверяет productSettings.ts -- тем же набором правил, что
+  // POST/PATCH (аудит Kaspi 06.11.2026, K7/K18): пол > 0, шаг >= 0, максимум выше
+  // пола, стратегия из списка (неизвестная больше не подменяется молча),
+  // частота -- целое число минут не меньше минимума формы.
+  const checked = validateBulkSettings(body)
+  if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
+  const { floorPrice, maxPrice, undercutStep, dempingStrategy, checkFrequencyMinutes } = checked.value
+
+  // Одна общая цена-пол и один максимум на товары с РАЗНЫМИ ценами (K18):
+  // товар за 800 с полом 5000 на следующем цикле был бы поднят до 5000. Читаем
+  // строки (только свои: user_id) и не включаем те, где пол выше текущей цены
+  // или максимум ниже неё; список пропущенных возвращаем, чтобы форма показала,
+  // какие товары и почему остались как были.
+  const { data: rows, error: rowsError } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('id, product_name, own_current_price')
+    .in('id', productIds)
+    .eq('user_id', user.id)
+  if (rowsError) return NextResponse.json({ error: rowsError.message }, { status: 500 })
+  const { eligible, skipped } = partitionBulkRows(rows || [], floorPrice, maxPrice)
+  if (eligible.length === 0) {
+    return NextResponse.json({
+      error: skipped.length > 0
+        ? 'Ни один товар не подошёл: минимальная цена выше текущей цены товара или максимальная ниже неё. Проверьте значения.'
+        : 'Товары не найдены',
+      skipped,
+    }, { status: 400 })
   }
 
   // .in('id', ...) scoped to .eq('user_id', user.id) -- same ownership
@@ -118,17 +116,17 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('kaspi_shop_tracked_products')
     .update({
-      floor_price: floorPriceNum,
-      max_price: maxPriceNum,
-      undercut_step: undercutStepNum,
+      floor_price: floorPrice,
+      max_price: maxPrice,
+      undercut_step: undercutStep,
       demping_strategy: dempingStrategy,
-      check_frequency_minutes: checkFrequencyMinutesNum,
+      check_frequency_minutes: checkFrequencyMinutes,
       enabled: true,
     })
-    .in('id', productIds)
+    .in('id', eligible.map(r => r.id))
     .eq('user_id', user.id)
     .select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ ok: true, updated: (data || []).length })
+  return NextResponse.json({ ok: true, updated: (data || []).length, skipped })
 }

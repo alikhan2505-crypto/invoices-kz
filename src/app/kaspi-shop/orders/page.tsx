@@ -9,6 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES, PACKING_STATUS } from '@/lib/kaspiShop/orderStatuses'
 import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
+import { paginateOrders, partialLoadMessage, almatyDateStamp } from '@/lib/kaspiShop/ordersPaging'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
@@ -54,6 +55,11 @@ type Order = {
   items: { code: string; name: string; imageUrl: string | null; quantity: number }[]
 }
 
+// Ключ загруженного списка: вкладка + город + поиск.
+function ordersKey(status: string, cityId: string, orderCode: string): string {
+  return `${status}|${cityId}|${orderCode}`
+}
+
 function KaspiShopOrdersInner() {
   // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
   usePageDocumentTitle('Заказы')
@@ -68,6 +74,14 @@ function KaspiShopOrdersInner() {
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  // Нейтральное сообщение после действия (выгрузка, накладные): не ошибка, поэтому не в loadError
+  // (у того кнопка «Повторить» перезагружает список).
+  const [notice, setNotice] = useState('')
+  // Список не получен (сбой Kaspi): пустой экран не должен читаться как «заказов нет».
+  const [listFailed, setListFailed] = useState(false)
+  // Для какой вкладки/города/поиска загружен список orders. Пока он не совпал с текущими,
+  // список на экране чужой: его не показываем и по нему не действуем (аудит K1/K2).
+  const [loadedKey, setLoadedKey] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
   const [confirmingPacking, setConfirmingPacking] = useState(false)
@@ -95,6 +109,10 @@ function KaspiShopOrdersInner() {
   const PAGE_SIZE = 10
   const LOAD_ALL_CAP = 500
   const prevStatus = useRef(status)
+  // Счётчик запусков loadOrders: ответ медленного прежнего запуска (например «Архив» на
+  // 50 запросов), пришедший после переключения вкладки, не имеет права затереть список
+  // новой вкладки и погасить её индикатор загрузки (аудит K1).
+  const reqId = useRef(0)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
@@ -157,8 +175,13 @@ function KaspiShopOrdersInner() {
   // progress instead of sitting on "Загружаем заказы..." for however long a
   // few dozen sequential requests take.
   async function loadOrders(forStatus: string, forCityId: string = '', forOrderCode: string = '') {
+    const id = ++reqId.current
+    const isStale = () => id !== reqId.current
+    const key = ordersKey(forStatus, forCityId, forOrderCode)
     setOrdersLoading(true)
     setLoadError('')
+    setListFailed(false)
+    setNotice('')
     setSelected(new Set())
     setPackingConfirmedMessage('')
     setLoadedCount(0)
@@ -166,30 +189,51 @@ function KaspiShopOrdersInner() {
       const headers = await authHeader()
       const cityParam = forCityId ? `&cityId=${encodeURIComponent(forCityId)}` : ''
       const orderCodeParam = forOrderCode ? `&orderCode=${encodeURIComponent(forOrderCode)}` : ''
-      const all: Order[] = []
-      let realTotal = 0
-      let sawSessionExpired = false
-      for (let p = 0; p * PAGE_SIZE < LOAD_ALL_CAP; p++) {
-        const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${p}${cityParam}${orderCodeParam}`, { headers })
-        const data = await res.json()
-        if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
-        if (data.sessionExpired) sawSessionExpired = true
-        realTotal = data.total || 0
-        const pageOrders: Order[] = data.orders || []
-        all.push(...pageOrders)
-        setLoadedCount(all.length)
-        if (pageOrders.length < PAGE_SIZE || all.length >= realTotal) break
+      const outcome = await paginateOrders<Order>({
+        pageSize: PAGE_SIZE,
+        cap: LOAD_ALL_CAP,
+        shouldStop: isStale,
+        onProgress: n => { if (!isStale()) setLoadedCount(n) },
+        fetchPage: async p => {
+          const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${p}${cityParam}${orderCodeParam}`, { headers })
+          const data = await res.json().catch(() => ({}))
+          // Сбой приходит как 502 с текстом (и sessionExpired) -- это не «пустая страница».
+          if (!res.ok) return { orders: [], total: 0, failed: true, sessionExpired: !!data.sessionExpired, error: data.error || 'Не удалось загрузить заказы' }
+          return { orders: (data.orders || []) as Order[], total: Number(data.total) || 0, sessionExpired: !!data.sessionExpired }
+        },
+      })
+      if (outcome.aborted || isStale()) return
+      setLoadedKey(key)
+      if (outcome.sessionExpired) {
+        setSessionExpired(true)
+        setOrders([]); setTotal(0)
+        setListFailed(true)
+        setLoadError(outcome.error || 'Сессия Kaspi истекла — переподключите магазин')
+        return
       }
-      setOrders(all)
-      setTotal(realTotal)
-      if (sawSessionExpired) setSessionExpired(true)
-      if (realTotal > LOAD_ALL_CAP) setLoadError(`Показаны первые ${LOAD_ALL_CAP} заказов из ${realTotal} — сузьте фильтром по городу или поиском по номеру`)
+      if (outcome.failed) {
+        // Не затираем total нулём и не выдаём набранное за полный список.
+        setOrders(outcome.orders)
+        setListFailed(outcome.orders.length === 0)
+        setTotal(outcome.orders.length > 0 ? outcome.total : 0)
+        setLoadError(outcome.orders.length > 0
+          ? partialLoadMessage(outcome.orders.length, outcome.total, true)
+          : (outcome.error || 'Не удалось загрузить заказы'))
+        return
+      }
+      setOrders(outcome.orders)
+      setTotal(outcome.total)
+      if (outcome.capped) setLoadError(`Показаны первые ${LOAD_ALL_CAP} заказов из ${outcome.total} — сузьте фильтром по городу или поиском по номеру`)
+      else if (!outcome.complete) setLoadError(partialLoadMessage(outcome.orders.length, outcome.total, false) + ', повторите')
     } catch (e: any) {
+      if (isStale()) return
+      setLoadedKey(key)
+      setListFailed(true)
       setLoadError('Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.')
       setOrders([])
       setTotal(0)
     } finally {
-      setOrdersLoading(false)
+      if (!isStale()) setOrdersLoading(false)
     }
   }
 
@@ -197,10 +241,11 @@ function KaspiShopOrdersInner() {
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/orders/counters', { headers })
-      if (!res.ok) return
-      const data = await res.json()
-      setCounts(data.counts || {})
-      if (data.sessionExpired) setSessionExpired(true)
+      const data = await res.json().catch(() => null)
+      if (data?.sessionExpired) setSessionExpired(true)
+      // Сбой (502) оставляет прежние числа на вкладках, а не обнуляет их.
+      if (!res.ok || !data?.counts) return
+      setCounts(data.counts)
     } catch {
       // Badge counts are a nice-to-have -- a failure here shouldn't block
       // the order list itself from showing.
@@ -227,19 +272,34 @@ function KaspiShopOrdersInner() {
     setSelected(new Set(visibleOrders.map(o => o.code)))
   }
 
+  // Переключение «Все» / «Завтра до 20:00» меняет, какие карточки видны, поэтому выбор
+  // сбрасывается: иначе действия уходили бы по скрытым заказам (аудит K2).
+  function changeDateMode(mode: DeliveryDateMode) {
+    setDateMode(mode)
+    setSelected(new Set())
+  }
+
   async function printWaybills(format: 'a4' | 'a6') {
-    if (selected.size === 0 || printing) return
+    if (selectedVisibleCodes.length === 0 || printing) return
     setPrinting(format)
     setLoadError('')
+    setNotice('')
     try {
       const headers = await authHeader()
+      // Только то, что выбрано И видно сейчас (то же число, что в счётчике над кнопками).
       const res = await fetch('/api/kaspi-shop/orders/waybills', {
-        method: 'POST', headers, body: JSON.stringify({ orderCodes: Array.from(selected), format }),
+        method: 'POST', headers, body: JSON.stringify({ orderCodes: selectedVisibleCodes, format }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+        if (data.sessionExpired) setSessionExpired(true)
         setLoadError(data.error || 'Не удалось получить накладные')
         return
+      }
+      const missingHeader = res.headers.get('x-missing-orders')
+      if (missingHeader) {
+        const missing = missingHeader.split(',').filter(Boolean)
+        setNotice(`Скачаны накладные для ${selectedVisibleCodes.length - missing.length} из ${selectedVisibleCodes.length} заказов. Для остальных накладной ещё нет (появится в течение 5 минут): ${missing.join(', ')}.`)
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -262,20 +322,26 @@ function KaspiShopOrdersInner() {
   // instant it succeeds (confirmed live 2026-08-26), so a full reload of
   // both the list and the sidebar-style counts is exactly what's needed.
   async function confirmPackingAction() {
-    if (selected.size === 0 || confirmingPacking) return
+    if (selectedVisibleOrders.length === 0 || confirmingPacking) return
     setConfirmingPacking(true)
     setLoadError('')
+    setNotice('')
     setPackingConfirmedMessage('')
     try {
       const headers = await authHeader()
-      const selectedOrders = orders
-        .filter(o => selected.has(o.code))
+      // Отправляем только выбранные И видимые заказы: ровно то, что показывает счётчик «Выбрано».
+      const selectedOrders = selectedVisibleOrders
         .map(o => ({ orderCode: o.code, quantity: o.items.reduce((sum, it) => sum + it.quantity, 0) }))
+      if (selectedOrders.some(o => o.quantity < 1)) {
+        setLoadError('У одного из выбранных заказов нет позиций, подтвердить упаковку нельзя. Снимите его с выбора.')
+        return
+      }
       const res = await fetch('/api/kaspi-shop/orders/confirm-packing', {
         method: 'POST', headers, body: JSON.stringify({ orders: selectedOrders }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (data.sessionExpired) setSessionExpired(true)
         setLoadError(data.error || 'Не удалось подтвердить упаковку')
         return
       }
@@ -291,23 +357,34 @@ function KaspiShopOrdersInner() {
   async function exportExcel() {
     setExporting(true)
     setLoadError('')
+    setNotice('')
     try {
       const headers = await authHeader()
       const cityParam = cityId ? `&cityId=${encodeURIComponent(cityId)}` : ''
       const res = await fetch(`/api/kaspi-shop/orders/export?status=${encodeURIComponent(status)}${cityParam}`, { headers })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+        if (data.sessionExpired) setSessionExpired(true)
         setLoadError(data.error || 'Не удалось выгрузить заказы')
         return
       }
-      if (res.headers.get('x-truncated') === 'true') {
-        setLoadError('Выгружены первые 500 заказов — список обрезан')
+      // Точное число строк в файле: «выгружено N» без «возможно обрезано» вслепую.
+      const exportedCount = Number(res.headers.get('x-exported-count'))
+      const totalCount = Number(res.headers.get('x-total-count'))
+      if (Number.isFinite(exportedCount) && res.headers.get('x-exported-count') !== null) {
+        if (res.headers.get('x-truncated') === 'true') {
+          setLoadError(`Выгружено ${exportedCount} из ${totalCount} заказов — файл неполный (лимит 500 заказов или Kaspi прервал ответ), повторите`)
+        } else {
+          setNotice(`Выгружено заказов: ${exportedCount}`)
+        }
+      } else if (res.headers.get('x-truncated') === 'true') {
+        setLoadError('Выгрузка неполная — повторите')
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `zakazy_${status}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.download = `zakazy_${status}_${almatyDateStamp()}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -319,7 +396,17 @@ function KaspiShopOrdersInner() {
     }
   }
 
-  const visibleOrders = BULK_SELECTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(orders, dateMode) : orders
+  const currentKey = ordersKey(status, cityId, orderCodeSearch)
+  // Список принадлежит текущей вкладке только когда ключи совпали; до этого (кадр между
+  // сменой вкладки и стартом загрузки) он чужой и не показывается.
+  const listIsCurrent = loadedKey === currentKey
+  const visibleOrders = !listIsCurrent ? [] : (BULK_SELECTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(orders, dateMode) : orders)
+  // Массовые действия только по выбранным И видимым заказам; счётчик показывает их же число.
+  const selectedVisibleOrders = visibleOrders.filter(o => selected.has(o.code))
+  const selectedVisibleCodes = selectedVisibleOrders.map(o => o.code)
+  // В режиме поиска по номеру карточки из любых статусов: выбор и массовые кнопки выключены.
+  const bulkEnabled = BULK_SELECTABLE_STATUSES.includes(status) && !orderCodeSearch
+  const listPending = ordersLoading || !listIsCurrent
 
   if (loading) return <LoadingSpinner />
 
@@ -373,6 +460,10 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
+        {notice && (
+          <div className="nav-glass rounded-2xl p-3 mb-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{notice}</div>
+        )}
+
         {orderCodeSearch && (
           <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
             Поиск по номеру заказа «{orderCodeSearch}» — ищет по всем статусам, вкладка ниже не учитывается
@@ -401,12 +492,12 @@ function KaspiShopOrdersInner() {
           })}
         </div>
 
-        {BULK_SELECTABLE_STATUSES.includes(status) && (
+        {bulkEnabled && (
           <div className="flex gap-2 mb-4">
             {([['all', 'Все'], ['tomorrow', 'Завтра до 20:00']] as const).map(([value, label]) => {
               const active = dateMode === value
               return (
-                <button key={value} onClick={() => setDateMode(value)}
+                <button key={value} onClick={() => changeDateMode(value)}
                   className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
                   style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'var(--nav-accent)' : 'var(--nav-surface-glass)' }}>
                   {label}
@@ -416,13 +507,14 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {BULK_SELECTABLE_STATUSES.includes(status) && total > 0 && (
+        {bulkEnabled && !listPending && visibleOrders.length > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <button onClick={selectAllVisible}
               className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-primary)' }}>
-              {`Выбрать все (${total})`}
+              {/* Число = сколько реально выберется (видимые карточки); при неполной загрузке говорим об этом. */}
+              {orders.length < total ? `Выбрать загруженные (${visibleOrders.length} из ${total})` : `Выбрать все (${visibleOrders.length})`}
             </button>
-            {selected.size > 0 && (
+            {selectedVisibleOrders.length > 0 && (
               <button onClick={deselectAll}
                 className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
                 Снять выбор
@@ -431,9 +523,9 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {status === PACKING_STATUS && selected.size > 0 && (
-          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
-            <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
+        {bulkEnabled && status === PACKING_STATUS && selectedVisibleOrders.length > 0 && (
+          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap mb-4" style={{ background: 'var(--nav-accent)' }}>
+            <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selectedVisibleOrders.length}</span>
             <button onClick={confirmPackingAction} disabled={confirmingPacking}
               className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
               {confirmingPacking ? 'Подтверждаем...' : 'Я упаковал, сформировать накладные'}
@@ -445,10 +537,10 @@ function KaspiShopOrdersInner() {
           <div className="rounded-2xl p-3 mb-4 text-sm" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>{packingConfirmedMessage}</div>
         )}
 
-        {WAYBILL_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
-          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
-            <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
-            <div className="flex gap-2">
+        {bulkEnabled && WAYBILL_PRINTABLE_STATUSES.includes(status) && selectedVisibleOrders.length > 0 && (
+          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap mb-4" style={{ background: 'var(--nav-accent)' }}>
+            <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selectedVisibleOrders.length}</span>
+            <div className="flex gap-2 flex-wrap">
               <button onClick={() => printWaybills('a4')} disabled={printing !== null}
                 className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
                 {printing === 'a4' ? 'Готовим PDF...' : 'Скачать накладные в формате А4'}
@@ -461,23 +553,26 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {ordersLoading ? (
+        {listPending ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>
             {loadedCount > PAGE_SIZE ? `Загружаем заказы... (${loadedCount})` : 'Загружаем заказы...'}
           </div>
         ) : visibleOrders.length === 0 ? (
+          // При сбое загрузки пустой список -- не «заказов нет»: причину уже показывает красная плашка выше.
+          listFailed ? null : (
           <div className="nav-glass rounded-2xl p-8 text-center">
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
               {orders.length > 0 && dateMode === 'tomorrow' ? 'Среди загруженных заказов нет заказов на завтра до 20:00.' : 'Заказов в этом статусе нет.'}
             </div>
           </div>
+          )
         ) : (() => {
           const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 min-[2000px]:grid-cols-10 gap-2.5'
 
           function renderCard(o: Order, i: number) {
             const firstItem = o.items[0]
             const extraCount = o.items.length - 1
-            const selectable = BULK_SELECTABLE_STATUSES.includes(status)
+            const selectable = bulkEnabled
             return (
               <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, ease: EASE, delay: Math.min(i * 0.02, 0.2) }}
@@ -558,7 +653,7 @@ function KaspiShopOrdersInner() {
           )
         })()}
 
-        {orders.length < total && (
+        {listIsCurrent && !listPending && orders.length < total && (
           <div className="mt-4 text-xs" style={{ color: 'var(--nav-text-muted)' }}>Показаны первые {orders.length} из {total}</div>
         )}
       </PageContainer>

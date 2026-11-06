@@ -78,8 +78,9 @@ export async function GET(req: NextRequest) {
   }
 
   const body: MenuCounts & { sessionExpired: boolean } = {
-    orders: orders && !orders.sessionExpired ? ordersInWork(orders.counts) : null,
-    refunds: refunds && !refunds.sessionExpired ? refundsNeedingAttention(refunds.counts) : null,
+    // failed -> null («не знаем»): сбой Kaspi не должен превращаться в число.
+    orders: orders && !orders.sessionExpired && !orders.failed ? ordersInWork(orders.counts) : null,
+    refunds: refunds && !refunds.sessionExpired && !refunds.failed ? refundsNeedingAttention(refunds.counts) : null,
     pendingProducts: pending && !pending.sessionExpired ? pending.count : null,
     sessionExpired: false,
   }

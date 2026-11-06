@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
-import { isCheckDue } from '@/lib/kaspiShop/checkCycle'
+import { isCheckDue, isSessionActive } from '@/lib/kaspiShop/checkCycle'
+import { validateProductCreate, validateProductPatch } from '@/lib/kaspiShop/productSettings'
+import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,10 +35,17 @@ export async function GET(req: NextRequest) {
   // FIRST PROJECT header right after the founder connected their 2nd store).
   let connectionPaused = false
   let connectionId: string | null = null
+  let sessionActive = true
   try {
     const connection = await loadConnection(user.id)
     connectionPaused = !!connection?.paused
     connectionId = connection?.id ?? null
+    // Мёртвая сессия кабинета: бот такое подключение не проверяет (см.
+    // getDueTrackedProducts), значит и «готовых к применению» нет.
+    if (connectionId) {
+      const { data: sessionRow } = await supabase.from('kaspi_shop_connections').select('session_status').eq('id', connectionId).maybeSingle()
+      sessionActive = isSessionActive(sessionRow?.session_status)
+    }
   } catch {
     // Stats are a best-effort summary, not the source of truth for whether
     // the connection itself works -- the rest of the page already surfaces
@@ -69,9 +78,9 @@ export async function GET(req: NextRequest) {
   const stats = {
     totalRules: products.length,
     activeCount: products.filter((p: any) => p.enabled).length,
-    readyToApply: connectionPaused
+    readyToApply: connectionPaused || !sessionActive
       ? 0
-      : products.filter((p: any) => p.enabled && isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)).length,
+      : products.filter((p: any) => p.enabled && p.available_for_sale !== false && isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)).length,
     blockedAtFloor: products.filter((p: any) => p.enabled && p.held_at_floor).length,
   }
 
@@ -93,7 +102,10 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { kaspiSku, productName, brand, storeId, stockCount, ownCurrentPrice, floorPrice, undercutStep, checkFrequencyMinutes } = body
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
+  }
+  const { kaspiSku, productName, brand, storeId, ownCurrentPrice, floorPrice, undercutStep } = body
   if (!kaspiSku || !productName || !brand || !storeId || ownCurrentPrice == null || floorPrice == null || undercutStep == null) {
     return NextResponse.json({ error: 'kaspiSku, productName, brand, storeId, ownCurrentPrice, floorPrice и undercutStep обязательны' }, { status: 400 })
   }
@@ -102,11 +114,11 @@ export async function POST(req: NextRequest) {
   // (the brief's original shape) let a non-numeric floorPrice like "abc"
   // slip past `Number("abc") <= 0` (false, since NaN compares false to
   // everything) straight into the insert, defeating the one check this
-  // field exists for.
-  const floorPriceNum = Number(floorPrice)
-  if (!Number.isFinite(floorPriceNum) || floorPriceNum <= 0) {
-    return NextResponse.json({ error: 'floorPrice должен быть числом больше нуля' }, { status: 400 })
-  }
+  // field exists for. Все денежные поля (цена, пол, шаг, частота, остаток)
+  // проверяются одним набором правил с PATCH и bulk -- см. productSettings.ts
+  // (аудит Kaspi 06.11.2026, K7).
+  const checked = validateProductCreate(body)
+  if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
 
   const { data, error } = await supabase.from('kaspi_shop_tracked_products').insert({
     connection_id: connection.id,
@@ -115,11 +127,11 @@ export async function POST(req: NextRequest) {
     product_name: productName,
     brand,
     store_id: storeId,
-    stock_count: stockCount ?? 0,
-    own_current_price: ownCurrentPrice,
-    floor_price: floorPriceNum,
-    undercut_step: undercutStep,
-    check_frequency_minutes: checkFrequencyMinutes ?? 15,
+    stock_count: checked.value.stockCount,
+    own_current_price: checked.value.ownCurrentPrice,
+    floor_price: checked.value.floorPrice,
+    undercut_step: checked.value.undercutStep,
+    check_frequency_minutes: checked.value.checkFrequencyMinutes,
   }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ product: data })
@@ -137,37 +149,28 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { id, ...updates } = body
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-
-  const allowed = ['floor_price', 'undercut_step', 'check_frequency_minutes', 'enabled', 'stock_count', 'demping_strategy', 'excluded_city_codes', 'excluded_merchant_ids', 'max_price']
-  const patch: Record<string, any> = {}
-  for (const key of allowed) if (key in updates) patch[key] = updates[key]
-  if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'no updatable fields provided' }, { status: 400 })
-
-  // Only checked when both fields are being set in the same PATCH -- the
-  // live caller (the product settings form) always sends floor_price and
-  // max_price together, and validating a max_price-only PATCH against the
-  // row's existing floor_price would need an extra read before the write.
-  // A PATCH touching only one of the two fields (or neither) is unaffected.
-  if ('floor_price' in patch && 'max_price' in patch && patch.max_price !== null) {
-    const floorPriceNum = Number(patch.floor_price)
-    const maxPriceNum = Number(patch.max_price)
-    if (Number.isFinite(floorPriceNum) && Number.isFinite(maxPriceNum) && maxPriceNum <= floorPriceNum) {
-      return NextResponse.json({ error: 'max_price должен быть больше floor_price' }, { status: 400 })
-    }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
+  const { id, ...updates } = body
+  if (!id || typeof id !== 'string' || !isUuid(id)) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-  // Previous state, to detect a real stock_count change for the honest
-  // notice below.
+  // Previous state: stock_count (to detect a real change for the honest
+  // notice below) and the stored floor/max -- когда пришло только одно из
+  // двух, второе берётся отсюда (аудит Kaspi 06.11.2026, K7/K16: раньше max
+  // сверялся с полом только если оба пришли в одном запросе).
   const { data: row, error: rowError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('stock_count')
+    .select('stock_count, floor_price, max_price')
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
   if (rowError) return NextResponse.json({ error: rowError.message }, { status: 500 })
   if (!row) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+
+  const checked = validateProductPatch(updates, row)
+  if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
+  const patch = checked.patch
 
   const { error } = await supabase
     .from('kaspi_shop_tracked_products')

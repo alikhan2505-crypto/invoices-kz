@@ -34,7 +34,25 @@ describe('getRefundCounts', () => {
   it('reports sessionExpired on 401', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 401))
     const result = await getRefundCounts('cookie=1', '425002', fetchFn as any)
-    expect(result).toEqual({ counts: [], sessionExpired: true })
+    expect(result).toMatchObject({ counts: [], sessionExpired: true, failed: true })
+  })
+
+  it('a 500 is a failure, not an honest empty list of counts', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 500))
+    const result = await getRefundCounts('c', '425002', fetchFn as any)
+    expect(result).toMatchObject({ counts: [], sessionExpired: false, failed: true })
+    expect(result.error).toMatch(/500/)
+  })
+
+  it('an unexpected (non-array) body is a failure', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ nope: 1 }))
+    expect(await getRefundCounts('c', '425002', fetchFn as any)).toMatchObject({ counts: [], failed: true })
+  })
+
+  it('a thrown fetch (timeout, network) is a failure, not an exception', async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new DOMException('timed out', 'TimeoutError'))
+    const result = await getRefundCounts('c', '425002', fetchFn as any)
+    expect(result).toMatchObject({ counts: [], sessionExpired: false, failed: true, error: 'Kaspi не ответил вовремя' })
   })
 })
 
@@ -113,7 +131,19 @@ describe('listRefunds', () => {
   it('reports sessionExpired on 403', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 403))
     const result = await listRefunds('c', '425002', 'NEW', 0, fetchFn as any)
-    expect(result).toEqual({ refunds: [], total: 0, sessionExpired: true })
+    expect(result).toMatchObject({ refunds: [], total: 0, sessionExpired: true, failed: true })
+  })
+
+  it('a 500 or a body without data[] is a failure, not an empty tab', async () => {
+    expect(await listRefunds('c', '425002', 'NEW', 0, vi.fn().mockResolvedValue(jsonResponse({}, 500)) as any))
+      .toMatchObject({ refunds: [], total: 0, failed: true })
+    expect(await listRefunds('c', '425002', 'NEW', 0, vi.fn().mockResolvedValue(jsonResponse({ total: 3 })) as any))
+      .toMatchObject({ refunds: [], total: 0, failed: true })
+  })
+
+  it('a genuinely empty tab (data: []) is NOT a failure', async () => {
+    const result = await listRefunds('c', '425002', 'NEW', 0, vi.fn().mockResolvedValue(jsonResponse({ data: [], total: 0 })) as any)
+    expect(result).toMatchObject({ refunds: [], total: 0, failed: false })
   })
 })
 
@@ -179,6 +209,6 @@ describe('getRefundDetails', () => {
   it('reports sessionExpired on 401', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 401))
     const result = await getRefundDetails('c', '425002', 'x', 'y-1', fetchFn as any)
-    expect(result).toEqual({ detail: null, sessionExpired: true })
+    expect(result).toMatchObject({ detail: null, sessionExpired: true, failed: true })
   })
 })

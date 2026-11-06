@@ -32,9 +32,12 @@ describe('computeRepriceCandidate', () => {
     expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 1 })
   })
 
-  it('also recovers if own current price somehow sits below the floor', () => {
+  // Было 4950 (ползком по шагу, цена ещё несколько циклов ниже минимума).
+  // Изменено осознанно 06.11.2026 (аудит K6/K16): пол -- «ниже не опускаться»,
+  // цена ниже пола сразу поднимается на пол.
+  it('jumps straight to the floor if own current price somehow sits below the floor', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 50, floorPrice: 5000, ownCurrentPrice: 4900 })
-    expect(result).toEqual({ price: 4950, heldAtFloor: false, newStreak: 1 })
+    expect(result).toEqual({ price: 5000, heldAtFloor: false, newStreak: 1 })
   })
 
   it('does not keep climbing once recovered above the floor -- holds flat on the next no-competitor cycle (no maxPrice configured)', () => {
@@ -319,7 +322,8 @@ describe('computePerCityReprice', () => {
     })
     expect(results).toEqual([
       { cityCode: 'A', price: 6100, heldAtFloor: false, newStreak: 3 },
-      { cityCode: 'B', price: 8900, heldAtFloor: false, newStreak: 0 },
+      // Конкурент 9000 выше потолка 8000: раньше было 8900 (баг K6/K17), теперь потолок.
+      { cityCode: 'B', price: 8000, heldAtFloor: false, newStreak: 0 },
     ])
   })
 

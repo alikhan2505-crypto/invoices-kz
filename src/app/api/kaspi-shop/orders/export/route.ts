@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listOrders } from '@/lib/kaspiShop/cabinetApi'
+import { listOrders, PAGE_SIZE } from '@/lib/kaspiShop/cabinetApi'
 import { buildOrdersWorkbookBuffer } from '@/lib/kaspiShop/ordersExport'
 import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
+import { paginateOrders, almatyDateStamp } from '@/lib/kaspiShop/ordersPaging'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,6 +29,9 @@ const MAX_EXPORT_ORDERS = 500
 // budget -- same pattern as api/cron/kaspi-poll/route.ts.
 export const maxDuration = 60
 
+// Сколько из 60 секунд тратим на листание Kaspi; остальное на сборку xlsx и ответ.
+const EXPORT_BUDGET_MS = 48_000
+
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -45,38 +49,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const orders: Awaited<ReturnType<typeof listOrders>>['orders'] = []
-  let total = 0
-  let page = 0
-  while (orders.length < MAX_EXPORT_ORDERS) {
-    const result = await listOrders(connection.sessionCookies, connection.merchantId, status, page, cityId)
-    if (result.sessionExpired) {
-      await markSessionExpired(connection.id)
-      return NextResponse.json({ error: 'Сессия истекла — переподключите кабинет' }, { status: 400 })
-    }
-    if (result.orders.length === 0) break
-    orders.push(...result.orders)
-    total = result.total
-    page++
+  // Страницы листаются общей функцией (ordersPaging.ts): сбой страницы -- это failed, а не
+  // «заказов больше нет», и total при этом не затирается нулём. Запас по времени оставляем
+  // до лимита функции, чтобы вернуть хотя бы честно подписанную неполную выгрузку.
+  const { sessionCookies, merchantId } = connection
+  const deadline = Date.now() + EXPORT_BUDGET_MS
+  const outcome = await paginateOrders({
+    pageSize: PAGE_SIZE,
+    cap: MAX_EXPORT_ORDERS,
+    shouldStop: () => Date.now() > deadline,
+    fetchPage: page => listOrders(sessionCookies, merchantId, status, page, cityId),
+  })
+
+  if (outcome.sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 400 })
   }
-  // `total` only ever advances past 0 on a successful page fetch, so this
-  // comparison also correctly flags an upstream error mid-pagination as
-  // truncated (the loop breaks with `total` still at its last confirmed
-  // value, which is now greater than `orders.length`). The one case this
-  // cannot distinguish from a genuinely empty result is an error on page 0
-  // itself, before any total is ever confirmed -- the same ambiguity every
-  // listOrders() caller in this codebase already has, since listOrders
-  // returns an identical {orders:[],total:0} shape for both. Not solved
-  // here; would require listOrders itself to report failures explicitly.
-  const truncated = orders.length < total
-  const buffer = buildOrdersWorkbookBuffer(orders.slice(0, MAX_EXPORT_ORDERS))
-  const filename = `zakazy_${status}_${new Date().toISOString().slice(0, 10)}.xlsx`
+  // Сбой на самой первой странице: ни одной строки не получено. Раньше здесь уходил пустой
+  // валидный xlsx с кодом 200, который выглядел как «заказов нет».
+  if (outcome.failed && outcome.orders.length === 0) {
+    return NextResponse.json({ error: `Kaspi не отдал заказы для выгрузки${outcome.error ? ` (${outcome.error})` : ''}. Повторите через минуту.` }, { status: 502 })
+  }
+
+  const exported = outcome.orders.slice(0, MAX_EXPORT_ORDERS)
+  const total = Math.max(outcome.total, exported.length)
+  // Неполной считаем любую выгрузку, где строк меньше, чем сообщил Kaspi: потолок, сбой
+  // посередине или выход по времени. Точные числа уходят в заголовках, страница их показывает.
+  const truncated = exported.length < total || outcome.failed || outcome.aborted
+  const buffer = buildOrdersWorkbookBuffer(exported)
+  const filename = `zakazy_${status}_${almatyDateStamp()}.xlsx`
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'content-disposition': `attachment; filename="${filename}"`,
       'x-truncated': truncated ? 'true' : 'false',
+      'x-exported-count': String(exported.length),
+      'x-total-count': String(total),
+      'x-export-failed': outcome.failed ? 'true' : 'false',
     },
   })
 }

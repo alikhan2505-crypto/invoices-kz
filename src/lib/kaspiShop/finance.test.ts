@@ -109,6 +109,33 @@ describe('computeFinanceSummary', () => {
     expect(fakeListOrders).toHaveBeenCalledTimes(1)
   })
 
+  it('a Kaspi failure on a page is upstreamFailed, never an honest zero, and does not finish the loop', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, _s: string, _p = 0) => ({
+      total: 0, sessionExpired: false, failed: true, error: 'Kaspi ответил HTTP 500', orders: [],
+    }))
+    const summary = await computeFinanceSummary('cookies', 'merchant1', 30, fakeListOrders as any)
+    expect(summary.upstreamFailed).toBe(true)
+    expect(summary.sessionExpired).toBe(false)
+    expect(fakeListOrders).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failure on page 3 after two good pages keeps the partial sums but flags upstreamFailed (not complete)', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, page = 0) => {
+      if (status !== 'KASPI_DELIVERY_TRANSMITTED') return { total: 0, sessionExpired: false, orders: [] }
+      if (page < 2) return { total: 80, sessionExpired: false, orders: Array.from({ length: 10 }, (_, i) => makeOrder(`p${page}-${i}`, 100, '2026-08-11T10:00:00.000Z')) }
+      return { total: 0, sessionExpired: false, failed: true, orders: [] }
+    })
+    const summary = await computeFinanceSummary('cookies', 'merchant1', 7, fakeListOrders as any)
+    expect(summary.upstreamFailed).toBe(true)
+    expect(summary.orderCount).toBe(20)
+  })
+
+  it('a healthy run reports upstreamFailed false', async () => {
+    const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: false, failed: false, orders: [] }))
+    const summary = await computeFinanceSummary('cookies', 'merchant1', 30, fakeListOrders as any)
+    expect(summary.upstreamFailed).toBe(false)
+  })
+
   it('sums item quantities into byDay.unitsSold, not just order count', async () => {
     const orderWithItems: Order = {
       code: '1', status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T',

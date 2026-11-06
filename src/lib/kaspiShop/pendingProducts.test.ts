@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { listPendingProducts, getPendingCount, getPendingCountOrNull } from './pendingProducts'
+import { listPendingProducts, getPendingCount, getPendingCountOrNull, hasMoreByCount } from './pendingProducts'
 
 function fakeFetch(status: number, body: any): typeof fetch {
   return (async () => ({
@@ -37,13 +37,49 @@ describe('listPendingProducts', () => {
   it('returns an empty result and sessionExpired:true on a 401', async () => {
     const fetchFn = fakeFetch(401, {})
     const result = await listPendingProducts('cookies', 'merchant1', 1, fetchFn)
-    expect(result).toEqual({ products: [], hasMore: false, sessionExpired: true })
+    expect(result).toMatchObject({ products: [], hasMore: false, sessionExpired: true, failed: true })
   })
 
-  it('returns an empty result and sessionExpired:false on a non-401 failure', async () => {
+  it('treats 403 like 401 (session expiry)', async () => {
+    const result = await listPendingProducts('cookies', 'merchant1', 1, fakeFetch(403, {}))
+    expect(result).toMatchObject({ sessionExpired: true, failed: true })
+  })
+
+  it('a non-401 failure is failed (not an empty "none" list) and not a session expiry', async () => {
     const fetchFn = fakeFetch(500, {})
     const result = await listPendingProducts('cookies', 'merchant1', 1, fetchFn)
-    expect(result).toEqual({ products: [], hasMore: false, sessionExpired: false })
+    expect(result).toMatchObject({ products: [], hasMore: false, sessionExpired: false, failed: true })
+    expect(result.error).toMatch(/500/)
+  })
+
+  it('a wrong-shape body is failed', async () => {
+    const result = await listPendingProducts('cookies', 'merchant1', 1, fakeFetch(200, { oops: 1 }))
+    expect(result).toMatchObject({ products: [], failed: true })
+  })
+
+  it('a thrown fetch (timeout) is failed, not an exception', async () => {
+    const fetchFn = (async () => { throw new DOMException('t', 'TimeoutError') }) as unknown as typeof fetch
+    const result = await listPendingProducts('cookies', 'merchant1', 1, fetchFn)
+    expect(result).toMatchObject({ products: [], failed: true, error: 'Kaspi не ответил вовремя' })
+  })
+
+  it('a genuinely empty page (data: []) is not a failure', async () => {
+    const result = await listPendingProducts('cookies', 'merchant1', 1, fakeFetch(200, { data: [] }))
+    expect(result).toMatchObject({ products: [], hasMore: false, failed: false })
+  })
+})
+
+describe('hasMoreByCount', () => {
+  it('no next page when the count is an exact multiple of the page size and we are on the last page', () => {
+    expect(hasMoreByCount(2, 10)).toBe(false)
+    expect(hasMoreByCount(1, 10)).toBe(true)
+  })
+  it('a partial last page has no next page', () => {
+    expect(hasMoreByCount(2, 7)).toBe(false)
+    expect(hasMoreByCount(1, 7)).toBe(true)
+  })
+  it('zero count has no next page', () => {
+    expect(hasMoreByCount(1, 0)).toBe(false)
   })
 })
 
@@ -51,13 +87,22 @@ describe('getPendingCount', () => {
   it('returns just the CHECK count', async () => {
     const fetchFn = fakeFetch(200, { IMPORTED: 0, CHECK: 3, PENDING: 0, TRASH: 0 })
     const result = await getPendingCount('cookies', 'merchant1', fetchFn)
-    expect(result).toEqual({ count: 3, sessionExpired: false })
+    expect(result).toEqual({ count: 3, sessionExpired: false, failed: false })
   })
 
-  it('returns 0 and sessionExpired:true on a 401', async () => {
+  it('flags failed (and still sessionExpired) on a 401: the 0 is not a real zero', async () => {
     const fetchFn = fakeFetch(401, {})
     const result = await getPendingCount('cookies', 'merchant1', fetchFn)
-    expect(result).toEqual({ count: 0, sessionExpired: true })
+    expect(result).toEqual({ count: 0, sessionExpired: true, failed: true })
+  })
+
+  it('flags failed on a 500 and on a body without CHECK', async () => {
+    expect(await getPendingCount('c', 'm', fakeFetch(500, {}))).toMatchObject({ failed: true })
+    expect(await getPendingCount('c', 'm', fakeFetch(200, {}))).toMatchObject({ failed: true })
+  })
+
+  it('a real zero is not a failure', async () => {
+    expect(await getPendingCount('c', 'm', fakeFetch(200, { CHECK: 0 }))).toEqual({ count: 0, sessionExpired: false, failed: false })
   })
 })
 
@@ -78,5 +123,9 @@ describe('getPendingCountOrNull (sidebar badge variant)', () => {
 
   it('reports sessionExpired on a 401', async () => {
     expect(await getPendingCountOrNull('c', 'm', fakeFetch(401, {}))).toEqual({ count: null, sessionExpired: true })
+  })
+
+  it('treats 403 like 401', async () => {
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(403, {}))).toEqual({ count: null, sessionExpired: true })
   })
 })

@@ -108,6 +108,36 @@ export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: 
   return elapsedMinutes >= checkFrequencyMinutes
 }
 
+// Сессия кабинета пригодна для работы бота. Пустой статус у старых строк
+// считается active -- как и в connection.ts (`row.session_status || 'active'`).
+export function isSessionActive(status: string | null | undefined): boolean {
+  return status == null || status === 'active'
+}
+
+// PostgREST отдаёт встроенное подключение объектом или массивом из одного
+// элемента, в зависимости от объявления FK.
+function joinedConnection(row: any): any {
+  const c = row?.kaspi_shop_connections
+  return Array.isArray(c) ? c[0] ?? null : c ?? null
+}
+
+// Баланс кошелька (profiles.kaspi_wallet_balance) для набора владельцев одним
+// запросом на пачку -- тот же источник, что и getKaspiShopWalletBalance в
+// applyPriceCheckResult. Сбой чтения -- исключение: лучше красный запуск, чем
+// списывать со всех или молча пропустить всех.
+const WALLET_BALANCE_CHUNK = 200
+async function loadOwnerWalletBalances(userIds: (string | null | undefined)[]): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(userIds.filter((id): id is string => !!id)))
+  const byId = new Map<string, number>()
+  for (let i = 0; i < ids.length; i += WALLET_BALANCE_CHUNK) {
+    const chunk = ids.slice(i, i + WALLET_BALANCE_CHUNK)
+    const { data, error } = await supabase.from('profiles').select('id, kaspi_wallet_balance').in('id', chunk)
+    if (error) throw new Error(`owner wallet balances lookup failed: ${error.message}`)
+    for (const row of (data || []) as any[]) byId.set(row.id, Number(row.kaspi_wallet_balance) || 0)
+  }
+  return byId
+}
+
 // Kaspi returns a persistent HTTP 429 to its public product pages from
 // Vercel's IP ranges (confirmed live 2026-08-12: identical block across 4
 // attempts spanning 3.5 hours, no Retry-After/rate-limit headers -- not a
@@ -125,22 +155,49 @@ export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: 
 // itself. Owner profiles are loaded once for the whole due batch. A failed
 // profile read throws (the cron route 500s, the GitHub Actions run fails
 // loudly) rather than either charging everyone or silently skipping all.
+//
+// Аудит Kaspi 06.11.2026 (K4/K8/K10/K20/K21/K43/K44): в список попадает только
+// то, что бот реально может и вправе проверить за деньги продавца:
+//  - сбой самого запроса -- исключение (cron/due отвечает 500, GitHub красный),
+//    а не молчаливый пустой список;
+//  - сессия кабинета не active -- пропуск (цену всё равно не отправить, а
+//    проверка раньше списывалась и крутилась по кругу);
+//  - товар снят с продажи в кабинете (available_for_sale = false) -- пропуск,
+//    иначе пуш с available:'yes' вернул бы его в продажу;
+//  - баланс владельца меньше цены проверки -- пропуск: раньше такие товары
+//    оставались due вечно и бегунок GitHub впустую ходил в Kaspi за каждым.
+// Ничего не выключается и не удаляется: пополнил кошелёк / переподключил
+// кабинет -- бот поехал дальше сам.
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
-  const { data: due } = await supabase
+  const { data: due, error: dueError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, user_id, kaspi_sku, kaspi_master_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(user_id, paused, tracked_city_codes)')
+    .select('id, user_id, kaspi_sku, kaspi_master_sku, last_checked_at, check_frequency_minutes, enabled, available_for_sale, excluded_city_codes, point_city_codes, kaspi_shop_connections(user_id, paused, session_status, tracked_city_codes)')
     .eq('enabled', true)
+  if (dueError) throw new Error(`due tracked products lookup failed: ${dueError.message}`)
 
   const now = Date.now()
   const dueNow = (due || []).filter((p: any) => {
-    if (p.kaspi_shop_connections?.paused) return false
+    const conn = joinedConnection(p)
+    // Без подключения цену отправить некуда (apply всё равно вернётся).
+    if (!conn || conn.paused) return false
+    if (!isSessionActive(conn.session_status)) return false
+    if (p.available_for_sale === false) return false
     return isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)
   })
-  const ownerOf = (p: any): string | null => p.kaspi_shop_connections?.user_id ?? p.user_id ?? null
+  const ownerOf = (p: any): string | null => joinedConnection(p)?.user_id ?? p.user_id ?? null
   const ownerProfiles = await loadOwnerPlanProfiles(dueNow.map(ownerOf))
-  return filterByOwnerAccess(dueNow, ownerOf, ownerProfiles)
+  const allowed = filterByOwnerAccess(dueNow, ownerOf, ownerProfiles)
+  // Кошелёк списывается с p.user_id (см. applyPriceCheckResult) -- по нему и смотрим.
+  const walletOwnerOf = (p: any): string | null => p.user_id ?? ownerOf(p)
+  const balances = await loadOwnerWalletBalances(allowed.map(walletOwnerOf))
+  return allowed
+    .filter((p: any) => {
+      const owner = walletOwnerOf(p)
+      return !!owner && (balances.get(owner) ?? 0) >= KASPI_SHOP_CREDIT_PRICE_TENGE
+    })
     .map((p: any) => {
-      let targetCities = resolveTargetCities(p.kaspi_shop_connections?.tracked_city_codes || [], p.excluded_city_codes || [])
+      const conn = joinedConnection(p)
+      let targetCities = resolveTargetCities(conn?.tracked_city_codes || [], p.excluded_city_codes || [])
       // Auto mode (2026-08-21): with no manually tracked cities, check the
       // product's OWN point cities -- the old hardcoded-Almaty reference
       // missed a real competitor visible only in the point's city
@@ -273,13 +330,53 @@ export type ApplyOffers =
   | { perCityOffers: Record<string, CompetitorOffer[]> }
   | { competitorOffers: CompetitorOffer[] }
 
+// Вызов пуша, который не бросает: любое исключение внутри (сеть, разбор
+// ответа Kaspi) -- это обычный «не отправлено», а не падение всего цикла.
+async function safePush(params: Parameters<typeof pushProductPrices>[0]): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
+  try {
+    return await pushProductPrices(params)
+  } catch (err: any) {
+    return { pushed: false, sessionExpired: false, message: `push threw: ${err?.message || err}` }
+  }
+}
+
+// kaspi_shop_price_checks.action имеет CHECK (см. миграцию
+// kaspi_price_checks_push_failed.sql). Пока миграция не применена, вставка
+// 'push_failed' упадёт на нём -- тогда пишем 'error' с тем же текстом, чтобы
+// запись и причина не пропали.
+async function insertPriceCheckRow(row: Record<string, any>): Promise<void> {
+  const { error } = await supabase.from('kaspi_shop_price_checks').insert(row)
+  if (!error) return
+  const isCheckViolation = error.code === '23514' || /check constraint/i.test(error.message || '')
+  if (row.action === 'push_failed' && isCheckViolation) {
+    const { error: retryError } = await supabase.from('kaspi_shop_price_checks').insert({ ...row, action: 'error' })
+    if (!retryError) return
+    console.error('kaspi-shop checkCycle: price check row insert failed for product', row.tracked_product_id, ':', retryError.message)
+    return
+  }
+  console.error('kaspi-shop checkCycle: price check row insert failed for product', row.tracked_product_id, ':', error.message)
+}
+
 // One tracked product, one already-fetched set of competitor offers (or a
 // fetch error, reported by the caller since the fetch itself no longer
 // happens here). Never throws -- a single product's failure must not abort
 // the rest of the caller's batch. Always logs a kaspi_shop_price_checks row
-// and debits one credit, even on error -- the competitor-price check itself
-// is the billable work, and an error row is real information the seller
-// should see in their history, not a silently dropped cycle.
+// once it got past the guards below -- an error row is real information the
+// seller should see in their history, not a silently dropped cycle.
+//
+// Деньги (аудит Kaspi 06.11.2026, K4/K5/K19/K20/K43/K44): 5 ₸ за проверку
+// списываются ТОЛЬКО за проверку, которая дошла до конца: Kaspi ответил
+// (нет fetchError), сессия кабинета active, товар включён, не на паузе и в
+// продаже, кошелёк покрывает проверку. Нет списания и при неудачной отправке
+// цены в Kaspi (action 'push_failed') -- продавец не платит за то, что не
+// применилось. До проверок «сессия / продажа / баланс» функция выходит, ничего
+// не записав: товар остаётся как был, а в getDueTrackedProducts такие товары
+// уже не попадают.
+//
+// Цена (K9/K19): own_current_price товара и action 'updated' пишутся только
+// ПОСЛЕ успешной отправки в Kaspi. Отправка не удалась (бюджет, HTTP, сессия) --
+// старая цена остаётся, действие 'push_failed', причина в error_message, а
+// следующий цикл посчитает то же решение заново и повторит отправку.
 //
 // Two payload shapes: `perCityOffers` (the store has configured
 // tracked_city_codes -- each city gets its own competitor offers and its
@@ -298,8 +395,11 @@ export async function applyPriceCheckResult(
     .eq('id', trackedProductId)
     .single()
   if (!product || !product.enabled) return
-  const connection = product.kaspi_shop_connections
-  if (connection?.paused) return
+  // Снят с продажи в кабинете: правило включено, но пуш с available:'yes'
+  // вернул бы товар в продажу, а проверка стоила бы денег (K21).
+  if (product.available_for_sale === false) return
+  const connection = joinedConnection(product)
+  if (!connection || connection.paused) return
 
   const userId = product.user_id
 
@@ -309,11 +409,16 @@ export async function applyPriceCheckResult(
   // seller the wallet belongs to), falling back to the product row's own
   // user_id. A failed read skips this cycle -- this function never throws.
   try {
-    if (!(await ownerHasKaspiShopAccess(connection?.user_id ?? userId))) return
+    if (!(await ownerHasKaspiShopAccess(connection.user_id ?? userId))) return
   } catch (err: any) {
     console.error('kaspi-shop checkCycle: owner plan check failed for product', trackedProductId, ':', err.message)
     return
   }
+
+  // Мёртвая сессия кабинета (или нет cookies): цену не отправить, значит и
+  // проверка бессмысленна и платной быть не может (K4/K20/K43). Выходим до
+  // любых записей и списаний; подключение вернётся в работу при переподключении.
+  if (!isSessionActive(connection.session_status) || !connection.session_cookies) return
 
   // Founder's explicit ask: extend the same negative-balance protection
   // Kaspi Cashier's invoice-payment path already had to every unified-
@@ -323,10 +428,49 @@ export async function applyPriceCheckResult(
   // could actually afford it. Checked before any of the repricing work or
   // Kaspi cabinet writes below, so a depleted wallet also means no product
   // gets touched -- its price simply stays as last set until topped up.
-  if ((await getKaspiShopWalletBalance(userId)) < KASPI_SHOP_CREDIT_PRICE_TENGE) return
+  try {
+    if ((await getKaspiShopWalletBalance(userId)) < KASPI_SHOP_CREDIT_PRICE_TENGE) return
+  } catch (err: any) {
+    console.error('kaspi-shop checkCycle: wallet balance read failed for product', trackedProductId, ':', err.message)
+    return
+  }
 
   const ownPriceBefore = Number(product.own_current_price)
-  let action: 'updated' | 'held_at_floor' | 'no_change' | 'error' = 'no_change'
+
+  // Проверка не состоялась: Kaspi не ответил, ответ пуст или у товара битая
+  // настройка (пол не положительное число -- такой товар ничего не должен
+  // менять). Фиксируем строку «error», сдвигаем last_checked_at (иначе товар
+  // остаётся due и бегунок долбит Kaspi каждые 10 минут) и НЕ списываем.
+  const floorNumber = Number(product.floor_price)
+  const perCityEmpty = !!offers && 'perCityOffers' in offers && Object.keys(offers.perCityOffers || {}).length === 0
+  const skipReason: string | null =
+    fetchError
+    || (!offers ? 'нет данных от Kaspi в ответе проверки' : null)
+    || (perCityEmpty ? 'в ответе проверки нет ни одного города' : null)
+    || (!Number.isFinite(floorNumber) || floorNumber <= 0 ? 'у товара не задана минимальная цена, цена не менялась' : null)
+  if (skipReason) {
+    // held_at_floor deliberately left untouched here -- a fetch error tells
+    // us nothing new about whether the floor is still binding, so clearing
+    // it would hide a real still-held product behind a transient upstream
+    // failure, and setting it would assert something this cycle never
+    // observed.
+    await supabase
+      .from('kaspi_shop_tracked_products')
+      .update({ last_checked_at: new Date().toISOString() })
+      .eq('id', trackedProductId)
+    await insertPriceCheckRow({
+      tracked_product_id: trackedProductId,
+      competitor_price: null,
+      own_price_before: ownPriceBefore,
+      own_price_after: ownPriceBefore,
+      action: 'error',
+      credit_cost: 0,
+      error_message: skipReason,
+    })
+    return
+  }
+
+  let action: 'updated' | 'held_at_floor' | 'no_change' | 'error' | 'push_failed' = 'no_change'
   let ownPriceAfter = ownPriceBefore
   let competitorPrice: number | null = null
   // Collects a message for every push that didn't happen (rate-limited,
@@ -334,6 +478,8 @@ export async function applyPriceCheckResult(
   // it can be surfaced in the kaspi_shop_price_checks row at the end --
   // previously these were silently discarded (final-review finding I2).
   const pushIssues: string[] = []
+  // Цена, которую хотели поставить, но не смогли отправить (для текста строки).
+  let unappliedPrice: number | null = null
 
   // maxPrice/noCompetitorStreak are read once here and reused by both the
   // top-level computeRepriceCandidate call AND the legacy branch's inner
@@ -344,7 +490,17 @@ export async function applyPriceCheckResult(
   const maxPrice = product.max_price !== null && product.max_price !== undefined ? Number(product.max_price) : undefined
   const noCompetitorStreak = Number(product.no_competitor_streak) || 0
 
-  if (!fetchError && offers && 'perCityOffers' in offers) {
+  let sessionCookies: string
+  try {
+    sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
+  } catch (err: any) {
+    // Cookies не расшифровать -- равносильно мёртвой сессии: ни отправки, ни
+    // списания (функция не бросает).
+    console.error('kaspi-shop checkCycle: session cookies decrypt failed for product', trackedProductId, ':', err.message)
+    return
+  }
+
+  if (offers && 'perCityOffers' in offers) {
     // Own merchant is ALWAYS excluded from the competitor list, not just
     // the seller's manual excluded_merchant_ids -- the public offer-view
     // endpoint's response includes our own offer alongside real
@@ -369,128 +525,136 @@ export async function applyPriceCheckResult(
       cityOffers: cityOffersList,
       excludedMerchantIds: excludedMerchants,
       undercutStep: Number(product.undercut_step),
-      floorPrice: Number(product.floor_price),
+      floorPrice: floorNumber,
       maxPrice,
       strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
       currentCityPrices,
       currentCityStreaks,
     })
 
-    if (results.length > 0) {
-      ownPriceAfter = Math.min(...results.map(r => r.price))
-      const anyHeldAtFloor = results.some(r => r.heldAtFloor)
-      action = anyHeldAtFloor ? 'held_at_floor' : (ownPriceAfter === ownPriceBefore ? 'no_change' : 'updated')
-      const allCompetitorPrices = cityOffersList.flatMap(c => c.offers.filter(o => !excludedMerchants.includes(o.merchantId)).map(o => o.price))
-      competitorPrice = allCompetitorPrices.length > 0 ? Math.min(...allCompetitorPrices) : null
+    const desiredPrice = Math.min(...results.map(r => r.price))
+    const anyHeldAtFloor = results.some(r => r.heldAtFloor)
+    const allCompetitorPrices = cityOffersList.flatMap(c => c.offers.filter(o => !excludedMerchants.includes(o.merchantId)).map(o => o.price))
+    competitorPrice = allCompetitorPrices.length > 0 ? Math.min(...allCompetitorPrices) : null
 
-      // "Leader" city -- whichever city's result actually set ownPriceAfter
-      // (falls back to the first city if none matches, which can't happen
-      // in practice since ownPriceAfter is Math.min of these same results).
-      // Its raw offers back both the card's "N продавцов кроме вас" count
-      // (previously stuck reading the top-level market_offer_count column,
-      // which this branch never wrote -- confirmed live 2026-08-21: the
-      // card showed "0 продавцов" even after a real competitor was found)
-      // and a name+price snapshot for the card's hover tooltip.
-      const leaderCityCode = results.find(r => r.price === ownPriceAfter)?.cityCode ?? results[0].cityCode
-      const leaderOffers = cityOffersList.find(c => c.cityCode === leaderCityCode)?.offers || []
-      const { position: leaderPosition, totalOffers: leaderTotalOffers } = computeMarketPosition(leaderOffers, connection.merchant_id, ownPriceAfter)
-      const competitorSnapshot = leaderOffers
-        .filter(o => !excludedMerchants.includes(o.merchantId))
-        .sort((a, b) => a.price - b.price)
-        .slice(0, 10)
-        .map(o => ({ merchantName: o.merchantName || null, price: o.price, merchantId: o.merchantId }))
+    // Decide per city, not from the aggregate `action` -- the
+    // aggregate can read "no_change" even when one city genuinely
+    // moved, if a different city happens to still hold the overall
+    // minimum. All changed cities ride ONE batch upload together.
+    const changedCityPrices: Record<string, number> = {}
+    for (const result of results) {
+      if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) {
+        continue
+      }
+      changedCityPrices[result.cityCode] = result.price
+    }
 
-      await supabase
+    // Отправка ДО записи цены в нашу базу (K19): цена товара и 'updated'
+    // фиксируются только если Kaspi её принял.
+    let pushFailed = false
+    if (Object.keys(changedCityPrices).length > 0) {
+      const { data: connProducts } = await supabase
         .from('kaspi_shop_tracked_products')
-        .update({
-          own_current_price: ownPriceAfter,
-          last_checked_at: new Date().toISOString(),
-          last_competitor_price: competitorPrice,
-          held_at_floor: anyHeldAtFloor,
-          market_position: leaderPosition,
-          market_offer_count: leaderTotalOffers,
-          competitor_snapshot: competitorSnapshot,
-        })
-        .eq('id', trackedProductId)
-
-      // Streak persistence runs unconditionally, independent of the
-      // session-active guard below -- the competitor observation happens in
-      // the GitHub Actions relay, which has nothing to do with whether the
-      // cabinet session is alive. Writing this only inside the push-attempt
-      // loop (as before) meant an expired/absent session silently dropped
-      // every city's streak for the cycle, freezing the Макс-памп countdown
-      // exactly when a stale session made it most likely to matter
-      // (final-review finding I1). Also carries this cycle's market
-      // position (price-rank among ALL sellers in this city, computed from
-      // the raw per-city offers -- not the excludedMerchants-filtered
-      // competitorPrices used for the repricing math above, since position
-      // should reflect real market reality, not this seller's own "ignore
-      // this competitor" preference). No longer skips on an unchanged
-      // streak -- position can move even when the streak doesn't (e.g. a
-      // competitor's price shifts without disappearing), so every city gets
-      // written every cycle now.
-      for (const result of results) {
-        const rawOffers = cityOffersList.find(c => c.cityCode === result.cityCode)?.offers || []
-        const { position, totalOffers } = computeMarketPosition(rawOffers, connection.merchant_id, result.price)
-        await supabase
-          .from('kaspi_shop_product_city_prices')
-          .update({ no_competitor_streak: result.newStreak, market_position: position, market_offer_count: totalOffers })
-          .eq('tracked_product_id', trackedProductId)
-          .eq('city_code', result.cityCode)
-      }
-
-      if (connection?.session_cookies && connection.session_status === 'active') {
-        const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
-        const { data: connProducts } = await supabase
-          .from('kaspi_shop_tracked_products')
-          .select('id')
-          .eq('connection_id', connection.id)
-        const productIds = (connProducts || []).map((p: any) => p.id)
-        // Decide per city, not from the aggregate `action` above -- the
-        // aggregate can read "no_change" even when one city genuinely
-        // moved, if a different city happens to still hold the overall
-        // minimum. All changed cities ride ONE batch upload together.
-        const changedCityPrices: Record<string, number> = {}
-        for (const result of results) {
-          if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) {
-            continue
-          }
-          changedCityPrices[result.cityCode] = result.price
+        .select('id')
+        .eq('connection_id', connection.id)
+      const productIds = (connProducts || []).map((p: any) => p.id)
+      const pushResult = await safePush({
+        connectionId: connection.id,
+        merchantId: connection.merchant_id,
+        sessionCookies,
+        productIds,
+        sku: product.kaspi_sku,
+        masterSku: product.kaspi_master_sku || null,
+        model: product.product_name,
+        storeId: product.store_id,
+        cityPrices: changedCityPrices,
+      })
+      if (pushResult.pushed) {
+        const pushedAt = new Date().toISOString()
+        for (const [cityCode, price] of Object.entries(changedCityPrices)) {
+          await supabase
+            .from('kaspi_shop_product_city_prices')
+            .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+            .eq('tracked_product_id', trackedProductId)
+            .eq('city_code', cityCode)
         }
-        if (Object.keys(changedCityPrices).length > 0) {
-          const pushResult = await pushProductPrices({
-            connectionId: connection.id,
-            merchantId: connection.merchant_id,
-            sessionCookies,
-            productIds,
-            sku: product.kaspi_sku,
-            masterSku: product.kaspi_master_sku || null,
-            model: product.product_name,
-            storeId: product.store_id,
-            cityPrices: changedCityPrices,
-          })
-          if (pushResult.pushed) {
-            const pushedAt = new Date().toISOString()
-            for (const [cityCode, price] of Object.entries(changedCityPrices)) {
-              await supabase
-                .from('kaspi_shop_product_city_prices')
-                .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
-                .eq('tracked_product_id', trackedProductId)
-                .eq('city_code', cityCode)
-            }
-          } else {
-            console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', pushResult.message)
-            pushIssues.push(pushResult.message || 'batch push failed')
-          }
-        }
-      }
-
-      if (anyHeldAtFloor) {
-        await alertFloorPriceOnce(userId, trackedProductId, product.held_at_floor === true,
-          `🔴 Kaspi Магазин: цена товара «${escapeHtml(product.product_name)}» упёрлась в ваш минимум (${product.floor_price} ₸) в одном или нескольких городах — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
+      } else {
+        pushFailed = true
+        console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', pushResult.message)
+        pushIssues.push(pushResult.message || 'batch push failed')
       }
     }
-  } else if (!fetchError) {
+
+    // Цена города, которая реально стоит на Kaspi после этого цикла: при
+    // неудачной отправке у изменившихся городов -- прежняя.
+    const effectiveCityPrice = (cityCode: string, decided: number): number =>
+      pushFailed && changedCityPrices[cityCode] !== undefined ? (currentCityPrices[cityCode] ?? decided) : decided
+
+    ownPriceAfter = pushFailed ? ownPriceBefore : desiredPrice
+    if (pushFailed) {
+      action = 'push_failed'
+      unappliedPrice = desiredPrice
+    } else {
+      action = anyHeldAtFloor ? 'held_at_floor' : (ownPriceAfter === ownPriceBefore ? 'no_change' : 'updated')
+    }
+
+    // "Leader" city -- whichever city's result actually set the displayed
+    // price (falls back to the first city if none matches). Its raw offers
+    // back both the card's "N продавцов кроме вас" count (previously stuck
+    // reading the top-level market_offer_count column, which this branch
+    // never wrote -- confirmed live 2026-08-21: the card showed "0
+    // продавцов" even after a real competitor was found) and a name+price
+    // snapshot for the card's hover tooltip.
+    const leaderCityCode = results.find(r => effectiveCityPrice(r.cityCode, r.price) === ownPriceAfter)?.cityCode ?? results[0].cityCode
+    const leaderOffers = cityOffersList.find(c => c.cityCode === leaderCityCode)?.offers || []
+    const { position: leaderPosition, totalOffers: leaderTotalOffers } = computeMarketPosition(leaderOffers, connection.merchant_id, ownPriceAfter)
+    const competitorSnapshot = leaderOffers
+      .filter(o => !excludedMerchants.includes(o.merchantId))
+      .sort((a, b) => a.price - b.price)
+      .slice(0, 10)
+      .map(o => ({ merchantName: o.merchantName || null, price: o.price, merchantId: o.merchantId }))
+
+    await supabase
+      .from('kaspi_shop_tracked_products')
+      .update({
+        // Наблюдения (конкуренты, позиция, пол) пишем всегда, а саму цену
+        // товара -- только если она принята Kaspi.
+        ...(pushFailed ? {} : { own_current_price: ownPriceAfter }),
+        last_checked_at: new Date().toISOString(),
+        last_competitor_price: competitorPrice,
+        held_at_floor: anyHeldAtFloor,
+        market_position: leaderPosition,
+        market_offer_count: leaderTotalOffers,
+        competitor_snapshot: competitorSnapshot,
+      })
+      .eq('id', trackedProductId)
+
+    // Streak persistence runs unconditionally, independent of the push
+    // outcome -- the competitor observation happens in the GitHub Actions
+    // relay, which has nothing to do with whether the cabinet accepted a
+    // price. Also carries this cycle's market position (price-rank among
+    // ALL sellers in this city, computed from the raw per-city offers --
+    // not the excludedMerchants-filtered competitorPrices used for the
+    // repricing math above, since position should reflect real market
+    // reality, not this seller's own "ignore this competitor" preference).
+    // No longer skips on an unchanged streak -- position can move even when
+    // the streak doesn't (e.g. a competitor's price shifts without
+    // disappearing), so every city gets written every cycle now.
+    for (const result of results) {
+      const rawOffers = cityOffersList.find(c => c.cityCode === result.cityCode)?.offers || []
+      const { position, totalOffers } = computeMarketPosition(rawOffers, connection.merchant_id, effectiveCityPrice(result.cityCode, result.price))
+      await supabase
+        .from('kaspi_shop_product_city_prices')
+        .update({ no_competitor_streak: result.newStreak, market_position: position, market_offer_count: totalOffers })
+        .eq('tracked_product_id', trackedProductId)
+        .eq('city_code', result.cityCode)
+    }
+
+    if (anyHeldAtFloor) {
+      await alertFloorPriceOnce(userId, trackedProductId, product.held_at_floor === true,
+        `🔴 Kaspi Магазин: цена товара «${escapeHtml(product.product_name)}» упёрлась в ваш минимум (${product.floor_price} ₸) в одном или нескольких городах — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
+    }
+  } else {
     const competitorOffers = offers && 'competitorOffers' in offers ? offers.competitorOffers : null
     // Same self-exclusion as the perCityOffers branch above -- see comment
     // there.
@@ -502,14 +666,86 @@ export async function applyPriceCheckResult(
     const { price, heldAtFloor, newStreak } = computeRepriceCandidate({
       competitorPrices,
       undercutStep: Number(product.undercut_step),
-      floorPrice: Number(product.floor_price),
+      floorPrice: floorNumber,
       maxPrice,
       strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
       ownCurrentPrice: ownPriceBefore,
       noCompetitorStreak,
     })
-    ownPriceAfter = price
-    action = heldAtFloor ? 'held_at_floor' : (price === ownPriceBefore ? 'no_change' : 'updated')
+
+    // Отправка нужна при ЛЮБОМ изменении цены, не только при action
+    // 'updated': раньше цена, упёршаяся в пол (held_at_floor), менялась у нас
+    // в базе, но в Kaspi не уходила. Цену товара пишем только после успеха --
+    // при неудаче следующий цикл снова увидит расхождение и повторит.
+    const priceChanged = price !== ownPriceBefore
+    let pushFailed = false
+    if (priceChanged) {
+      const { data: cityRows } = await supabase
+        .from('kaspi_shop_product_city_prices')
+        .select('city_code, own_current_price')
+        .eq('tracked_product_id', trackedProductId)
+      const excludedCities: string[] = product.excluded_city_codes || []
+      const citiesToPush = (cityRows || []).filter(c => !excludedCities.includes(c.city_code))
+
+      if (citiesToPush.length === 0) {
+        pushFailed = true
+        pushIssues.push('нет городов для отправки цены в Kaspi')
+      } else {
+        const { data: connProducts } = await supabase
+          .from('kaspi_shop_tracked_products')
+          .select('id')
+          .eq('connection_id', connection.id)
+        const productIds = (connProducts || []).map((p: any) => p.id)
+        const legacyCityPrices: Record<string, number> = {}
+        for (const city of citiesToPush) {
+          const cityCandidate = computeRepriceCandidate({
+            competitorPrices,
+            undercutStep: Number(product.undercut_step),
+            floorPrice: floorNumber,
+            maxPrice,
+            strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
+            ownCurrentPrice: Number(city.own_current_price ?? ownPriceBefore),
+            noCompetitorStreak,
+          })
+          legacyCityPrices[city.city_code] = cityCandidate.price
+        }
+
+        const result = await safePush({
+          connectionId: connection.id,
+          merchantId: connection.merchant_id,
+          sessionCookies,
+          productIds,
+          sku: product.kaspi_sku,
+          masterSku: product.kaspi_master_sku || null,
+          model: product.product_name,
+          storeId: product.store_id,
+          cityPrices: legacyCityPrices,
+        })
+
+        if (result.pushed) {
+          const pushedAt = new Date().toISOString()
+          for (const [cityCode, cityPrice] of Object.entries(legacyCityPrices)) {
+            await supabase
+              .from('kaspi_shop_product_city_prices')
+              .update({ own_current_price: cityPrice, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+              .eq('tracked_product_id', trackedProductId)
+              .eq('city_code', cityCode)
+          }
+        } else {
+          pushFailed = true
+          console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', result.message)
+          pushIssues.push(result.message || 'batch push failed')
+        }
+      }
+    }
+
+    ownPriceAfter = pushFailed ? ownPriceBefore : price
+    if (pushFailed) {
+      action = 'push_failed'
+      unappliedPrice = price
+    } else {
+      action = heldAtFloor ? 'held_at_floor' : (priceChanged ? 'updated' : 'no_change')
+    }
 
     // Raw competitorOffers (not the excludedMerchants-filtered
     // competitorPrices used for the repricing math above) -- position
@@ -524,103 +760,51 @@ export async function applyPriceCheckResult(
 
     await supabase
       .from('kaspi_shop_tracked_products')
-      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers, held_at_floor: heldAtFloor, competitor_snapshot: competitorSnapshot })
+      .update({
+        ...(pushFailed ? {} : { own_current_price: ownPriceAfter }),
+        last_checked_at: new Date().toISOString(),
+        last_competitor_price: competitorPrice,
+        no_competitor_streak: newStreak,
+        market_position: position,
+        market_offer_count: totalOffers,
+        held_at_floor: heldAtFloor,
+        competitor_snapshot: competitorSnapshot,
+      })
       .eq('id', trackedProductId)
-
-    if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {
-      const { data: cityRows } = await supabase
-        .from('kaspi_shop_product_city_prices')
-        .select('city_code, own_current_price')
-        .eq('tracked_product_id', trackedProductId)
-      const excludedCities: string[] = product.excluded_city_codes || []
-      const citiesToPush = (cityRows || []).filter(c => !excludedCities.includes(c.city_code))
-
-      if (citiesToPush.length > 0) {
-        const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
-        const { data: connProducts } = await supabase
-          .from('kaspi_shop_tracked_products')
-          .select('id')
-          .eq('connection_id', connection.id)
-        const productIds = (connProducts || []).map((p: any) => p.id)
-        const legacyCityPrices: Record<string, number> = {}
-        for (const city of citiesToPush) {
-          const cityCandidate = computeRepriceCandidate({
-            competitorPrices,
-            undercutStep: Number(product.undercut_step),
-            floorPrice: Number(product.floor_price),
-            maxPrice,
-            strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
-            ownCurrentPrice: Number(city.own_current_price ?? ownPriceBefore),
-            noCompetitorStreak,
-          })
-          legacyCityPrices[city.city_code] = cityCandidate.price
-        }
-
-        const result = await pushProductPrices({
-          connectionId: connection.id,
-          merchantId: connection.merchant_id,
-          sessionCookies,
-          productIds,
-          sku: product.kaspi_sku,
-          masterSku: product.kaspi_master_sku || null,
-          model: product.product_name,
-          storeId: product.store_id,
-          cityPrices: legacyCityPrices,
-        })
-
-        if (result.pushed) {
-          const pushedAt = new Date().toISOString()
-          for (const [cityCode, price] of Object.entries(legacyCityPrices)) {
-            await supabase
-              .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
-              .eq('tracked_product_id', trackedProductId)
-              .eq('city_code', cityCode)
-          }
-        } else {
-          console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', result.message)
-          pushIssues.push(result.message || 'batch push failed')
-        }
-      }
-    }
 
     if (heldAtFloor) {
       await alertFloorPriceOnce(userId, trackedProductId, product.held_at_floor === true,
         `🔴 Kaspi Магазин: цена товара «${escapeHtml(product.product_name)}» упёрлась в ваш минимум (${product.floor_price} ₸) — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
     }
-  } else {
-    action = 'error'
-    // held_at_floor deliberately left untouched here -- a fetch error tells
-    // us nothing new about whether the floor is still binding, so clearing
-    // it would hide a real still-held product behind a transient upstream
-    // failure, and setting it would assert something this cycle never
-    // observed.
-    await supabase
-      .from('kaspi_shop_tracked_products')
-      .update({ last_checked_at: new Date().toISOString() })
-      .eq('id', trackedProductId)
   }
 
-  // fetchError takes priority (it's a distinct, more specific failure this
-  // cycle never got past); otherwise surface any push issues collected
-  // above -- e.g. own_current_price was updated in our DB but Kaspi never
-  // actually received it because the rate-limit budget was exhausted, one
-  // of the two cases finding I2 flagged as previously silent.
-  const errorMessage = fetchError ?? summarizePushIssues(pushIssues)
+  // Surface any push issues collected above. «не применено» keeps the price
+  // we wanted next to the reason, so the history answers "why does Kaspi
+  // still show the old price".
+  const issuesSummary = summarizePushIssues(pushIssues)
+  const errorMessage = action === 'push_failed'
+    ? `Цена ${unappliedPrice} ₸ не отправлена в Kaspi${issuesSummary ? `: ${issuesSummary}` : ''}`.slice(0, 2000)
+    : issuesSummary
 
-  await supabase.from('kaspi_shop_price_checks').insert({
+  // Списание: только за состоявшуюся проверку, цена которой дошла до Kaspi
+  // (или менять было нечего). Неудачная отправка -- бесплатно.
+  let creditCost = 0
+  if (action !== 'push_failed') {
+    try {
+      await debitKaspiShopWallet(userId, 1, `Проверка цены: ${product.product_name}`)
+      creditCost = 1
+    } catch (err: any) {
+      console.error('kaspi-shop checkCycle: wallet debit failed for user', userId, 'product', trackedProductId, ':', err.message)
+    }
+  }
+
+  await insertPriceCheckRow({
     tracked_product_id: trackedProductId,
     competitor_price: competitorPrice,
     own_price_before: ownPriceBefore,
     own_price_after: ownPriceAfter,
     action,
-    credit_cost: 1,
+    credit_cost: creditCost,
     error_message: errorMessage,
   })
-
-  try {
-    await debitKaspiShopWallet(userId, 1, `Проверка цены: ${product.product_name}`)
-  } catch (err: any) {
-    console.error('kaspi-shop checkCycle: wallet debit failed for user', userId, 'product', trackedProductId, ':', err.message)
-  }
 }

@@ -11,6 +11,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const due = await getDueTrackedProducts()
-  return NextResponse.json({ due })
+  // Сбой выборки -- громкий 500, а не пустой список с 200: скрипт GitHub
+  // выходит с кодом 1 и запуск краснеет (аудит Kaspi 06.11.2026, K8).
+  try {
+    const due = await getDueTrackedProducts()
+    return NextResponse.json({ due })
+  } catch (err: any) {
+    console.error('kaspi-shop cron/due: due list failed:', err?.message || err)
+    return NextResponse.json({ error: 'due list failed' }, { status: 500 })
+  }
 }

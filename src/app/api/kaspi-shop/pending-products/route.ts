@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listPendingProducts, getPendingCount } from '@/lib/kaspiShop/pendingProducts'
+import { listPendingProducts, getPendingCount, hasMoreByCount } from '@/lib/kaspiShop/pendingProducts'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,12 +31,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })
   }
 
-  const [{ products, hasMore, sessionExpired: listExpired }, { count, sessionExpired: countExpired }] = await Promise.all([
+  const [list, counter] = await Promise.all([
     listPendingProducts(connection.sessionCookies, connection.merchantId, page),
     getPendingCount(connection.sessionCookies, connection.merchantId),
   ])
-  const sessionExpired = listExpired || countExpired
-  if (sessionExpired) await markSessionExpired(connection.id)
+  const sessionExpired = list.sessionExpired || counter.sessionExpired
+  if (sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин', sessionExpired: true }, { status: 502 })
+  }
+  // Сбой списка это 502, а не «нераспознанных нет». Сбой одного только счётчика не роняет
+  // страницу: список виден, число «Всего» неизвестно (count: null), «Дальше» по размеру страницы.
+  if (list.failed) {
+    return NextResponse.json({ error: `Kaspi не отдал список нераспознанных товаров${list.error ? ` (${list.error})` : ''}. Повторите через минуту.`, sessionExpired: false }, { status: 502 })
+  }
+  const count = counter.failed ? null : counter.count
+  // «Дальше» по общему числу: на ровно кратном размеру страницы числе карточек пустой
+  // следующей страницы больше нет. Без счётчика остаётся оценка по размеру страницы.
+  const hasMore = count !== null ? hasMoreByCount(page, count) : list.hasMore
 
-  return NextResponse.json({ products, hasMore, count, sessionExpired })
+  return NextResponse.json({ products: list.products, hasMore, count, sessionExpired: false })
 }

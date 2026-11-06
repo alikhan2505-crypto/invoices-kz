@@ -51,6 +51,7 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
   const [loaded, setLoaded] = useState(false)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [switchError, setSwitchError] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
 
   const refresh = useCallback(async () => {
@@ -80,9 +81,25 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
   async function switchTo(connectionId: string) {
     if (busy) return
     setBusy(true)
+    setSwitchError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/connections/switch', { method: 'POST', headers, body: JSON.stringify({ connectionId }) })
+      if (!res.ok) {
+        // Раньше ответ не читался: при отказе страница всё равно перезагружалась
+        // на прежнем магазине, будто переключение удалось. Теперь список остаётся
+        // открытым с причиной.
+        const data = await res.json().catch(() => ({}))
+        setSwitchError(typeof data?.error === 'string' && data.error ? data.error : 'Не удалось переключить магазин. Попробуйте ещё раз.')
+        setBusy(false)
+        return
+      }
+    } catch {
+      setSwitchError('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.')
+      setBusy(false)
+      return
+    }
     setOpen(false)
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/connections/switch', { method: 'POST', headers, body: JSON.stringify({ connectionId }) })
     // A full reload is deliberate: every Kaspi Bot page loads its data once
     // on mount for "the" active store -- reloading is the simplest way to
     // guarantee all of them reflect the newly-switched store correctly.
@@ -93,9 +110,24 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
     if (busy) return
     if (!confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.')) return
     setBusy(true)
+    setSwitchError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSwitchError(typeof data?.error === 'string' && data.error ? data.error : 'Не удалось отключить магазин.')
+        setOpen(true)
+        setBusy(false)
+        return
+      }
+    } catch {
+      setSwitchError('Нет связи с сервером. Магазин не отключён.')
+      setOpen(true)
+      setBusy(false)
+      return
+    }
     setOpen(false)
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
     window.location.href = '/kaspi-shop'
   }
 
@@ -109,26 +141,38 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
   if (connections.length === 0) return null
   const active = activeConn
 
-  // Dead cabinet session (founder request 2026-08-21): the whole pill
-  // becomes one clear reconnect button instead of a store name that no
-  // longer works -- clicking reuses the standard connect flow, which
-  // refreshes the session for the same merchant without duplicates.
-  if (active.sessionStatus === 'session_expired') {
-    return (
-      <div className={inSidebar ? 'relative w-full' : 'relative ml-auto flex-shrink-0'}>
-        <button
-          onClick={() => router.push('/kaspi-shop?addStore=1')}
-          className={`text-[12px] font-semibold rounded-full px-3 py-1.5${inSidebar ? ' w-full' : ''}`}
-          style={{ background: 'var(--nav-critical)', color: '#fff' }}
-        >
-          Подключить магазин
-        </button>
-      </div>
-    )
-  }
+  // Dead cabinet session (founder request 2026-08-21): the pill becomes one clear
+  // reconnect button instead of a store name that no longer works -- clicking
+  // reuses the standard connect flow, which refreshes the session for the same
+  // merchant without duplicates. The store list stays reachable next to it
+  // (K46, 2026-11-06): with only the red button a seller whose ACTIVE store
+  // expired could not switch to a healthy second store, and the blocking
+  // reconnect modal on /kaspi-shop covered the sidebar too.
+  const expired = active.sessionStatus === 'session_expired'
 
   return (
     <div ref={rootRef} className={inSidebar ? 'relative w-full' : 'relative ml-auto flex-shrink-0'}>
+      {expired ? (
+        <div className={`flex items-center gap-1${inSidebar ? ' w-full' : ''}`}>
+          <button
+            onClick={() => router.push('/kaspi-shop?addStore=1')}
+            title={`Сессия магазина «${active.companyName}» истекла`}
+            className={`text-[12px] font-semibold rounded-full px-3 py-1.5${inSidebar ? ' flex-1 min-w-0' : ''}`}
+            style={{ background: 'var(--nav-critical)', color: '#fff' }}
+          >
+            Переподключить
+          </button>
+          <button
+            onClick={() => setOpen(v => !v)}
+            aria-label="Магазины Kaspi"
+            aria-expanded={open}
+            className="nav-glass rounded-full w-8 h-8 flex-shrink-0 flex items-center justify-center"
+            style={{ color: 'var(--nav-text-secondary)' }}
+          >
+            <ChevronIcon />
+          </button>
+        </div>
+      ) : (
       <div className={`flex items-center gap-0.5 rounded-full nav-glass pl-1 pr-1 py-1${inSidebar ? ' w-full' : ''}`}>
         {/* Known, accepted exception to the 44px tap-zone rule (DESIGN.md):
             this pill is 2px-gap tight against the company-name button next to
@@ -154,6 +198,7 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
           <ChevronIcon />
         </button>
       </div>
+      )}
 
       <AnimatePresence>
         {open && (
@@ -178,12 +223,16 @@ export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: {
               >
                 <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.isActive ? 'var(--nav-success)' : 'var(--nav-border-soft)' }} />
                 <span className="truncate flex-1">{c.companyName}</span>
+                {c.sessionStatus === 'session_expired' && <span className="text-[10px] flex-shrink-0 font-semibold" style={{ color: 'var(--nav-critical)' }}>сессия истекла</span>}
                 {c.isActive && <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>сейчас</span>}
               </button>
             ))}
+            {switchError && (
+              <div className="px-3 py-1.5 text-[11px]" role="alert" style={{ color: 'var(--nav-critical)' }}>{switchError}</div>
+            )}
             <div className="mt-1 pt-1.5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
               <button
-                onClick={() => { setOpen(false); router.push('/kaspi-shop?addStore=1') }}
+                onClick={() => { setOpen(false); router.push(expired ? '/kaspi-shop?addStore=new' : '/kaspi-shop?addStore=1') }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] font-medium transition-colors hover:bg-black/[0.03]"
                 style={{ color: 'var(--nav-accent)' }}
               >

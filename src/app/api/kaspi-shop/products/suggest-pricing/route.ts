@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
-import { suggestPricingRule } from '@/lib/kaspiShop/suggestPricingRule'
+import { suggestPricingRule, SuggestionInputError, SuggestionRejectedError } from '@/lib/kaspiShop/suggestPricingRule'
+import { parseMoneyInput } from '@/lib/kaspiShop/moneyInput'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +23,9 @@ async function requireUser(req: NextRequest) {
 
 // Returns a suggestion only -- never writes it. The seller applies it
 // explicitly via the existing PATCH /api/kaspi-shop/products path.
+// Это оценка модели, а не расчёт: ответ несёт estimate: true, а интерфейс
+// показывает пояснение и просит проверить цифры. Без себестоимости и цен
+// конкурентов модель не вызывается (400 с понятным текстом).
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -34,12 +38,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { productId, ownCost } = body
+  const { productId, ownCost } = body ?? {}
   if (!productId) return NextResponse.json({ error: 'productId required' }, { status: 400 })
 
   const { data: product, error: productError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('product_name, kaspi_category, brand')
+    .select('product_name, kaspi_category, brand, cogs_amount, last_competitor_price')
     .eq('id', productId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -52,19 +56,34 @@ export async function POST(req: NextRequest) {
     .eq('tracked_product_id', productId)
   if (cityPricesError) return NextResponse.json({ error: cityPricesError.message }, { status: 500 })
 
-  const competitorPrices = (cityPrices || [])
-    .map(r => Number(r.last_competitor_price))
-    .filter(n => Number.isFinite(n) && n > 0)
+  // Цены конкурентов: по городам плюс общая цена с карточки товара (у свежего
+  // товара до первой проверки городских строк ещё нет).
+  const competitorPrices = [
+    ...(cityPrices || []).map(r => Number(r.last_competitor_price)),
+    Number(product.last_competitor_price),
+  ].filter(n => Number.isFinite(n) && n > 0)
+
+  // Себестоимость берём из карточки товара (раздел «Прибыль»); значение из тела
+  // запроса - запасное, и оно разбирается с пробелами и запятой.
+  const storedCost = Number(product.cogs_amount)
+  let cost: number | undefined = Number.isFinite(storedCost) && storedCost > 0 ? storedCost : undefined
+  if (cost === undefined && ownCost != null) {
+    const parsed = parseMoneyInput(String(ownCost))
+    if (parsed.ok && parsed.value > 0) cost = parsed.value
+  }
 
   try {
     const suggestion = await suggestPricingRule({
       productTitle: product.product_name,
       category: product.kaspi_category || product.brand || 'общая категория',
       competitorPrices,
-      ownCost: ownCost != null ? Number(ownCost) : undefined,
+      ownCost: cost,
     })
-    return NextResponse.json(suggestion)
+    return NextResponse.json({ ...suggestion, estimate: true, ownCost: cost, competitorCount: competitorPrices.length })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 502 })
+    if (err instanceof SuggestionInputError) return NextResponse.json({ error: err.message }, { status: 400 })
+    if (err instanceof SuggestionRejectedError) return NextResponse.json({ error: err.message }, { status: 502 })
+    console.error('suggest-pricing failed:', err?.message)
+    return NextResponse.json({ error: 'ИИ-подбор сейчас недоступен. Попробуйте позже.' }, { status: 502 })
   }
 }

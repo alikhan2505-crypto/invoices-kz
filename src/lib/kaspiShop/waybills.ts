@@ -27,22 +27,64 @@ export async function parseWaybillsZip(data: ArrayBuffer): Promise<JSZip> {
 }
 
 async function fetchWaybillsZip(sessionCookies: string, merchantId: string): Promise<JSZip> {
+  // Весь архив мерчанта качается одним запросом: без таймаута зависший ответ Kaspi
+  // держал функцию до лимита Vercel.
   const res = await fetch(`https://mc.shop.kaspi.kz/order/view/mc/order/waybill?merchantId=${encodeURIComponent(merchantId)}`, {
     headers: { 'x-auth-version': '3', 'cookie': sessionCookies, 'origin': 'https://kaspi.kz', 'referer': 'https://kaspi.kz/' },
+    signal: AbortSignal.timeout(30_000),
   })
   if (!res.ok) throw new Error(`Waybill fetch failed for merchant ${merchantId}: HTTP ${res.status}`)
   return parseWaybillsZip(await res.arrayBuffer())
 }
 
-export async function fetchWaybillPdfs(sessionCookies: string, merchantId: string, orderCodes: string[]): Promise<Buffer[]> {
-  const zip = await fetchWaybillsZip(sessionCookies, merchantId)
+// Сколько заказов можно просить за один раз и какой длины бывает код. Реальные коды
+// Kaspi это цифры (9-10 знаков); границы нужны, чтобы тело запроса не было ни
+// пустой строкой (совпадала с первым попавшимся файлом), ни мегабайтным массивом.
+export const MAX_WAYBILL_ORDER_CODES = 200
+const ORDER_CODE_RE = /^[A-Za-z0-9_-]{1,40}$/
+
+// Приводит тело запроса к списку кодов или возвращает текст ошибки.
+export function normalizeOrderCodes(raw: unknown): { codes: string[] } | { error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { error: 'orderCodes обязателен и не должен быть пустым' }
+  if (raw.length > MAX_WAYBILL_ORDER_CODES) return { error: `Не больше ${MAX_WAYBILL_ORDER_CODES} заказов за один раз` }
+  const codes: string[] = []
+  for (const c of raw) {
+    if (typeof c !== 'string' || !ORDER_CODE_RE.test(c.trim())) return { error: 'orderCodes должен содержать только номера заказов' }
+    const code = c.trim()
+    if (!codes.includes(code)) codes.push(code)
+  }
+  return { codes }
+}
+
+// Имя файла в архиве Kaspi: KASPI_SHOP-{orderCode}.pdf (возможно внутри папки).
+// Сравнение ТОЧНОЕ: подстрока .includes(orderCode) принимала 105012450 за часть
+// 1050124508 и отдавала накладную чужого покупателя (аудит, минор по Заказам).
+export function findWaybillEntry(zip: JSZip, orderCode: string): JSZip.JSZipObject | undefined {
+  const wanted = `KASPI_SHOP-${orderCode}.pdf`.toLowerCase()
+  return Object.values(zip.files).find(f => {
+    if (f.dir) return false
+    const base = f.name.slice(f.name.lastIndexOf('/') + 1).toLowerCase()
+    return base === wanted
+  })
+}
+
+// Накладные, найденные в архиве, и коды, для которых накладной ещё нет (5-минутная
+// задержка Kaspi после «Я упаковал»). Раньше первая ненайденная валила печать всех
+// и называла один заказ.
+export async function collectWaybillPdfs(zip: JSZip, orderCodes: string[]): Promise<{ pdfs: Buffer[]; missing: string[] }> {
   const pdfs: Buffer[] = []
+  const missing: string[] = []
   for (const orderCode of orderCodes) {
-    const entry = Object.values(zip.files).find(f => !f.dir && f.name.includes(orderCode))
-    if (!entry) throw new Error(`Накладная для заказа ${orderCode} не найдена в архиве — заказ ещё не готов к передаче`)
+    const entry = findWaybillEntry(zip, orderCode)
+    if (!entry) { missing.push(orderCode); continue }
     pdfs.push(await entry.async('nodebuffer'))
   }
-  return pdfs
+  return { pdfs, missing }
+}
+
+export async function fetchWaybillPdfs(sessionCookies: string, merchantId: string, orderCodes: string[]): Promise<{ pdfs: Buffer[]; missing: string[] }> {
+  const zip = await fetchWaybillsZip(sessionCookies, merchantId)
+  return collectWaybillPdfs(zip, orderCodes)
 }
 
 const CELL_MARGIN = 10
