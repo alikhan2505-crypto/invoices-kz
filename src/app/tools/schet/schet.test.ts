@@ -178,8 +178,8 @@ describe('schet validation', () => {
   })
 
   it('rejects an empty quantity or price (the document would otherwise disagree with the total)', () => {
-    expect(validateForm({ ...base, rows: [{ name: 'Услуга', qty: '', price: '100' }] }, err)).toBe(err.rowQty('Услуга'))
-    expect(validateForm({ ...base, rows: [{ name: 'Услуга', qty: '1', price: '' }] }, err)).toBe(err.rowPrice('Услуга'))
+    expect(validateForm({ ...base, rows: [{ name: 'Услуга', qty: '', price: '100' }] }, err)).toBe(err.rowQty(1))
+    expect(validateForm({ ...base, rows: [{ name: 'Услуга', qty: '1', price: '' }] }, err)).toBe(err.rowPrice(1))
     expect(validateForm({ ...base, rows: [{ name: '', qty: '1', price: '' }] }, err)).toBe(err.noRows)
   })
 

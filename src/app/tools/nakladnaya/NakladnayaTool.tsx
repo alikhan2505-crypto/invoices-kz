@@ -324,7 +324,7 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
               </select>
             </div>
             <MoreToggle m={docMore} lang={lang} className="col-span-2"
-              hint={moreHint([], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} />
+              hint={moreHint([], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} maskHint />
             <MorePanel m={docMore}>
               <div>
                 <label htmlFor="nk-number" className={label} style={labelStyle}>{t.numberLabel}</label>
@@ -355,7 +355,7 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
           <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
             <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={accentLink}>{t.addRow}</button>
-            <div className="text-right" aria-live="polite">
+            <div className="text-right ph-mask" aria-live="polite">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
                 {t.total(formatTengeExact(total))}
               </div>

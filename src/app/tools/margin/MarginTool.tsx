@@ -325,7 +325,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
           {/* Results update as you type -- there is no Calculate button on
               purpose: the whole tool is one screen and a button would just be
               a step between the numbers and the answer. */}
-          <div className="nav-glass nav-card-accent rounded-2xl p-4 lg:p-5 mb-4" aria-live="polite">
+          <div className="nav-glass nav-card-accent rounded-2xl p-4 lg:p-5 mb-4 ph-mask" aria-live="polite">
             <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.resultTitle}</div>
 
             <div className="text-3xl font-bold tabular-nums mb-1" style={{ color: profitColor }}>
@@ -402,12 +402,12 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
               ] as const).map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
                   <dt style={{ color: 'var(--nav-text-secondary)' }}>{label}</dt>
-                  <dd className="tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(value)}</dd>
+                  <dd className="tabular-nums ph-mask" style={{ color: 'var(--nav-text-primary)' }}>{money(value)}</dd>
                 </div>
               ))}
               <div className="flex justify-between gap-3 pt-1.5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
                 <dt className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.breakdownTotal}</dt>
-                <dd className="font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(result.totalCosts)}</dd>
+                <dd className="font-semibold tabular-nums ph-mask" style={{ color: 'var(--nav-text-primary)' }}>{money(result.totalCosts)}</dd>
               </div>
             </dl>
           </div>
@@ -478,7 +478,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
           {result.breakEvenPrice !== null && (
             <div className="nav-glass rounded-2xl p-5 mt-8">
               <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.ctaTitle}</div>
-              <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+              <p className="text-sm mb-3 ph-mask" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.ctaBody(money(result.breakEvenPrice))}
               </p>
               {/* Clicking through to the product remembers the page language,

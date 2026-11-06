@@ -177,12 +177,12 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
               <div id="nalogi-base-hint" className={hint} style={{ color: 'var(--nav-text-muted)' }}>
                 {t.baseHint(formatTenge(MZP_2026))}
                 {baseNotes.map(note => (
-                  <span key={note} className="block mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{note}</span>
+                  <span key={note} className="block mt-0.5 ph-no-capture" style={{ color: 'var(--nav-text-secondary)' }}>{note}</span>
                 ))}
               </div>
             </div>
             <div className="flex items-end pb-1">
-              <label className="flex items-center gap-2.5 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
+              <label className="flex items-center gap-2.5 text-sm cursor-pointer ph-no-capture" style={{ color: 'var(--nav-text-primary)' }}>
                 <input type="checkbox" checked={before1975} onChange={e => onChange(() => setBefore1975(e.target.checked))}
                   className="w-4 h-4 accent-[#5B4CE0]" />
                 {t.before1975}
@@ -191,7 +191,8 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
           </div>
         </div>
 
-        <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
+        {/* ph-mask: в записи сессии PostHog доход и налоги скрыты. */}
+        <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 ph-mask">
           <div className="text-sm font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.totalTitle}</div>
           <div className="relative inline-block cursor-help rounded-md outline-none focus-visible:ring-2 mb-1" {...rowHandlers('total')}>
             <div className="text-3xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>

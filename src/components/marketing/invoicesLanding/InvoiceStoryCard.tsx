@@ -70,7 +70,9 @@ export function InvoiceStoryCard({ t }: { t: StoryMockCopy }) {
       initial={reduce ? false : { opacity: 0, y: 30, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: reduce ? 0 : 0.7, ease: EASE }}
-      className="relative mx-auto w-full max-w-md select-none"
+      // ph-no-capture: запись сессии PostHog показывает на месте карточки заглушку.
+      // Анимация по кругу даёт десятки изменений в секунду, писать их на телефоне дорого.
+      className="relative mx-auto w-full max-w-md select-none ph-no-capture"
     >
       {/* мягкое свечение -- радиальный градиент без filter: blur (дорого на телефонах) */}
       <div

@@ -76,9 +76,13 @@ export function validateForm(f: Form, e: AvrDict['errors']): string {
   if (rows.length === 0) return e.noRows
   // Раньше пустое количество уходило в акт как 1, а итог на экране считал 0 —
   // экран и документ расходились. Теперь такую строку просим заполнить.
-  for (const r of rows) {
-    if (r.qty <= 0) return e.rowQty(r.name)
-    if (r.price <= 0) return e.rowPrice(r.name)
+  // Номер строки, а не название: название вводит пользователь, а текст ошибки остаётся на
+  // экране (и в записи сессии PostHog).
+  for (let i = 0; i < f.rows.length; i++) {
+    if (!f.rows[i].name.trim()) continue
+    const r = documentRows([f.rows[i]])[0]
+    if (r.qty <= 0) return e.rowQty(i + 1)
+    if (r.price <= 0) return e.rowPrice(i + 1)
   }
   if (documentTotal(f.rows) <= 0) return e.zero
   return ''

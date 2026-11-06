@@ -76,8 +76,8 @@ export interface SchetDict {
     clientBin: string
     noRows: string
     rowName: (n: number) => string
-    rowQty: (name: string) => string
-    rowPrice: (name: string) => string
+    rowQty: (n: number) => string
+    rowPrice: (n: number) => string
     zero: string
     popup: string
     /** Сервер лимита недоступен — документ не создан и не засчитан. */
@@ -169,8 +169,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       clientBin: 'БИН/ИИН клиента — 12 цифр',
       noRows: 'Добавьте хотя бы одну позицию',
       rowName: n => `Укажите наименование в позиции ${n}`,
-      rowQty: name => `Укажите количество для «${name}»`,
-      rowPrice: name => `Укажите цену для «${name}»`,
+      rowQty: n => `Позиция ${n}: укажите количество`,
+      rowPrice: n => `Позиция ${n}: укажите цену`,
       zero: 'Сумма счёта должна быть больше нуля',
       popup: 'Браузер заблокировал окно со счётом — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
       unavailable: 'Сервис временно недоступен — попробуйте через минуту. Счёт не создан и не засчитан.',
@@ -277,8 +277,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       clientBin: 'Клиенттің БСН/ЖСН-і — 12 цифр',
       noRows: 'Кемінде бір позиция қосыңыз',
       rowName: n => `${n}-позицияның атауын көрсетіңіз`,
-      rowQty: name => `«${name}» үшін санын көрсетіңіз`,
-      rowPrice: name => `«${name}» үшін бағасын көрсетіңіз`,
+      rowQty: n => `${n}-позиция: санын көрсетіңіз`,
+      rowPrice: n => `${n}-позиция: бағасын көрсетіңіз`,
       zero: 'Шот сомасы нөлден көп болуы керек',
       popup: 'Браузер шот терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
       unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Шот жасалған жоқ және есепке алынбады.',
@@ -385,8 +385,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       clientBin: 'Client BIN/IIN must be 12 digits',
       noRows: 'Add at least one item',
       rowName: n => `Enter the name of item ${n}`,
-      rowQty: name => `Enter a quantity for “${name}”`,
-      rowPrice: name => `Enter a price for “${name}”`,
+      rowQty: n => `Item ${n}: enter a quantity`,
+      rowPrice: n => `Item ${n}: enter a price`,
       zero: 'The invoice total must be greater than zero',
       popup: 'Your browser blocked the invoice window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
       unavailable: 'The service is temporarily unavailable — try again in a minute. No invoice was created or counted.',

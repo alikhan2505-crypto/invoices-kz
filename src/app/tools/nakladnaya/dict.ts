@@ -54,8 +54,8 @@ export interface NakladnayaDict {
     clientBin: string
     noRows: string
     rowName: (n: number) => string
-    rowQty: (name: string) => string
-    rowPrice: (name: string) => string
+    rowQty: (n: number) => string
+    rowPrice: (n: number) => string
     zero: string
     popup: string
     /** Сервер лимита недоступен — документ не создан и не засчитан. */
@@ -130,8 +130,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       clientBin: 'БИН/ИИН получателя — 12 цифр (или оставьте пустым)',
       noRows: 'Добавьте хотя бы один товар',
       rowName: n => `Укажите наименование товара в строке ${n}`,
-      rowQty: name => `Укажите количество для «${name}»`,
-      rowPrice: name => `Укажите цену для «${name}»`,
+      rowQty: n => `Позиция ${n}: укажите количество`,
+      rowPrice: n => `Позиция ${n}: укажите цену`,
       zero: 'Сумма накладной должна быть больше нуля',
       popup: 'Браузер заблокировал окно с накладной — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
       unavailable: 'Сервис временно недоступен — попробуйте через минуту. Накладная не создана и не засчитана.',
@@ -220,8 +220,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       clientBin: 'Алушының БСН/ЖСН-і — 12 цифр (немесе бос қалдырыңыз)',
       noRows: 'Кемінде бір тауар қосыңыз',
       rowName: n => `${n}-жолдағы тауардың атауын көрсетіңіз`,
-      rowQty: name => `«${name}» тауарының санын көрсетіңіз`,
-      rowPrice: name => `«${name}» тауарының бағасын көрсетіңіз`,
+      rowQty: n => `${n}-позиция: санын көрсетіңіз`,
+      rowPrice: n => `${n}-позиция: бағасын көрсетіңіз`,
       zero: 'Жүкқұжат сомасы нөлден көп болуы керек',
       popup: 'Браузер жүкқұжат терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
       unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Жүкқұжат жасалған жоқ және есепке алынбады.',
@@ -310,8 +310,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       clientBin: 'Recipient BIN/IIN must be 12 digits (or leave it empty)',
       noRows: 'Add at least one item',
       rowName: n => `Enter the item name in row ${n}`,
-      rowQty: name => `Enter a quantity for “${name}”`,
-      rowPrice: name => `Enter a price for “${name}”`,
+      rowQty: n => `Item ${n}: enter a quantity`,
+      rowPrice: n => `Item ${n}: enter a price`,
       zero: 'The delivery note total must be greater than zero',
       popup: 'Your browser blocked the delivery note window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
       unavailable: 'The service is temporarily unavailable — try again in a minute. No delivery note was created or counted.',

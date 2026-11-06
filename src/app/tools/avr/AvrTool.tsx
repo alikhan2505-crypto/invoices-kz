@@ -340,7 +340,7 @@ export default function AvrTool({ lang, children }: { lang: ToolLang; children?:
           <div className="text-sm font-bold mb-2 sm:mb-3 max-sm:hidden" style={{ color: 'var(--nav-text-primary)' }}>{t.docTitle}</div>
           {/* На телефоне номер, дата и договор свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня); НДС всегда на виду. */}
           <MoreToggle m={docMore} lang={lang} className="mb-3 sm:mb-0"
-            hint={moreHint([t.contractNumberLabel, t.contractDateLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} />
+            hint={moreHint([t.contractNumberLabel, t.contractDateLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localToday())}` : undefined)} maskHint />
           <MorePanel m={docMore} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
             <div>
               <label htmlFor="avr-number" className={label} style={labelStyle}>{t.numberLabel}</label>
@@ -384,7 +384,7 @@ export default function AvrTool({ lang, children }: { lang: ToolLang; children?:
           <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
             <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={accentLink}>{t.addRow}</button>
-            <div className="text-right" aria-live="polite">
+            <div className="text-right ph-mask" aria-live="polite">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
                 {t.total(formatTengeExact(total))}
               </div>

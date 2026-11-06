@@ -161,9 +161,9 @@ describe('avr validation', () => {
   })
 
   it('rejects an empty or zero quantity and a missing price', () => {
-    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '', price: '100' }] }, err)).toBe(err.rowQty('Работа'))
-    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '0', price: '100' }] }, err)).toBe(err.rowQty('Работа'))
-    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '1', price: '' }] }, err)).toBe(err.rowPrice('Работа'))
+    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '', price: '100' }] }, err)).toBe(err.rowQty(1))
+    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '0', price: '100' }] }, err)).toBe(err.rowQty(1))
+    expect(validateForm({ ...base, rows: [{ name: 'Работа', qty: '1', price: '' }] }, err)).toBe(err.rowPrice(1))
   })
 
   it('returns errors in the page language', () => {

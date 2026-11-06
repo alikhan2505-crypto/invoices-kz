@@ -505,11 +505,12 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
               >
                 {PAYROLL_CATEGORIES.map(c => <option key={c} value={c}>{t.categories[c]}</option>)}
               </select>
-              {catHint && <div id="zp-category-hint" className={hintCls} style={hintStyle}>{catHint}</div>}
+              {/* ph-no-capture: подсказка зависит от категории (пенсионер, инвалидность), в записи сессии её быть не должно. */}
+              {catHint && <div id="zp-category-hint" className={`${hintCls} ph-no-capture`} style={hintStyle}>{catHint}</div>}
             </div>
 
             <div>
-              <label className={checkCls} style={{ color: 'var(--nav-text-primary)' }}>
+              <label className={`${checkCls} ph-no-capture`} style={{ color: 'var(--nav-text-primary)' }}>
                 <input
                   type="checkbox"
                   checked={born1975}
@@ -581,7 +582,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
                     >
                       {t.months.map((name, i) => <option key={name} value={String(i + 1)}>{`${i + 1}. ${name}`}</option>)}
                     </select>
-                    <div id="zp-month-hint" className={hintCls} style={hintStyle}>{fill(t.monthHint, { from: m(monthFrom) })}</div>
+                    <div id="zp-month-hint" className={`${hintCls} ph-mask`} style={hintStyle}>{fill(t.monthHint, { from: m(monthFrom) })}</div>
                   </div>
                 ) : (
                   <div>
@@ -620,7 +621,8 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
           </div>
         </div>
 
-        <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
+        {/* ph-mask: в записи сессии PostHog суммы скрыты (и в aria-label полосы). */}
+        <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 ph-mask">
           {resultBlock}
 
           {calc.kind === 'ok' && (

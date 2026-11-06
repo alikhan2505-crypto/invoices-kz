@@ -366,7 +366,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
           </MorePanel>
           {/* На телефоне номер, дата, срок и примечание свёрнуты в «Дополнительно» (по умолчанию №1 и сегодня). */}
           <MoreToggle m={docMore} lang={lang} className="mb-3 sm:mb-0"
-            hint={moreHint([t.validLabel, t.noteLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localIsoDate())}` : undefined)} />
+            hint={moreHint([t.validLabel, t.noteLabel], ready ? `№ ${f.number.trim() || '1'}, ${ruDate(f.date || localIsoDate())}` : undefined)} maskHint />
           <MorePanel m={docMore} className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
             <div>
               <label htmlFor="kp-number" className={label} style={labelStyle}>{t.numberLabel}</label>
@@ -429,7 +429,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
           <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
             <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: KP_DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.addRow}</button>
-            <div className="text-right">
+            <div className="text-right ph-mask">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
                 {t.totalLabel}: {formatTengeExact(total)}
               </div>

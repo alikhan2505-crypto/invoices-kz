@@ -202,7 +202,7 @@ export default function BinWatchButton({ bin, lang, onSignInClick, className }: 
       {anonymous && sentTo ? (
         <div role="status" aria-live="polite">
           <div className="text-[13px] font-semibold" style={{ color: 'var(--nav-success)' }}>{a.checkEmailTitle}</div>
-          <p className="text-[12px] mt-1" style={{ color: 'var(--nav-text-primary)' }}>{a.linkSentPrefix} {sentTo}</p>
+          <p className="text-[12px] mt-1 ph-mask" style={{ color: 'var(--nav-text-primary)' }}>{a.linkSentPrefix} {sentTo}</p>
           <p className="text-[12px] mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.inlineAfterOpen}</p>
           <p className="text-[12px] mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{a.spamHint}</p>
           <button type="button" onClick={() => setSentTo(null)}

@@ -49,7 +49,7 @@ export function useMoreFields(opts: {
   return { expanded, toggle, panelId }
 }
 
-export function MoreToggle({ m, lang, hint, className = '' }: { m: MoreFieldsState; lang: ToolLang; hint: string; className?: string }) {
+export function MoreToggle({ m, lang, hint, className = '', maskHint = false }: { m: MoreFieldsState; lang: ToolLang; hint: string; className?: string; maskHint?: boolean }) {
   const t = FORM_TEXT[lang]
   return (
     <button type="button" onClick={m.toggle} aria-expanded={m.expanded} aria-controls={m.panelId}
@@ -57,7 +57,8 @@ export function MoreToggle({ m, lang, hint, className = '' }: { m: MoreFieldsSta
       style={{ border: '1px solid var(--nav-border)', background: 'transparent' }}>
       <span className="min-w-0">
         <span className="block text-[13px] font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.more}</span>
-        {hint && <span className="block text-[11px] leading-snug" style={{ color: 'var(--nav-text-muted)' }}>{hint}</span>}
+        {/* small, а не span: PostHog берёт текст кнопки из вложенных span, и номер документа из подсказки попал бы в событие нажатия. */}
+        {hint && <small className={`block text-[11px] leading-snug${maskHint ? ' ph-mask' : ''}`} style={{ color: 'var(--nav-text-muted)' }}>{hint}</small>}
       </span>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="flex-shrink-0"
         style={{ color: 'var(--nav-text-muted)', transform: m.expanded ? 'rotate(180deg)' : 'none' }}>

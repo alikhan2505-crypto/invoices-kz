@@ -107,12 +107,12 @@ describe('nakladnaya validation', () => {
   })
 
   it('rejects an empty or zero quantity (the document would otherwise print 1)', () => {
-    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '', price: '100' }] }, err)).toBe(err.rowQty('Товар'))
-    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '0', price: '100' }] }, err)).toBe(err.rowQty('Товар'))
+    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '', price: '100' }] }, err)).toBe(err.rowQty(1))
+    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '0', price: '100' }] }, err)).toBe(err.rowQty(1))
   })
 
   it('rejects a missing price', () => {
-    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '1', price: '' }] }, err)).toBe(err.rowPrice('Товар'))
+    expect(validateForm({ ...base, rows: [{ name: 'Товар', qty: '1', price: '' }] }, err)).toBe(err.rowPrice(1))
   })
 
   it('checks BINs and required parties', () => {

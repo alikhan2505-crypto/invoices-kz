@@ -245,7 +245,8 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
         )}
 
         {/* Не размонтируем при смене вкладки: введённый ИИН и результат остаются, повторный запрос к реестрам не нужен. */}
-        {personAllowed && <div hidden={!showPerson}><PersonCheckPanel /></div>}
+        {/* ph-no-capture: запись сессий PostHog показывает вместо блока заглушку (данные физлиц). */}
+        {personAllowed && <div hidden={!showPerson} className="ph-no-capture"><PersonCheckPanel /></div>}
 
         {!showPerson && (<>
         <div className="nav-glass rounded-2xl p-5 mb-4">
@@ -358,10 +359,11 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
             const enfAmount = enf && enf.totalAmount > 0 ? formatTenge(enf.totalAmount) : null
             return (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}
+                // ph-no-capture стоит только на названии, БИН и списке проверок: кнопка «Следить за БИН» и «Полная карточка» остаются видны в записи сессии (там конверсия).
                 className="nav-glass rounded-2xl p-5 mb-4">
                 <div className="mb-3">
-                  <div className="text-base font-bold" style={{ color: 'var(--nav-text-primary)' }}>{c.name}</div>
-                  <div className="text-[13px] mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>
+                  <div className="text-base font-bold ph-no-capture" style={{ color: 'var(--nav-text-primary)' }}>{c.name}</div>
+                  <div className="text-[13px] mt-0.5 ph-no-capture" style={{ color: 'var(--nav-text-secondary)' }}>
                     {t.binPrefix} {c.bin}
                     {c.status ? ` · ${t.status(c.status)}` : ''}
                     {registeredAt ? ` · ${c.status && /^зарегистрирован/i.test(c.status) ? t.registeredSince(registeredAt) : t.registered(registeredAt)}` : ''}
@@ -390,7 +392,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                   </button>
                 </div>
 
-                <div className="divide-y" style={{ borderColor: 'var(--nav-border)' }}>
+                <div className="divide-y ph-no-capture" style={{ borderColor: 'var(--nav-border)' }}>
                   <Verdict
                     ok={c.isUnreliable === null ? null : !c.isUnreliable}
                     label={t.unreliable.label}

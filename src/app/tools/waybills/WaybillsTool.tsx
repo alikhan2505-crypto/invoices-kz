@@ -30,7 +30,8 @@ const KASPI_BOT_LANDING =
   (PRODUCTS.find(p => p.key === 'kaspiShop')?.landing ?? 'https://kaspi.invoices.kz') +
   '/?utm_source=tools&utm_medium=cta&utm_campaign=waybills'
 
-type Notice = { tone: 'error' | 'info'; text: string }
+// sensitive: в тексте имя файла, в записи сессии PostHog он скрыт (ph-mask); остальные сообщения статичны.
+type Notice = { tone: 'error' | 'info'; text: string; sensitive?: boolean }
 
 // Лимит склейки (с 15.10.2026, «5 → сразу Про»): 5 в месяц на IP всем, у кого
 // нет Kaspi Bot, — и без входа, и вошедшим на Free/Базовом/триале; без
@@ -138,7 +139,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
         return
       }
       const q = addToQueue(filesRef.current, expanded.pdfs)
-      for (const name of q.tooBig) next.push({ tone: 'error', text: t.fileTooBig(name) })
+      for (const name of q.tooBig) next.push({ tone: 'error', text: t.fileTooBig(name), sensitive: true })
       // Раньше лишние файлы молча срезались .slice() — продавец, бросивший
       // 40 накладных, получал «успешный» PDF без последних десяти.
       if (q.overflow > 0) next.push({ tone: 'error', text: t.fileLimit(MAX_FILES) })
@@ -201,7 +202,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
           : lang === 'ru' && serverText ? serverText
           : res.status === 400 ? t.errUnreadable
           : t.errGeneric
-        setNotices([{ tone: 'error', text }])
+        setNotices([{ tone: 'error', text, sensitive: lang === 'ru' && serverText !== null && text === serverText }])
         return
       }
       // Сколько осталось после этой склейки — только у тех, кого считаем (без Kaspi Bot).
@@ -314,7 +315,8 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
                   {t.clear}
                 </button>
               </div>
-              <ul className="space-y-0.5 max-h-40 overflow-y-auto">
+              {/* ph-mask: имена файлов (в них бывают имена покупателей) скрыты в записи сессии. */}
+              <ul className="space-y-0.5 max-h-40 overflow-y-auto ph-mask">
                 {files.map((f, i) => (
                   <li key={`${f.name}-${f.size}-${i}`} className="flex items-center gap-2 text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                     <span className="truncate flex-1 min-w-0">{f.name}</span>
@@ -351,7 +353,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
 
           <div aria-live="polite">
             {notices.map((n, i) => (
-              <div key={i} className="text-sm mb-2"
+              <div key={i} className={n.sensitive ? 'text-sm mb-2 ph-mask' : 'text-sm mb-2'}
                 style={{ color: n.tone === 'error' ? 'var(--nav-critical)' : 'var(--nav-text-secondary)' }}>
                 {n.text}
               </div>

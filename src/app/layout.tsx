@@ -7,6 +7,7 @@ import TopUtilityBar from '@/components/TopUtilityBarGate'
 import HandoffBanner from '@/components/HandoffBanner'
 import NavAurora from '@/components/NavAurora'
 import { Analytics } from '@vercel/analytics/next'
+import AnalyticsRouteSync from '@/components/AnalyticsRouteSync'
 import StructuredData from '@/components/StructuredData'
 import { LANG_BOOT_SCRIPT, LANG_HOLD_CSS } from '@/lib/langResolve'
 
@@ -101,6 +102,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Pageviews only -- no custom events yet, and nothing that
                 identifies a person. */}
             <Analytics />
+            {/* PostHog (04.11.2026): сообщает, что новая страница на экране. */}
+            <AnalyticsRouteSync />
           </ThemeProvider>
         </LanguageProvider>
       </body>

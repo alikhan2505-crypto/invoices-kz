@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createSharedSessionStorage, sharedCookieDomain } from './sharedSessionStorage'
 import { coalesceGetUser } from './coalesceGetUser'
+import { setAnalyticsUser } from './analytics/posthogClient'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -33,4 +34,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey, storage ? { auth:
 
 // Пять-шесть компонентов страницы зовут getUser() сразу; в браузере это один запрос вместо очереди
 // (см. coalesceGetUser.ts). На сервере окна нет, и клиент остаётся как был.
-if (typeof window !== 'undefined') coalesceGetUser(supabase.auth)
+if (typeof window !== 'undefined') {
+  coalesceGetUser(supabase.auth)
+  // PostHog узнаёт, вошёл ли человек: гостей на публичных страницах записываем, вошедших
+  // нет, а вошедшему ставим id аккаунта, чтобы связать путь до входа и после.
+  supabase.auth.onAuthStateChange((event, session) => setAnalyticsUser(session?.user?.id ?? null, event))
+}

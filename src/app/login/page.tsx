@@ -410,7 +410,7 @@ export default function Login() {
                 {/* Адрес целиком, без переноса по «@», и подчёркнут: его надо прочитать, а не пробежать глазами. */}
                 <div className="font-medium">
                   {t.didYouMeanBefore}{' '}
-                  <span className="underline whitespace-nowrap font-semibold">{typoFix}</span>
+                  <span className="underline whitespace-nowrap font-semibold ph-mask">{typoFix}</span>
                   {t.didYouMeanAfter === '?' ? '?' : ` ${t.didYouMeanAfter}`}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">

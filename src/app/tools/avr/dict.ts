@@ -58,8 +58,8 @@ export interface AvrDict {
     clientBin: string
     noRows: string
     rowName: (n: number) => string
-    rowQty: (name: string) => string
-    rowPrice: (name: string) => string
+    rowQty: (n: number) => string
+    rowPrice: (n: number) => string
     zero: string
     popup: string
     /** Сервер лимита недоступен — документ не создан и не засчитан. */
@@ -137,8 +137,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       clientBin: 'БИН/ИИН заказчика — 12 цифр (или оставьте пустым)',
       noRows: 'Добавьте хотя бы одну работу или услугу',
       rowName: n => `Укажите наименование работы или услуги в строке ${n}`,
-      rowQty: name => `Укажите количество для «${name}»`,
-      rowPrice: name => `Укажите цену для «${name}»`,
+      rowQty: n => `Позиция ${n}: укажите количество`,
+      rowPrice: n => `Позиция ${n}: укажите цену`,
       zero: 'Сумма акта должна быть больше нуля',
       popup: 'Браузер заблокировал окно с актом — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
       unavailable: 'Сервис временно недоступен — попробуйте через минуту. Акт не создан и не засчитан.',
@@ -234,8 +234,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       clientBin: 'Тапсырыс берушінің БСН/ЖСН-і — 12 цифр (немесе бос қалдырыңыз)',
       noRows: 'Кемінде бір жұмыс немесе қызмет қосыңыз',
       rowName: n => `${n}-жолдағы жұмыстың немесе қызметтің атауын көрсетіңіз`,
-      rowQty: name => `«${name}» үшін санын көрсетіңіз`,
-      rowPrice: name => `«${name}» үшін бағасын көрсетіңіз`,
+      rowQty: n => `${n}-позиция: санын көрсетіңіз`,
+      rowPrice: n => `${n}-позиция: бағасын көрсетіңіз`,
       zero: 'Акт сомасы нөлден көп болуы керек',
       popup: 'Браузер акт терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
       unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Акт жасалған жоқ және есепке алынбады.',
@@ -331,8 +331,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       clientBin: 'Customer BIN/IIN must be 12 digits (or leave it empty)',
       noRows: 'Add at least one work item or service',
       rowName: n => `Enter the work or service name in row ${n}`,
-      rowQty: name => `Enter a quantity for “${name}”`,
-      rowPrice: name => `Enter a price for “${name}”`,
+      rowQty: n => `Item ${n}: enter a quantity`,
+      rowPrice: n => `Item ${n}: enter a price`,
       zero: 'The certificate total must be greater than zero',
       popup: 'Your browser blocked the certificate window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
       unavailable: 'The service is temporarily unavailable — try again in a minute. No certificate was created or counted.',
