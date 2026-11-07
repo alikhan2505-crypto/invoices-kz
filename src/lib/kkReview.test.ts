@@ -51,10 +51,28 @@ describe('makeKkReviewChecker', () => {
 })
 
 describe('реестр kkReview', () => {
-  it('с 05.11.2026 все вычитано: плашка нигде не показывается', () => {
-    expect(KK_REVIEW_ENTRIES.length).toBe(0)
+  it('на проверке только калькулятор маржи (новые строки 05.11.2026), остальное вычитано', () => {
+    expect(KK_REVIEW_ENTRIES.map(e => e.id)).toEqual(['tool-margin'])
+    expect(KK_REVIEW_ENTRIES[0].scope).toBe('page')
+    expect(KK_REVIEW_ENTRIES[0].paths).toEqual(['/tools/kk/margin'])
     expect(KK_DOC_UNDER_REVIEW).toBe(false)
+    expect(isKkUnderReview('/tools/kk/margin')).toBe(true)
+    expect(isKkUnderReview('/tools/kk/margin/')).toBe(true)
+    // Русская и английская версии и соседние страницы плашки не получают.
+    expect(isKkUnderReview('/tools/margin')).toBe(false)
+    expect(isKkUnderReview('/tools/en/margin')).toBe(false)
+    expect(isKkUnderReview('/guides/kk/komissiya-kaspi')).toBe(false)
     for (const p of KK_REVIEWED_PATHS) expect(isKkUnderReview(p), p).toBe(false)
+  })
+
+  it('страница на проверке не числится и вычитанной, и у неё есть настоящий page.tsx', () => {
+    for (const e of KK_REVIEW_ENTRIES.filter(x => x.scope === 'page')) {
+      for (const p of e.paths) {
+        expect(KK_REVIEWED_PATHS.includes(p), p).toBe(false)
+        const file = path.join(process.cwd(), 'src', 'app', ...p.split('/').filter(Boolean), 'page.tsx')
+        expect(fs.existsSync(file), `${p} -> ${file}`).toBe(true)
+      }
+    }
   })
 
   it('у каждого вычитанного адреса есть настоящий page.tsx', () => {
@@ -83,7 +101,11 @@ describe('реестр kkReview', () => {
       const p = `/tools/kk/${slug}`
       expect(isKkUnderReview(p) || KK_REVIEWED_PATHS.includes(p), p).toBe(true)
     }
-    expect(KK_REVIEWED_TOOL_SLUGS.length).toBe(LOCALIZED_TOOL_SLUGS.length)
+    // Вычитанные и ждущие вычитки вместе дают весь список инструментов, без пересечения.
+    const underReview = LOCALIZED_TOOL_SLUGS.filter(slug => isKkUnderReview(`/tools/kk/${slug}`))
+    expect(underReview).toEqual(['margin'])
+    expect(KK_REVIEWED_TOOL_SLUGS.length + underReview.length).toBe(LOCALIZED_TOOL_SLUGS.length)
+    for (const slug of underReview) expect(KK_REVIEWED_TOOL_SLUGS).not.toContain(slug)
   })
 
   it('каждая страница банка /bik/kk либо на проверке, либо утверждена', () => {

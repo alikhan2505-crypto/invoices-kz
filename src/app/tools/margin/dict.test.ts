@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { toolMetadata, toolAlternates, toolUrl, TOOL_LANGS } from '@/lib/tools-i18n'
-import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
+import { KASPI_CATEGORY_COMMISSIONS, KASPI_DELIVERY_DIRECTIONS } from '@/lib/kaspiShop/margin'
+import { KASPI_DELIVERY } from '@/lib/kaspiTariff'
 import { calculateMargin } from '@/lib/marginCalc'
 import { marginDict } from './dict'
 import { formatPercent, parseAmount } from './numbers'
@@ -52,6 +53,105 @@ describe('margin dictionary', () => {
     const en = JSON.stringify({ ...marginDict.en, categoryNames: Object.values(marginDict.en.categoryNames) },
       (_k, v) => (typeof v === 'function' ? v('X') : v))
     expect(en).not.toMatch(/[а-яёәғқңөұүһі]/i)
+  })
+})
+
+describe('margin dictionary: sale type and Kaspi delivery grid (05.11.2026)', () => {
+  const langs = ['ru', 'kk', 'en'] as const
+  const keys = (o: object) => Object.keys(o).sort()
+
+  it('has the same nested keys in every language', () => {
+    for (const lang of langs) {
+      expect(keys(marginDict[lang].saleTypeNames), lang).toEqual(['promo', 'promo24', 'regular'])
+      expect(keys(marginDict[lang].deliveryDirections), lang).toEqual([...KASPI_DELIVERY_DIRECTIONS, 'custom'].sort())
+      expect(keys(marginDict[lang].deliveryTierNames), lang).toEqual(keys(marginDict.ru.deliveryTierNames))
+    }
+  })
+
+  it('names every row of the Kaspi grid in every language, ru and kk exactly as in the guide table', () => {
+    const rows = [...KASPI_DELIVERY.underThreshold, ...KASPI_DELIVERY.fromThreshold]
+    expect(rows).toHaveLength(10)
+    for (const lang of langs) {
+      for (const r of rows) {
+        const name = marginDict[lang].deliveryTierNames[r.id]
+        expect(name, `${lang}: ${r.id}`).toBeTruthy()
+        if (lang !== 'en') expect(name).toBe(r[lang])
+      }
+    }
+  })
+
+  it('every new string is non-empty and has no long dash in user-visible text', () => {
+    for (const lang of langs) {
+      const t = marginDict[lang]
+      const strings = [
+        t.saleTypeLabel, ...Object.values(t.saleTypeNames), t.saleTypeNote, t.promoNote, t.promoUnknownRate,
+        t.surchargeLabel, t.surchargeHint, t.weightLabel, t.weightHint, t.weightAssumedNote, t.vatLabel, t.vatHint,
+        t.expressNote, t.customDeliveryHint, ...Object.values(t.deliveryDirections), ...Object.values(t.deliveryTierNames),
+        t.commissionSumLine('13,0 %', '1,0 %', '14,0 %'),
+        t.deliveryQuoteLine({ direction: 'x', tier: 'y', basis: 'amount', net: '1', total: '2', withVat: true }),
+      ]
+      for (const str of strings) {
+        expect(str.trim().length, lang).toBeGreaterThan(0)
+        expect(str, `${lang}: ${str}`).not.toContain('—')
+        expect(str, `${lang}: ${str}`).not.toContain('undefined')
+      }
+    }
+  })
+
+  it('states the facts the research found: no extra fee for Red/credit/other bank, 0-0-24 only in the cabinet, Express per warehouse', () => {
+    for (const lang of langs) {
+      const t = marginDict[lang]
+      expect(t.saleTypeNote, lang).toContain('0-0-3/6/12')
+      expect(t.saleTypeNote, lang).toMatch(/05\.01\.2026|5 January 2026/)
+      expect(t.surchargeHint, lang).toMatch(lang === 'en' ? /Marketing/ : /Маркетинг/)
+      expect(t.surchargeLabel, lang).toContain('0-0-24')
+      expect(t.promoNote, lang).toMatch(/13[.,]0.*7[.,]7.*16[.,]1/)
+      expect(t.vatLabel, lang).toContain('16%')
+    }
+    expect(marginDict.ru.expressNote).toContain('каждый склад')
+    expect(marginDict.kk.expressNote).toContain('әр қойма')
+    expect(marginDict.en.expressNote).toContain('each warehouse')
+  })
+
+  it('the one-line tariff quote shows the net price, and the VAT total only when VAT is on', () => {
+    for (const lang of langs) {
+      const q = marginDict[lang].deliveryQuoteLine
+      const withVat = q({ direction: 'D', tier: 'T', basis: 'weight', net: '1 099 ₸', total: '1 275 ₸', withVat: true })
+      const without = q({ direction: 'D', tier: 'T', basis: 'weight', net: '1 099 ₸', total: '1 275 ₸', withVat: false })
+      expect(withVat, lang).toContain('1 099 ₸')
+      expect(withVat, lang).toContain('1 275 ₸')
+      expect(without, lang).toContain('1 099 ₸')
+      expect(without, lang).not.toContain('1 275 ₸')
+    }
+  })
+
+  it('the promo copy tells the seller to check the rate in the seller account and that the field is editable (review 05.11)', () => {
+    const where = { ru: /Маркетинг → Акции Магазина/, kk: /Маркетинг → Дүкен акциялары/, en: /Marketing → Shop promos/ }
+    for (const lang of langs) {
+      const t = marginDict[lang]
+      expect(t.promoNote, `${lang} promoNote`).toMatch(where[lang])
+      const promoItem = t.howItems.find(i => /13[.,]0.*7[.,]7.*16[.,]1/.test(i))
+      expect(promoItem, `${lang} howItems promo item`).toBeTruthy()
+      expect(promoItem, `${lang} howItems promo item`).toMatch(where[lang])
+      expect(promoItem, lang).not.toContain('—')
+      expect(t.promoNote, lang).not.toContain('—')
+    }
+    expect(marginDict.ru.promoNote).toContain('таблицы акций')
+    expect(marginDict.en.promoNote).toContain('editable')
+  })
+
+  it('"How it is calculated" says the floor price uses the tariff for the price itself, in every language', () => {
+    const marker = { ru: 'для самой этой цены', kk: 'дәл сол бағаға сәйкес', en: 'for that price itself' }
+    for (const lang of langs) {
+      const item = marginDict[lang].howItems.find(i => i.includes(marker[lang]))
+      expect(item, lang).toBeTruthy()
+      expect(item, lang).not.toContain('—')
+    }
+  })
+
+  it('the quoted promo rates in the copy are the ones in the table', () => {
+    const promo = KASPI_CATEGORY_COMMISSIONS.map(c => c.promoRatePercent)
+    expect([...new Set(promo)].sort((a, b) => a - b)).toEqual([7.7, 13, 16.1])
   })
 })
 

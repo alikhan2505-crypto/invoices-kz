@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calculateMargin, MarginInput } from './marginCalc'
+import { kaspiDeliveryTariff, ceilPrice, type KaspiDeliveryDirection } from './kaspiShop/margin'
 
 const base: MarginInput = {
   costPrice: 5000,
@@ -89,5 +90,63 @@ describe('calculateMargin', () => {
     const r = calculateMargin(base)
     expect(r.monthlyRevenue).toBe(300000)
     expect(r.monthlyProfit).toBe(81000)
+  })
+})
+
+// Ревью 05.11.2026: тариф Kaspi зависит от цены, и «Минимальная цена» из одной формулы врала.
+describe('calculateMargin: break-even with the Kaspi delivery tariff', () => {
+  // Состояние /tools/margin по умолчанию: себестоимость 5000, цена 10000, комиссия 12,5, налог 4, прочее 200, город с НДС.
+  const tool: MarginInput = { costPrice: 5000, sellPrice: 10000, commissionPercent: 12.5, deliveryCost: 1275, taxPercent: 4, otherCosts: 200, monthlyUnits: 30 }
+  const city = kaspiDeliveryTariff({ direction: 'city', withVat: true })
+
+  it('default tool state: the floor is 7 199 ₸ (root 7 198,8, delivery 811 below 10 000), not 7 754 from the delivery of the current price', () => {
+    expect(calculateMargin(tool).breakEvenPrice).toBeCloseTo(6475 / 0.835, 6) // прежний результат: 7 754
+    const r = calculateMargin(tool, { deliveryTariff: city })
+    expect(r.breakEvenPrice).toBeCloseTo(6011 / 0.835, 6)
+    expect(ceilPrice(r.breakEvenPrice as number)).toBe(7199)
+    // На показанной цене и выше прибыль не отрицательна, на 1 ₸ ниже убыток.
+    const at = (p: number) => calculateMargin({ ...tool, sellPrice: p, deliveryCost: city.feeAt(p) }).profitPerUnit
+    expect(at(7199)).toBeGreaterThanOrEqual(0)
+    expect(at(7198)).toBeLessThan(0)
+  })
+
+  it('a seller at 4 900 ₸ is not told that 5 307 ₸ is safe (it loses money at delivery 811)', () => {
+    const cheap = { ...tool, costPrice: 4000, sellPrice: 4900, deliveryCost: 231 }
+    expect(calculateMargin(cheap).breakEvenPrice).toBeCloseTo(4431 / 0.835, 6) // прежний результат 5 307, а на нём убыток
+    const at = (p: number) => calculateMargin({ ...cheap, sellPrice: p, deliveryCost: city.feeAt(p) }).profitPerUnit
+    expect(at(5307)).toBeLessThan(0)
+    const r = calculateMargin(cheap, { deliveryTariff: city })
+    expect(r.breakEvenPrice).toBeCloseTo(5011 / 0.835, 6)
+    expect(at(ceilPrice(r.breakEvenPrice as number))).toBeGreaterThanOrEqual(0)
+  })
+
+  it('the profit shown still uses the delivery of the current price', () => {
+    expect(calculateMargin(tool, { deliveryTariff: city }).profitPerUnit).toBe(calculateMargin(tool).profitPerUnit)
+  })
+
+  it('brute force over random tool inputs: nothing above the floor loses money, one tenge below the floor does', () => {
+    let a = 77
+    const rnd = () => { a = (a * 1664525 + 1013904223) % 4294967296; return a / 4294967296 }
+    const dirs: KaspiDeliveryDirection[] = ['city', 'kazakhstan', 'express']
+    for (let n = 0; n < 200; n++) {
+      const tariff = kaspiDeliveryTariff({ direction: dirs[Math.floor(rnd() * 3)], withVat: rnd() < 0.7, weightKg: rnd() < 0.4 ? 0 : rnd() * 120 })
+      const input: MarginInput = {
+        costPrice: Math.round(10 ** (rnd() * 4.6)), sellPrice: 10000, commissionPercent: 5 + rnd() * 12, deliveryCost: 0,
+        taxPercent: Math.round(rnd() * 6), otherCosts: Math.round(rnd() * 1500), monthlyUnits: 1,
+      }
+      const floor = calculateMargin(input, { deliveryTariff: tariff }).breakEvenPrice as number
+      const profit = (p: number) => calculateMargin({ ...input, sellPrice: p, deliveryCost: tariff.feeAt(p) }).profitPerUnit
+      expect(profit(floor)).toBeGreaterThanOrEqual(-1e-6)
+      const start = ceilPrice(floor)
+      for (let p = start; p <= start + Math.max(0, 12000 - start) + 300; p++) {
+        if (profit(p) < -1e-6) throw new Error(`loss at ${p}, floor ${floor}`)
+      }
+      const below = Math.floor(floor - 1e-6)
+      if (below >= 0) expect(profit(below)).toBeLessThan(0)
+    }
+  })
+
+  it('without a tariff (own delivery or pickup) the floor stays the closed formula', () => {
+    expect(calculateMargin({ ...tool, deliveryCost: 0 }).breakEvenPrice).toBeCloseTo(5200 / 0.835, 6)
   })
 })

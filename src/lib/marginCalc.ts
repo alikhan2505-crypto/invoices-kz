@@ -13,6 +13,12 @@
 //
 // A seller who prices from a wrong floor loses money on every single order and
 // only finds out at the end of the month.
+//
+// Delivery can depend on the price itself (Kaspi's grid steps up with the order
+// amount), and then the floor cannot come from one formula: with a tariff passed
+// to calculateMargin it is solved tier by tier, see minProfitablePrice.
+
+import { minProfitablePrice, type DeliveryTariff } from '@/lib/kaspiShop/margin'
 
 export interface MarginInput {
   /** Себестоимость единицы товара, ₸ */
@@ -49,9 +55,12 @@ export interface MarginResult {
    */
   markupPercent: number | null
   /**
-   * Минимальная цена, при которой сделка выходит в ноль, ₸. null, когда
-   * комиссия и налог вместе съедают 100% и более: тогда безубыточной цены
-   * не существует ни при какой цене.
+   * Минимальная цена, ₸: наименьшая, начиная с которой ЛЮБАЯ цена выше не
+   * убыточна. Без тарифа доставки это просто цена выхода в ноль; с тарифом
+   * (доставка растёт скачками вместе с ценой) считается точно по ступеням,
+   * и ниже неё возможен карман прибыли под границей ступени (см.
+   * minProfitablePrice). null, когда комиссия и налог вместе съедают 100% и
+   * более: тогда безубыточной цены не существует ни при какой цене.
    */
   breakEvenPrice: number | null
   monthlyRevenue: number
@@ -63,7 +72,15 @@ function clean(n: number): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
-export function calculateMargin(input: MarginInput): MarginResult {
+export function calculateMargin(
+  input: MarginInput,
+  /**
+   * Доставка как функция цены (тариф Kaspi). Нужна только для минимальной цены:
+   * прибыль считается по input.deliveryCost, то есть по доставке для ТЕКУЩЕЙ цены.
+   * Без тарифа доставка при поиске порога считается постоянной.
+   */
+  options?: { deliveryTariff?: DeliveryTariff },
+): MarginResult {
   const costPrice = clean(input.costPrice)
   const sellPrice = clean(input.sellPrice)
   const deliveryCost = clean(input.deliveryCost)
@@ -83,10 +100,14 @@ export function calculateMargin(input: MarginInput): MarginResult {
   const marginPercent = sellPrice > 0 ? (profitPerUnit / sellPrice) * 100 : 0
   const markupPercent = costPrice > 0 ? (profitPerUnit / costPrice) * 100 : null
 
-  // P - P*(c+t)/100 = fixed  =>  P = fixed / (1 - (c+t)/100)
+  // P - P*(c+t)/100 = fixed  =>  P = fixed / (1 - (c+t)/100), where fixed includes
+  // the delivery as long as that does not depend on the price.
   const takenShare = (commissionPercent + taxPercent) / 100
-  const fixedCosts = costPrice + deliveryCost + otherCosts
-  const breakEvenPrice = takenShare >= 1 ? null : fixedCosts / (1 - takenShare)
+  const breakEvenPrice = minProfitablePrice({
+    share: takenShare,
+    fixed: costPrice + otherCosts,
+    delivery: options?.deliveryTariff ?? deliveryCost,
+  })
 
   return {
     commission,

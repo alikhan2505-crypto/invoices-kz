@@ -1,5 +1,7 @@
 import type { ToolFaqItem, ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
 import type { MarginInput } from '@/lib/marginCalc'
+import type { KaspiDeliveryDirection, KaspiSaleType } from '@/lib/kaspiShop/margin'
+import { KASPI_DELIVERY } from '@/lib/kaspiTariff'
 
 // Все тексты /tools/margin на трёх языках: и <head> (seo), и интерфейс.
 // Русский — дословно прежний текст страницы (и прежние title/description из
@@ -72,7 +74,46 @@ export interface MarginDict {
    * Незнакомую категорию показываем по-русски.
    */
   categoryNames: Record<string, string>
+
+  // --- Тип продажи, комиссия в акциях, доставка по сетке Kaspi (05.11.2026) ---
+  saleTypeLabel: string
+  saleTypeNames: Record<KaspiSaleType, string>
+  /** Рассрочка Red, кредит и чужая карта комиссию не меняют (единая комиссия с 05.01.2026). */
+  saleTypeNote: string
+  /** Ставки акций рядом с обычными, показывается в режимах «Акция». */
+  promoNote: string
+  /** Режим «Акция», а ставка в поле не из таблицы Kaspi: ставку акции не подставляем. */
+  promoUnknownRate: string
+  surchargeLabel: string
+  surchargeHint: string
+  /** «Итого комиссия: 13,0 + 1,0 = 14,0 %»; числа приходят готовыми строками. */
+  commissionSumLine: (base: string, extra: string, total: string) => string
+  deliveryDirections: Record<KaspiDeliveryDirection | 'custom', string>
+  weightLabel: string
+  weightHint: string
+  weightAssumedNote: string
+  vatLabel: string
+  vatHint: string
+  expressNote: string
+  customDeliveryHint: string
+  /** Названия строк тарифа Kaspi по id (KASPI_DELIVERY.*[].id). */
+  deliveryTierNames: Record<string, string>
+  /** Итог выбранного тарифа одной строкой. */
+  deliveryQuoteLine: (p: DeliveryLineParts) => string
 }
+
+export interface DeliveryLineParts {
+  direction: string
+  tier: string
+  basis: 'amount' | 'weight'
+  net: string
+  total: string
+  withVat: boolean
+}
+
+/** Названия строк тарифа Kaspi из самой таблицы (ru/kk уже в kaspiTariff.ts, их вычитывал основатель). */
+const TIER_ROWS = [...KASPI_DELIVERY.underThreshold, ...KASPI_DELIVERY.fromThreshold]
+const tierNames = (lang: 'ru' | 'kk') => Object.fromEntries(TIER_ROWS.map(r => [r.id, r[lang]]))
 
 export const marginDict: Record<ToolLang, MarginDict> = {
   ru: {
@@ -154,6 +195,8 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Маржинальность — доля прибыли в цене продажи. Наценка — прибыль, делённая на себестоимость.',
       'Минимальная цена = (себестоимость + доставка + прочие расходы) ÷ (1 − (комиссия % + налог %) ÷ 100). Это цена, при которой продажа выходит ровно в ноль.',
       'Дробные числа можно вводить и с запятой, и с точкой.',
+      'Доставка Kaspi считается по официальной сетке с 01.01.2026: до 10 000 ₸ по сумме заказа, от 10 000 ₸ по весу. Цены в сетке без НДС, Kaspi списывает с НДС 16%. Тарифы проверены 17.10.2026. Минимальная цена считается по тарифу для самой этой цены, а не для текущей: это наименьшая цена, начиная с которой любая более высокая не приносит убытка.',
+      'В акциях Магазина комиссия выше: 13,0 / 7,7 / 16,1 % вместо 12,5 / 7,3 / 15,5 %. Надбавку за рассрочку 0-0-24 Kaspi публикует только в кабинете продавца, поэтому её вводите сами. Ставки акций взяты из таблицы акций Kaspi: сверьте свою в кабинете продавца (Маркетинг → Акции Магазина), поле комиссии можно править.',
     ],
     guideLink: 'Комиссия Kaspi по категориям: полная таблица ставок →',
     categoryGuideLink: 'Все ставки по категориям →',
@@ -177,6 +220,32 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       },
     ],
     categoryNames: {},
+
+    saleTypeLabel: 'Тип продажи',
+    saleTypeNames: { regular: 'Обычная', promo: 'Акция Kaspi', promo24: 'Акция 0-0-24' },
+    saleTypeNote:
+      'Рассрочка Kaspi Red 0-0-3/6/12, Kaspi Кредит и оплата картой другого банка комиссию не меняют: с 05.01.2026 она единая. Меняет её только участие в акции.',
+    promoNote:
+      'В акциях Магазина комиссия выше: 13,0 / 7,7 / 16,1 % вместо 12,5 / 7,3 / 15,5 % (тарифы акций Kaspi, проверено 17.10.2026). Это ставки из таблицы акций, а не из общего тарифа: сверьте свою в кабинете продавца (Маркетинг → Акции Магазина), поле можно править.',
+    promoUnknownRate:
+      'Ставка в поле не из таблицы Kaspi (7,3 / 12,5 / 15,5 %), поэтому ставку акции мы не подставляем: впишите её сами.',
+    surchargeLabel: 'Надбавка за 0-0-24, п.п.',
+    surchargeHint:
+      'Kaspi публикует эту надбавку только в кабинете продавца: Маркетинг → Акции Магазина. Впишите её оттуда; пока там 0, расчёт идёт по ставке акции. Применяется ли таблица акций именно к 0-0-24, Kaspi не уточняет.',
+    commissionSumLine: (base, extra, total) => `Итого комиссия: ${base} + ${extra} = ${total}`,
+    deliveryDirections: { city: 'Город', kazakhstan: 'По Казахстану', express: 'Express', custom: 'Свой вариант или самовывоз' },
+    weightLabel: 'Вес заказа, кг',
+    weightHint:
+      'Нужен только для заказов от 10 000 ₸: с этой суммы Kaspi считает доставку по весу.',
+    weightAssumedNote: 'Вес не указан: взята строка «до 5 кг». Тяжелее заказ, дороже доставка.',
+    vatLabel: 'Добавить НДС 16% (Kaspi списывает доставку с НДС)',
+    vatHint:
+      'Тарифы доставки Kaspi указаны без НДС. Зачитывается ли этот НДС у плательщиков НДС, Kaspi не пишет.',
+    expressNote: 'Express: Kaspi берёт отдельную плату за каждый склад в заказе. Здесь посчитана одна доставка.',
+    customDeliveryHint: 'Самовывоз или своя курьерская служба: впишите любую сумму, можно 0.',
+    deliveryTierNames: tierNames('ru'),
+    deliveryQuoteLine: ({ direction, tier, basis, net, total, withVat }) =>
+      `Тариф Kaspi: ${direction}, ${basis === 'amount' ? 'сумма заказа' : 'заказ от 10 000 ₸, вес'} ${tier}: ${net} без НДС${withVat ? `, с НДС 16%: ${total}` : ''}`,
   },
 
   kk: {
@@ -258,6 +327,8 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Маржиналдылық — пайданың сату бағасындағы үлесі. Үстеме — пайданың өзіндік құнға қатынасы.',
       'Ең төмен баға = (өзіндік құны + жеткізу + басқа шығындар) ÷ (1 − (комиссия % + салық %) ÷ 100). Осы бағамен сатылым дәл нөлге шығады.',
       'Бөлшек сандарды үтірмен де, нүктемен де жазуға болады.',
+      'Kaspi жеткізуі 01.01.2026 бастап ресми кесте бойынша есептеледі: 10 000 ₸-ға дейінгі тапсырыстар үшін тапсырыс сомасымен, 10 000 ₸ және одан жоғарылар үшін салмақпен. Кестедегі бағалар ҚҚС-сыз, Kaspi 16% ҚҚС-пен ұстайды. Тарифтер 17.10.2026 күні тексерілді. Ең төмен баға ағымдағы бағаға емес, дәл сол бағаға сәйкес тариф бойынша есептеледі: бұл одан жоғары кез келген баға залал әкелмейтін ең төмен баға.',
+      'Дүкен акцияларында комиссия жоғары: 12,5 / 7,3 / 15,5 % орнына 13,0 / 7,7 / 16,1 %. 0-0-24 бөліп төлеуі үшін қосымша комиссияны Kaspi тек сатушының тіркелгісінде жариялайды, сондықтан оны өзіңіз жазасыз. Акция мөлшерлемелері Kaspi акция кестесінен алынған: өзіңіздікін сатушының тіркелгісінде (Маркетинг → Дүкен акциялары) тексеріңіз, комиссия өрісін түзетуге болады.',
     ],
     guideLink: 'Kaspi комиссиясы санаттар бойынша: мөлшерлемелердің толық кестесі →',
     categoryGuideLink: 'Санаттар бойынша барлық мөлшерлемелер →',
@@ -307,6 +378,32 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Товары для животных — прочее (ветаптека, груминг, аксессуары)': 'Жануарлар тауарлары — басқасы (ветдәріхана, груминг, аксессуарлар)',
       'Украшения': 'Әшекейлер',
     },
+
+    saleTypeLabel: 'Сатылым түрі',
+    saleTypeNames: { regular: 'Әдеттегі', promo: 'Kaspi акциясы', promo24: '0-0-24 акциясы' },
+    saleTypeNote:
+      'Kaspi Red 0-0-3/6/12 бөліп төлеуі, Kaspi Кредит және басқа банк картасымен төлеу комиссияны өзгертпейді: 05.01.2026 бастап комиссия бірыңғай. Оны тек акцияға қатысу өзгертеді.',
+    promoNote:
+      'Дүкен акцияларында комиссия жоғары: 12,5 / 7,3 / 15,5 % орнына 13,0 / 7,7 / 16,1 % (Kaspi акция тарифтері, 17.10.2026 тексерілді). Бұл жалпы тарифтегі емес, акция кестесіндегі мөлшерлемелер: өзіңіздікін сатушының тіркелгісінде (Маркетинг → Дүкен акциялары) тексеріңіз, өрісті түзетуге болады.',
+    promoUnknownRate:
+      'Өрістегі мөлшерлеме Kaspi кестесіндегі (7,3 / 12,5 / 15,5 %) мөлшерлемелердің бірі емес, сондықтан акция мөлшерлемесін өзіміз қоймаймыз: оны өзіңіз жазыңыз.',
+    surchargeLabel: '0-0-24 үшін қосымша комиссия, п.т.',
+    surchargeHint:
+      'Kaspi бұл қосымша комиссияны тек сатушының тіркелгісінде жариялайды: Маркетинг → Дүкен акциялары. Сол жерден алып жазыңыз; онда 0 тұрғанда есеп акция мөлшерлемесімен жүреді. Акция кестесі дәл 0-0-24 акциясына қолданыла ма, Kaspi нақтыламайды. п.т. деп пайыздық тармақты айтамыз.',
+    commissionSumLine: (base, extra, total) => `Комиссия жиыны: ${base} + ${extra} = ${total}`,
+    deliveryDirections: { city: 'Қала', kazakhstan: 'Қазақстан бойынша', express: 'Express', custom: 'Өз нұсқам немесе өзі алып кету' },
+    weightLabel: 'Тапсырыс салмағы, кг',
+    weightHint:
+      'Тек сомасы 10 000 ₸ және одан жоғары тапсырыстарға керек: осы сомадан бастап Kaspi жеткізуді салмақпен есептейді.',
+    weightAssumedNote: 'Салмағы көрсетілмеген: «5 кг-ға дейін» жолы алынды. Тапсырыс ауыр болса, жеткізу қымбаттайды.',
+    vatLabel: 'Жеткізуге 16% ҚҚС қосу (Kaspi жеткізуді ҚҚС-пен ұстайды)',
+    vatHint:
+      'Kaspi жеткізу тарифтері ҚҚС-сыз көрсетілген. ҚҚС төлеушілер бұл ҚҚС-ты есепке жатқыза ала ма, Kaspi жазбайды.',
+    expressNote: 'Express: Kaspi тапсырыстағы әр қойма үшін бөлек ақы алады. Мұнда бір жеткізу есептелген.',
+    customDeliveryHint: 'Өзі алып кету немесе өз курьерлік қызметі: кез келген соманы жазыңыз, 0 болады.',
+    deliveryTierNames: tierNames('kk'),
+    deliveryQuoteLine: ({ direction, tier, basis, net, total, withVat }) =>
+      `Kaspi тарифі: ${direction}, ${basis === 'amount' ? 'тапсырыс сомасы' : '10 000 ₸ және одан жоғары тапсырыс, салмағы'} ${tier}: ${net} ҚҚС-сыз${withVat ? `, 16% ҚҚС-пен: ${total}` : ''}`,
   },
 
   en: {
@@ -388,6 +485,8 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Margin is profit as a share of the selling price. Markup is profit divided by the cost price.',
       'Floor price = (cost + delivery + other costs) ÷ (1 − (commission % + tax %) ÷ 100). At this price a sale breaks exactly even.',
       'Amounts are in Kazakhstani tenge (₸). Decimals can be typed with a comma or a dot.',
+      'Kaspi delivery follows the official grid in force since 1 January 2026: by order amount below 10 000 ₸, by weight from 10 000 ₸. Grid prices exclude VAT, Kaspi debits them with 16% VAT. Tariffs checked on 17 October 2026. The floor price uses the tariff for that price itself, not for the current one: it is the lowest price from which every higher price makes no loss.',
+      'In Shop promos the commission is higher: 13.0 / 7.7 / 16.1% instead of 12.5 / 7.3 / 15.5%. Kaspi publishes the surcharge for 0-0-24 instalments only in the seller cabinet, so you enter it yourself. The promo rates come from the Kaspi promo table: check yours in the seller cabinet (Marketing → Shop promos); the commission field is editable.',
     ],
     guideLink: 'Kaspi commission by category: full rate table (in Russian) →',
     categoryGuideLink: 'All rates by category (in Russian) →',
@@ -437,5 +536,42 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Товары для животных — прочее (ветаптека, груминг, аксессуары)': 'Pet supplies — other (vet pharmacy, grooming, accessories)',
       'Украшения': 'Jewellery',
     },
+
+    saleTypeLabel: 'Sale type',
+    saleTypeNames: { regular: 'Regular', promo: 'Kaspi promo', promo24: '0-0-24 promo' },
+    saleTypeNote:
+      'Kaspi Red 0-0-3/6/12 instalments, Kaspi Credit and paying with a card from another bank do not change the commission: it has been a single rate since 5 January 2026. Only taking part in a promo does.',
+    promoNote:
+      'In Shop promos the commission is higher: 13.0 / 7.7 / 16.1% instead of 12.5 / 7.3 / 15.5% (Kaspi promo tariff, checked 17 October 2026). These are rates from the promo table, not from the regular tariff: check yours in the seller cabinet (Marketing → Shop promos); the field is editable.',
+    promoUnknownRate:
+      'The rate in the field is not one of the Kaspi tiers (7.3 / 12.5 / 15.5%), so we do not fill in a promo rate: type it yourself.',
+    surchargeLabel: 'Surcharge for 0-0-24, pp',
+    surchargeHint:
+      'Kaspi publishes this surcharge only in the seller cabinet: Marketing → Shop promos. Copy it from there; while it is 0 the result uses the plain promo rate. Kaspi does not say whether the promo table applies to 0-0-24 promos.',
+    commissionSumLine: (base, extra, total) => `Total commission: ${base} + ${extra} = ${total}`,
+    deliveryDirections: { city: 'City', kazakhstan: 'Across Kazakhstan', express: 'Express', custom: 'My own or pickup' },
+    weightLabel: 'Order weight, kg',
+    weightHint:
+      'Only needed for orders of 10 000 ₸ and up: from that amount Kaspi bills delivery by weight.',
+    weightAssumedNote: 'No weight entered: the “up to 5 kg” row is used. A heavier order costs more to deliver.',
+    vatLabel: 'Add 16% VAT (Kaspi debits delivery with VAT)',
+    vatHint:
+      'Kaspi delivery tariffs are listed without VAT. Whether VAT-registered sellers can offset this VAT, Kaspi does not say.',
+    expressNote: 'Express: Kaspi charges separately for each warehouse in the order. One delivery is counted here.',
+    customDeliveryHint: 'Pickup or your own courier: type any amount, 0 is allowed.',
+    deliveryTierNames: {
+      lt1000: 'under 1 000 ₸',
+      '1000-3000': '1 000 to 3 000 ₸',
+      '3000-5000': '3 000 to 5 000 ₸',
+      '5000-10000': '5 000 to 10 000 ₸',
+      'w-to5': 'up to 5 kg',
+      'w-5-15': '5-15 kg',
+      'w-15-30': '15-30 kg',
+      'w-30-60': '30-60 kg',
+      'w-60-100': '60-100 kg',
+      'w-over100': 'over 100 kg',
+    },
+    deliveryQuoteLine: ({ direction, tier, basis, net, total, withVat }) =>
+      `Kaspi tariff: ${direction}, ${basis === 'amount' ? 'order amount' : 'order of 10 000 ₸ and up, weight'} ${tier}: ${net} excl. VAT${withVat ? `, with 16% VAT: ${total}` : ''}`,
   },
 }

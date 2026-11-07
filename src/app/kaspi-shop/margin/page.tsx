@@ -8,7 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import {
-  computeMargin, computeVerdict, computeBreakEvenPrice, estimateKaspiDeliveryFee,
+  computeMargin, computeVerdict, computeBreakEvenPrice, cityDeliveryTariff, deliveryWeightAssumed, autoDeliveryFee, inputsAtPrice, ceilPrice,
   KASPI_CATEGORY_COMMISSIONS, DEFAULT_CARGO_RATE_PER_KG, DEFAULT_TARGET_MARGIN_PERCENT,
 } from '@/lib/kaspiShop/margin'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
@@ -104,14 +104,19 @@ export default function KaspiShopMargin() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
-  // Auto-fill the delivery estimate from weight -- but only until the
-  // seller directly edits the field. Same "don't clobber a manual override"
-  // rule the rest of Kaspi Shop follows for tracked-city availability etc.
+  // Auto-fill the delivery fee from Kaspi's official grid (направление «город»,
+  // с НДС, как Kaspi её списывает) -- but only until the seller directly edits
+  // the field. Same "don't clobber a manual override" rule the rest of Kaspi
+  // Shop follows for tracked-city availability etc. До 10 000 ₸ тариф зависит от
+  // цены Kaspi, от 10 000 ₸ от веса. От 10 000 ₸ без веса берём строку «до 5 кг»
+  // (как /tools/margin) и пишем об этом под полем: молча оставлять в поле тариф
+  // для цены до 10 000 ₸ нельзя, он меньше настоящего минимум на 460 ₸. Без цены
+  // считать нечего, поле остаётся как есть.
   useEffect(() => {
     if (deliveryTouched) return
-    const w = Number(weightGrams)
-    if (Number.isFinite(w) && w > 0) setDeliveryFee(String(estimateKaspiDeliveryFee(w)))
-  }, [weightGrams, deliveryTouched])
+    const fee = autoDeliveryFee(Number(kaspiPrice), Number(weightGrams))
+    if (fee !== null) setDeliveryFee(String(fee))
+  }, [kaspiPrice, weightGrams, deliveryTouched])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -182,9 +187,13 @@ export default function KaspiShopMargin() {
   const result = useMemo(() => computeMargin(baseInputs), [baseInputs])
   // Solved, not hunted for with the slider below: commission is a share OF
   // the price, so the floor always sits above the plain sum of costs.
+  // Пока доставку не правили руками, она ступенчатая функция цены (сетка Kaspi), и
+  // порог считается по ступеням тарифа: доставка в baseInputs посчитана для
+  // ТЕКУЩЕЙ цены и для другой цены была бы другой. Своя сумма в поле постоянна.
+  const weightNum = Number(weightGrams) || 0
   const floors = useMemo(
-    () => computeBreakEvenPrice(baseInputs, Number(targetMarginPercent) || 0),
-    [baseInputs, targetMarginPercent]
+    () => computeBreakEvenPrice(baseInputs, Number(targetMarginPercent) || 0, deliveryTouched ? undefined : cityDeliveryTariff(weightNum)),
+    [baseInputs, targetMarginPercent, deliveryTouched, weightNum]
   )
   const targetNum = Number(targetMarginPercent) || 0
   const verdict = computeVerdict(result.marginPercent, targetNum)
@@ -193,9 +202,11 @@ export default function KaspiShopMargin() {
   // how margin erodes if a Демпинг repricer race pushes this product's price
   // down, so the seller can pick a sane floor before setting one up.
   const whatIfPrice = baseInputs.kaspiPrice * (whatIfPercent / 100)
+  // Доставка на цене ползунка своя, пока её не правили руками: при падении цены
+  // ниже 10 000 ₸ тариф уходит с весового на сумму заказа, и с 5 000 ₸ вниз дешевеет.
   const whatIfResult = useMemo(
-    () => computeMargin({ ...baseInputs, kaspiPrice: whatIfPrice }),
-    [baseInputs, whatIfPrice]
+    () => computeMargin(inputsAtPrice(baseInputs, whatIfPrice, deliveryTouched)),
+    [baseInputs, whatIfPrice, deliveryTouched]
   )
   const whatIfVerdict = computeVerdict(whatIfResult.marginPercent, targetNum)
 
@@ -337,9 +348,17 @@ export default function KaspiShopMargin() {
                     placeholder="Алматы" value={cityNote} onChange={e => setCityNote(e.target.value)} />
                 </label>
               </div>
+              <span className="text-[11px] -mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                Тариф Kaspi Доставки для города, с НДС 16%: до 10 000 ₸ по цене Kaspi, от 10 000 ₸ по весу. Для «по Казахстану» или Express впишите сумму сами.
+              </span>
+              {!deliveryTouched && deliveryWeightAssumed(baseInputs.kaspiPrice, weightNum) && (
+                <span className="text-[11px] -mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                  Вес не указан: взята строка «до 5 кг». Тяжелее товар, дороже доставка.
+                </span>
+              )}
               {deliveryTouched && (
                 <button onClick={() => { setDeliveryTouched(false) }} className="text-[11px] self-start underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>
-                  Пересчитать доставку по весу
+                  Пересчитать доставку по тарифу Kaspi
                 </button>
               )}
 
@@ -410,17 +429,18 @@ export default function KaspiShopMargin() {
                   <>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span style={{ color: 'var(--nav-text-secondary)' }}>Ниже этой цены — в минус</span>
-                      <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-critical)' }}>{fmt(floors.breakEven)} ₸</span>
+                      <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-critical)' }}>{fmt(ceilPrice(floors.breakEven))} ₸</span>
                     </div>
                     {floors.atTargetMargin !== null && (
                       <div className="flex items-center justify-between text-sm">
                         <span style={{ color: 'var(--nav-text-secondary)' }}>Чтобы выйти на цель {targetMarginPercent}%</span>
-                        <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-success)' }}>{fmt(floors.atTargetMargin)} ₸</span>
+                        <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-success)' }}>{fmt(ceilPrice(floors.atTargetMargin))} ₸</span>
                       </div>
                     )}
                     <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                       Порог демпинга не должен опускаться ниже первой цифры: комиссия берётся с цены, поэтому
                       она всегда выше суммы расходов.
+                      {!deliveryTouched && ' Доставка Kaspi растёт скачками вместе с ценой, поэтому порог посчитан по тарифу: это цена, начиная с которой любая более высокая не убыточна.'}
                     </div>
                   </>
                 )}

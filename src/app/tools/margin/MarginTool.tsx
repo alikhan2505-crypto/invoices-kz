@@ -8,7 +8,10 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { useLanguage } from '@/components/LanguageProvider'
 import { calculateMargin, MarginInput } from '@/lib/marginCalc'
-import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
+import {
+  KASPI_CATEGORY_COMMISSIONS, KASPI_DELIVERY_DIRECTIONS, ceilPrice, effectiveCommissionPercent, kaspiDeliveryQuote,
+  kaspiDeliveryTariff, rateOnSaleTypeSwitch, regularRateFor, type KaspiDeliveryDirection, type KaspiSaleType,
+} from '@/lib/kaspiShop/margin'
 import { formatTenge, toolGuidePath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
@@ -32,6 +35,10 @@ const EASE = [0.16, 1, 0.3, 1] as const
 // ведёт на русский и честно подписывает ссылку «(in Russian)».
 const GUIDE_SLUG = 'komissiya-kaspi'
 
+// Доставка по умолчанию считается по официальной сетке Kaspi для «города» (с НДС),
+// а не вводится числом: сумма из DEFAULTS.deliveryCost нужна только как стартовое
+// значение режима «Свой вариант» (0, а не выдуманные 800 ₸).
+//
 // 12.5% is the rate the large majority of Kaspi's top-level categories carry
 // (see KASPI_CATEGORY_COMMISSIONS, transcribed from Kaspi's own published
 // tariff). An ИП on упрощёнка in Kazakhstan pays 4% of turnover since
@@ -42,7 +49,7 @@ const DEFAULTS: MarginInput = {
   costPrice: 5000,
   sellPrice: 10000,
   commissionPercent: 12.5,
-  deliveryCost: 800,
+  deliveryCost: 0,
   taxPercent: 4,
   otherCosts: 200,
   monthlyUnits: 30,
@@ -72,6 +79,31 @@ const FIELD_STYLE = {
 
 const INPUT_CLS = 'w-full rounded-lg pl-3 pr-10 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] tabular-nums'
 
+// Переключатель на радиокнопках: клавиатура и скринридеры работают сами, а
+// на телефоне это крупные кнопки (44px), не выпадающий список.
+function Segmented<T extends string>({ name, label, value, options, onChange, cols }: {
+  name: string
+  label: string
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  cols: string
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className={`grid gap-1.5 ${cols}`}>
+      {options.map(o => (
+        <label key={o.value} className="relative block cursor-pointer">
+          <input type="radio" name={name} value={o.value} checked={value === o.value}
+            onChange={() => onChange(o.value)} className="peer sr-only" />
+          <span className="flex min-h-[44px] items-center justify-center rounded-lg border border-[color:var(--nav-border)] bg-[var(--nav-surface-glass)] px-2 py-2 text-center text-[13px] font-medium leading-tight text-[color:var(--nav-text-primary)] transition-colors peer-checked:border-[color:var(--nav-accent)] peer-checked:bg-[var(--nav-accent)] peer-checked:font-semibold peer-checked:text-[color:var(--nav-accent-ink)] peer-focus-visible:ring-2 peer-focus-visible:ring-[color:var(--nav-accent-track)]">
+            {o.label}
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export default function MarginTool({ lang }: { lang: ToolLang }) {
   const reduceMotion = !!useReducedMotion()
   // Только для явных действий (клик в продукт): текст страницы — из пропса.
@@ -87,6 +119,13 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   )
   // '' = manual entry, which is what the field alone used to be.
   const [category, setCategory] = useState('')
+  // Тип продажи, надбавка 0-0-24 (п.п.), доставка: направление из сетки Kaspi или
+  // свой вариант, вес заказа (нужен от 10 000 ₸), НДС 16% на доставку.
+  const [saleType, setSaleType] = useState<KaspiSaleType>('regular')
+  const [surcharge, setSurcharge] = useState('0')
+  const [direction, setDirection] = useState<KaspiDeliveryDirection | 'custom'>('city')
+  const [weightKg, setWeightKg] = useState('')
+  const [deliveryVat, setDeliveryVat] = useState(true)
   const [leadContact, setLeadContact] = useState('')
   const [leadStatus, setLeadStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [exported, setExported] = useState(false)
@@ -105,17 +144,38 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   // parseAmount, not Number(): «12,5» and «10 000» are how people here type
   // numbers, and Number() turned both into 0 without a word. lang matters on
   // /tools/en/margin, where «10,000» is ten thousand, not 10.
+  const baseRate = parseAmount(raw.commissionPercent, lang)
+  const surchargePp = parseAmount(surcharge, lang)
+  const sellAmount = parseAmount(raw.sellPrice, lang)
+  const quote = useMemo(() => direction === 'custom' ? null : kaspiDeliveryQuote({
+    orderAmount: sellAmount, weightKg: parseAmount(weightKg, lang), direction, withVat: deliveryVat,
+  }), [direction, sellAmount, weightKg, deliveryVat, lang])
+
+  // Поле комиссии хранит ставку выбранного режима (обычную или акции), надбавка
+  // за 0-0-24 прибавляется к ней при расчёте. Доставка: тариф сетки Kaspi или
+  // число из поля «Свой вариант».
+  const commissionTotal = effectiveCommissionPercent(baseRate, saleType, surchargePp)
   const input = useMemo<MarginInput>(() => ({
     costPrice: parseAmount(raw.costPrice, lang),
     sellPrice: parseAmount(raw.sellPrice, lang),
-    commissionPercent: parseAmount(raw.commissionPercent, lang),
-    deliveryCost: parseAmount(raw.deliveryCost, lang),
+    commissionPercent: commissionTotal,
+    deliveryCost: quote ? quote.totalTenge : parseAmount(raw.deliveryCost, lang),
     taxPercent: parseAmount(raw.taxPercent, lang),
     otherCosts: parseAmount(raw.otherCosts, lang),
     monthlyUnits: parseAmount(raw.monthlyUnits, lang),
-  }), [raw, lang])
+  }), [raw, lang, commissionTotal, quote])
 
-  const result = useMemo(() => calculateMargin(input), [input])
+  // Доставка как функция цены нужна минимальной цене: тариф до 10 000 ₸ растёт
+  // скачками вместе с ценой, и порог считается по ступеням, а не по доставке для
+  // текущей цены. «Свой вариант» постоянный, тарифа нет.
+  const weightNum = parseAmount(weightKg, lang)
+  const deliveryTariff = useMemo(
+    () => direction === 'custom' ? undefined : kaspiDeliveryTariff({ weightKg: weightNum, direction, withVat: deliveryVat }),
+    [direction, weightNum, deliveryVat],
+  )
+  const result = useMemo(() => calculateMargin(input, { deliveryTariff }), [input, deliveryTariff])
+  // Показываем целым тенге вверх: на округлённой вниз цене прибыль уходила бы в минус на доли тенге.
+  const breakEvenShown = result.breakEvenPrice === null ? null : ceilPrice(result.breakEvenPrice)
 
   // |n| < 0.5 would round to «-0 ₸».
   const money = (n: number) => formatTenge(Math.abs(n) < 0.5 ? 0 : n)
@@ -123,6 +183,20 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   const categoryName = (label: string) => t.categoryNames[label] ?? label
   const unitOf = (unit: 'tenge' | 'percent' | 'pieces') =>
     unit === 'tenge' ? t.unitTenge : unit === 'percent' ? t.unitPercent : t.unitPieces
+
+  // Смена типа продажи между обычной и акцией переставляет ставку в поле: по
+  // выбранной категории, а без категории по трём опубликованным уровням
+  // (12,5 <-> 13,0 и т.д.). Своя ставка не из таблицы остаётся как есть: ставку
+  // акции для неё мы не знаем и не выдумываем (показываем подсказку).
+  function changeSaleType(next: KaspiSaleType) {
+    touched.current = true
+    const wasPromo = saleType !== 'regular'
+    const toPromo = next !== 'regular'
+    setSaleType(next)
+    if (wasPromo === toPromo) return
+    const target = rateOnSaleTypeSwitch(category, baseRate, toPromo)
+    if (target !== null) setRaw(prev => ({ ...prev, commissionPercent: String(target) }))
+  }
 
   // One id per visit, so a visitor still editing after a reload updates their
   // own row instead of creating a second one.
@@ -180,6 +254,9 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
     const row = (param: string, value: string | number) => ({ [t.excelHeaderParam]: param, [t.excelHeaderValue]: value })
     const rows: Record<string, string | number>[] = [
       ...(category ? [row(t.categoryLabel, categoryName(category))] : []),
+      row(t.saleTypeLabel, t.saleTypeNames[saleType]),
+      ...(saleType === 'promo24' ? [row(t.surchargeLabel, surchargePp)] : []),
+      row(t.fieldLabels.deliveryCost, t.deliveryDirections[direction]),
       // Unit in the label: the commission shows up twice -- as the % typed in
       // and as ₸ taken off the price -- and without it the two rows read alike.
       ...FIELDS.map(f => row(`${t.fieldLabels[f.key]}, ${unitOf(f.unit)}`, input[f.key])),
@@ -190,7 +267,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
       row(`${result.profitPerUnit < 0 ? t.lossPerUnitLabel : t.profitPerUnitLabel}, ₸`, Math.round(result.profitPerUnit)),
       row(`${t.marginLabel}, %`, Number(result.marginPercent.toFixed(1))),
       row(`${t.markupLabel}, %`, result.markupPercent === null ? '—' : Number(result.markupPercent.toFixed(1))),
-      row(`${t.breakEvenLabel}, ₸`, result.breakEvenPrice === null ? '—' : Math.round(result.breakEvenPrice)),
+      row(`${t.breakEvenLabel}, ₸`, breakEvenShown === null ? '—' : breakEvenShown),
       row('', ''),
       row(`${t.monthlyTitle} · ${t.monthlyRevenueLabel}, ₸`, Math.round(result.monthlyRevenue)),
       row(`${t.monthlyTitle} · ${t.monthlyProfitLabel}, ₸`, Math.round(result.monthlyProfit)),
@@ -267,13 +344,13 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
                   touched.current = true
                   setCategory(e.target.value)
                   const found = KASPI_CATEGORY_COMMISSIONS.find(c => c.label === e.target.value)
-                  if (found) setRaw(prev => ({ ...prev, commissionPercent: String(found.ratePercent) }))
+                  if (found) setRaw(prev => ({ ...prev, commissionPercent: String(saleType === 'regular' ? found.ratePercent : found.promoRatePercent) }))
                 }}
                 className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)]"
                 style={FIELD_STYLE}>
                 <option value="">{t.categoryManual}</option>
                 {KASPI_CATEGORY_COMMISSIONS.map(c => (
-                  <option key={c.label} value={c.label}>{categoryName(c.label)} — {percent(c.ratePercent)}</option>
+                  <option key={c.label} value={c.label}>{categoryName(c.label)} — {percent(saleType === 'regular' ? c.ratePercent : c.promoRatePercent)}</option>
                 ))}
               </select>
               <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.categoryHint}</span>
@@ -282,8 +359,88 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
             <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={guideLang} className="text-[13px] font-semibold block w-fit -mt-1 mb-3" style={{ color: 'var(--nav-accent)' }}>
               {t.categoryGuideLink}
             </Link>
+            <div className="mb-3">
+              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.saleTypeLabel}</span>
+              <Segmented name="saleType" label={t.saleTypeLabel} value={saleType} onChange={changeSaleType} cols="grid-cols-3"
+                options={(['regular', 'promo', 'promo24'] as const).map(v => ({ value: v, label: t.saleTypeNames[v] }))} />
+              <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.saleTypeNote}</span>
+              {saleType !== 'regular' && (
+                <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                  {t.promoNote}
+                  {regularRateFor(baseRate) === null && <>{' '}{t.promoUnknownRate}</>}
+                </span>
+              )}
+              {saleType === 'promo24' && (
+                <label className="block mt-3">
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.surchargeLabel}</span>
+                  <input type="text" inputMode="decimal" autoComplete="off" value={surcharge}
+                    onChange={e => { touched.current = true; setSurcharge(e.target.value) }}
+                    className={INPUT_CLS} style={FIELD_STYLE} />
+                  <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.surchargeHint}</span>
+                  {surchargePp > 0 && (
+                    <span className="text-[11px] mt-1 block font-semibold ph-mask" style={{ color: 'var(--nav-text-secondary)' }}>
+                      {t.commissionSumLine(percent(baseRate), percent(surchargePp), percent(commissionTotal))}
+                    </span>
+                  )}
+                </label>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FIELDS.map(f => (
+              {FIELDS.map(f => f.key === 'deliveryCost' ? (
+                <div key={f.key} className="sm:col-span-2">
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.fieldLabels.deliveryCost}</span>
+                  <Segmented name="deliveryDirection" label={t.fieldLabels.deliveryCost} value={direction}
+                    onChange={v => { touched.current = true; setDirection(v) }} cols="grid-cols-2 sm:grid-cols-4"
+                    options={[...KASPI_DELIVERY_DIRECTIONS, 'custom' as const].map(v => ({ value: v, label: t.deliveryDirections[v] }))} />
+                  {quote ? (
+                    <div className="mt-2 space-y-2">
+                      {quote.basis === 'weight' && (
+                        <label className="block sm:max-w-[50%]">
+                          <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.weightLabel}</span>
+                          <input type="text" inputMode="decimal" autoComplete="off" placeholder="5" value={weightKg}
+                            onChange={e => { touched.current = true; setWeightKg(e.target.value) }}
+                            className={INPUT_CLS} style={FIELD_STYLE} />
+                          <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                            {quote.weightAssumed ? t.weightAssumedNote : t.weightHint}
+                          </span>
+                        </label>
+                      )}
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" checked={deliveryVat} onChange={e => { touched.current = true; setDeliveryVat(e.target.checked) }}
+                          className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[color:var(--nav-accent)]" />
+                        <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                          {t.vatLabel}
+                          <span className="text-[11px] mt-0.5 block" style={{ color: 'var(--nav-text-muted)' }}>{t.vatHint}</span>
+                        </span>
+                      </label>
+                      <div className="text-xs font-medium tabular-nums ph-mask" style={{ color: 'var(--nav-text-primary)' }}>
+                        {t.deliveryQuoteLine({
+                          direction: t.deliveryDirections[direction as KaspiDeliveryDirection],
+                          tier: t.deliveryTierNames[quote.tierId] ?? quote.tierId,
+                          basis: quote.basis,
+                          net: money(quote.netTenge),
+                          total: money(quote.totalTenge),
+                          withVat: deliveryVat,
+                        })}
+                      </div>
+                      {direction === 'express' && (
+                        <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{t.expressNote}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <div className="relative">
+                        <input type="text" inputMode="decimal" autoComplete="off" value={raw.deliveryCost}
+                          aria-label={t.fieldLabels.deliveryCost}
+                          onChange={e => { touched.current = true; setRaw(prev => ({ ...prev, deliveryCost: e.target.value })) }}
+                          className={INPUT_CLS} style={FIELD_STYLE} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--nav-text-muted)' }}>{t.unitTenge}</span>
+                      </div>
+                      <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.customDeliveryHint}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <label key={f.key} className="block">
                   <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>
                     {t.fieldLabels[f.key]}
@@ -356,12 +513,12 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
 
             <div className="rounded-lg p-3" style={{ background: 'var(--nav-bg)' }}>
               <div className="text-[11px] mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.breakEvenLabel}</div>
-              {result.breakEvenPrice === null ? (
+              {breakEvenShown === null ? (
                 <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{t.breakEvenImpossible}</div>
               ) : (
                 <>
                   <div className="text-xl font-bold tabular-nums mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-                    {money(result.breakEvenPrice)}
+                    {money(breakEvenShown)}
                   </div>
                   <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{t.breakEvenHint}</div>
                 </>
@@ -475,11 +632,11 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
           {/* The floor price the calculator just produced is exactly what the
               repricing bot protects -- so the pitch is the visitor's own
               number, not a generic feature list. */}
-          {result.breakEvenPrice !== null && (
+          {breakEvenShown !== null && (
             <div className="nav-glass rounded-2xl p-5 mt-8">
               <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.ctaTitle}</div>
               <p className="text-sm mb-3 ph-mask" style={{ color: 'var(--nav-text-secondary)' }}>
-                {t.ctaBody(money(result.breakEvenPrice))}
+                {t.ctaBody(money(breakEvenShown))}
               </p>
               {/* Clicking through to the product remembers the page language,
                   so the landing (another subdomain, shared cookie) opens in it.
