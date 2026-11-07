@@ -12,6 +12,8 @@ export interface DailyFunnelInput {
   invoices: number | null
   binWatch: number | null
   igPosts: { kind: string; at: string }[] | null
+  // Новых переписок в директе Instagram за день (07.11.2026: реклама ведёт в директ); undefined: блок не нужен.
+  igDmChats?: number | null
 }
 
 const n = (v: number | null) => (v === null ? 'н/д' : String(v))
@@ -52,6 +54,15 @@ export function buildDailyFunnelText(d: DailyFunnelInput): string {
   if (d.igPosts === null) lines.push('Instagram: н/д')
   else if (d.igPosts.length === 0) lines.push('Instagram: публикаций не было.')
   else lines.push(`Instagram: опубликовано: ${d.igPosts.map(p => `${p.kind} в ${p.at}`).join(', ')}.`)
+
+  if (d.igDmChats !== undefined) {
+    // Заходы с рекламы Meta считаем по метке источника meta (ссылки /go/ad-*); люди, написавшие просто «Счёт»,
+    // получают обычную ссылку dm-*, поэтому рядом показываем и общее число новых диалогов.
+    const ad = f.sources.filter(x => x.source === 'meta').reduce((s, x) => s + x.visitors, 0)
+    lines.push('')
+    lines.push(`Директ Instagram: новых переписок ${n(d.igDmChats)}; на сайт с рекламной ссылки ${ad} посетителей.`)
+    lines.push('Расход и цена переписки: в Ads Manager (через API не виден), пришлите скриншот.')
+  }
 
   return lines.join('\n')
 }

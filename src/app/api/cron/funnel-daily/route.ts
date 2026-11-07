@@ -84,7 +84,9 @@ async function run(request: Request) {
     count('bin_watch', target.startIso, target.endIso),
   ])
 
-  const text = buildDailyFunnelText({ label: formatAlmatyDay(target.day), funnel, signups, signupsPrev, invoices, binWatch, igPosts })
+  const igDmChats = await count('ai_agent_conversations', target.startIso, target.endIso, q => q.eq('channel', 'instagram'))
+
+  const text = buildDailyFunnelText({ label: formatAlmatyDay(target.day), funnel, signups, signupsPrev, invoices, binWatch, igPosts, igDmChats })
   if (dry) return NextResponse.json({ dry: true, day: target.day, text })
 
   const KIND = 'funnel'

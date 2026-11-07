@@ -39,6 +39,15 @@ describe('buildDailyFunnelText', () => {
     expect(t).toContain('опубликовано: картинка в 17:47')
   })
 
+  it('рекламный блок: новые переписки и заходы с метки meta; без поля блока нет', () => {
+    const rows = [ev('view', 'schet', 'a', { utm_source: 'meta', utm_medium: 'paid_dm' }), ev('view', 'schet', 'b', { utm_source: 'meta', utm_medium: 'paid_dm' }), ev('view', 'schet', 'c', { utm_source: 'dm' })]
+    const t = buildDailyFunnelText({ ...base, funnel: funnel(rows), igDmChats: 4 })
+    expect(t).toContain('Директ Instagram: новых переписок 4; на сайт с рекламной ссылки 2 посетителей.')
+    expect(t).toContain('Расход и цена переписки: в Ads Manager')
+    expect(buildDailyFunnelText({ ...base, funnel: funnel(rows) })).not.toContain('Директ Instagram')
+    expect(buildDailyFunnelText({ ...base, funnel: funnel([]), igDmChats: null })).toContain('новых переписок н/д')
+  })
+
   it('shows н/д instead of zero when a count is unavailable', () => {
     const t = buildDailyFunnelText({ ...base, funnel: funnel([]), signups: null, igPosts: null })
     expect(t).toContain('Регистрации: н/д')
