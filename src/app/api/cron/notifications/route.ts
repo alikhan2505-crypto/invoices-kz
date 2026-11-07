@@ -11,6 +11,7 @@ import { selectWithNotificationPrefs } from '@/lib/notificationPrefsServer'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { makeRecipientResolver } from '@/lib/welcomeDrip'
 import { isCronAuthorized } from '@/lib/cronAuth'
+import { notifySessionExpired, formatSessionExpiredDigestLine, SESSION_EXPIRED_EVENT } from '@/lib/kaspiShop/sessionExpiredNotice'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,7 +51,8 @@ function wrapEmail(accentColor: string, title: string, bodyHtml: string) {
 </html>`
 }
 
-export async function GET(request: Request) {
+export async function GET(request: Request) {
+
   if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -288,10 +290,63 @@ export async function GET(request: Request) {
     return false
   })
 
+  // --- Kaspi: мёртвая сессия кабинета (K45) ---
+  // Соединения со session_expired по всей базе одним запросом. Сюда попадает и
+  // обрыв, найденный пушем цен в checkCycle (он пишет статус напрямую и
+  // уведомления не шлёт), и обрыв, о котором не успел сообщить markSessionExpired.
+  // Сообщение продавцу: раз в сутки и не больше трёх за обрыв (общий счётчик с
+  // markSessionExpired, см. sessionExpiredNotice.ts), Telegram по тумблеру
+  // kaspi_session_expired + колокольчик. Сбой одного продавца цикл не останавливает.
+  let sessionNotices = 0
+  const expiredNamesByUser = new Map<string, string[]>()
+  const { data: expiredRows, error: expiredError } = await supabase
+    .from('kaspi_shop_connections')
+    .select('user_id, company_name')
+    .eq('session_status', 'session_expired')
+  if (expiredError) console.error('cron/notifications: kaspi expired sessions lookup failed:', expiredError.message)
+  for (const row of (expiredRows || []) as { user_id: string; company_name: string | null }[]) {
+    const list = expiredNamesByUser.get(row.user_id) || []
+    list.push(row.company_name || '')
+    expiredNamesByUser.set(row.user_id, list)
+  }
+  // Кто получил сообщение в Telegram прямо сейчас: в сводку той же ночью строку
+  // про мёртвую сессию не дублируем.
+  const noticedInTelegram = new Set<string>()
+  if (expiredNamesByUser.size > 0) {
+    const userIds = [...expiredNamesByUser.keys()]
+    for (let i = 0; i < userIds.length; i += 100) {
+      const ids = userIds.slice(i, i + 100)
+      const { data: owners, error: ownersError } = await selectWithNotificationPrefs<any[]>(
+        `id, ${OWNER_COLUMNS}, ${KASPI_SHOP_PROFILE_COLUMNS}`,
+        cols => supabase.from('profiles').select(cols).in('id', ids),
+      )
+      if (ownersError) {
+        console.error('cron/notifications: kaspi expired sessions owners lookup failed:', ownersError.message)
+        continue
+      }
+      for (const owner of (owners || []) as (Owner & { id: string })[]) {
+        const result = await notifySessionExpired(supabase, owner.id, expiredNamesByUser.get(owner.id) || [], { profile: owner })
+        if (result.status === 'sent') sessionNotices++
+        if (result.telegram) noticedInTelegram.add(owner.id)
+      }
+    }
+  }
+
   for (const owner of digestRecipients) {
     try {
       const digestData = await loadDigestData(supabase, owner.id, startOfDayAgo(1))
-      const text = formatDigest(digestData)
+      const digestText = formatDigest(digestData)
+      // Мёртвая сессия -- это «цены не меняются», и сводка должна об этом сказать.
+      // В тихий день строка идёт одна, только если отдельного уведомления об
+      // обрыве продавец не получает (выключил тумблер): иначе брошенный магазин
+      // получал бы сообщение каждое утро после лимита из трёх.
+      const expiredNames = expiredNamesByUser.get(owner.id)
+      let deadLine: string | null = null
+      if (expiredNames && !noticedInTelegram.has(owner.id)
+        && (digestText || !wantsNotification(owner, SESSION_EXPIRED_EVENT, 'telegram'))) {
+        deadLine = formatSessionExpiredDigestLine(expiredNames)
+      }
+      const text = digestText && deadLine ? `${digestText}\n\n${deadLine}` : (digestText || deadLine)
       if (!text) continue
       await sendTelegramNotification(owner.telegram_chat_id, text)
       digests++
@@ -302,5 +357,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells, digests, digestsSkippedNoPlan })
+  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells, digests, digestsSkippedNoPlan, sessionNotices })
 }

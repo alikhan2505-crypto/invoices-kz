@@ -10,6 +10,8 @@ import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -40,6 +42,8 @@ export default function KaspiShopStorefrontOrders() {
   const router = useRouter()
   const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
+  const [accessTry, setAccessTry] = useState(0)
   const [orders, setOrders] = useState<Order[]>([])
 
   useEffect(() => {
@@ -57,9 +61,10 @@ export default function KaspiShopStorefrontOrders() {
       // state when there's no active connection (2026-09-03 founder: check for a
       // connected store before opening any page or sub-page).
       const { data: { session } } = await supabase.auth.getSession()
-      const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-      const connData = await connRes.json().catch(() => null)
-      if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+      // Сбой запроса не равен «не подключён»: «Повторить», а не уход на окно подключения (K12).
+      const access = await checkKaspiConnection(session?.access_token)
+      if (access.kind === 'error') { setAccessError(access.message); return }
+      if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
       const headers = { 'Authorization': `Bearer ${session?.access_token}` }
       const res = await fetch('/api/kaspi-shop/storefront-orders', { headers })
       if (res.ok) {
@@ -69,8 +74,9 @@ export default function KaspiShopStorefrontOrders() {
       setLoading(false)
     }
     load()
-  }, [router])
+  }, [router, accessTry])
 
+  if (loading && accessError) return <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); setAccessTry(n => n + 1) }} />
   if (loading) return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">

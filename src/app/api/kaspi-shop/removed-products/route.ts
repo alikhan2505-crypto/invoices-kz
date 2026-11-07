@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog, listCatalogWithStatus, fetchOffersDetails, extractOfferPointInfo, totalStock, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
+import { listCatalogWithStatus, fetchOffersDetailsChecked, extractOfferPointInfo, totalStock, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -89,7 +89,14 @@ export async function GET(req: NextRequest) {
   ])
   if (activeRes.sessionExpired || removedRes.sessionExpired) {
     await markSessionExpired(connection.id)
-    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).' }, { status: 400 })
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).', sessionExpired: true }, { status: 400 })
+  }
+  // Короткий или оборванный список не равен «товаров нет»: иначе страница покажет «Все товары
+  // в продаже», а сверка available_for_sale ниже снимет флаги с товаров, которых просто не дочитали
+  // (аудит Kaspi K22). Отвечаем ошибкой до любых записей.
+  if (activeRes.failed || removedRes.failed || !activeRes.complete || !removedRes.complete) {
+    const reason = activeRes.error || removedRes.error
+    return NextResponse.json({ error: `Kaspi не отдал полный список товаров${reason ? ` (${reason})` : ''}. Повторите через минуту.` }, { status: 502 })
   }
 
   const allOffers = [...activeRes.offers, ...removedRes.offers]
@@ -124,12 +131,21 @@ export async function GET(req: NextRequest) {
   }
 
   const detailsBySku = new Map<string, Record<string, any>>()
+  // Города на карточках приходят из details. Сбой details не роняет страницу (список товаров
+  // верный), но об этом говорим флагом citiesIncomplete, а не молча рисуем карточки без городов.
+  let citiesIncomplete = false
   try {
-    const detailsItems = await fetchOffersDetails(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
-    for (const item of detailsItems) {
+    const details = await fetchOffersDetailsChecked(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
+    if (details.sessionExpired) {
+      await markSessionExpired(connection.id)
+      return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).', sessionExpired: true }, { status: 400 })
+    }
+    if (!details.ok) citiesIncomplete = true
+    for (const item of details.items) {
       if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
     }
   } catch (err: any) {
+    citiesIncomplete = true
     console.error('kaspi-shop removed-products: details batch failed (non-fatal, cards show no cities)', err.message)
   }
   const { data: connRow } = await supabase
@@ -143,6 +159,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     active: activeRes.offers.map(o => toSummary(o, pointsBySku)),
     removed: removedRes.offers.map(o => toSummary(o, pointsBySku)),
+    citiesIncomplete,
   })
 }
 
@@ -173,9 +190,17 @@ export async function POST(req: NextRequest) {
   if (!connection.sessionCookies) return NextResponse.json({ error: 'Сессия кабинета Kaspi не активна — переподключитесь' }, { status: 400 })
 
   // The offer must currently sit on the side the action moves it FROM.
-  const offers = await listCatalog(connection.sessionCookies, connection.merchantId, action === 'restore' ? false : true)
-  const offer = offers.find(o => o.sku === sku)
+  const list = await listCatalogWithStatus(connection.sessionCookies, connection.merchantId, action === 'restore' ? false : true)
+  const offer = list.offers.find(o => o.sku === sku)
   if (!offer) {
+    if (list.sessionExpired) {
+      await markSessionExpired(connection.id)
+      return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь', sessionExpired: true }, { status: 400 })
+    }
+    // Список не дочитан или Kaspi ответил сбоем: «не найден» было бы неправдой (аудит K22).
+    if (list.failed || !list.complete) {
+      return NextResponse.json({ error: `Не удалось получить список товаров из Kaspi${list.error ? ` (${list.error})` : ''}. Повторите через минуту.` }, { status: 502 })
+    }
     return NextResponse.json({
       error: action === 'restore' ? 'Товар не найден среди снятых с продажи' : 'Товар не найден среди товаров в продаже',
     }, { status: 404 })

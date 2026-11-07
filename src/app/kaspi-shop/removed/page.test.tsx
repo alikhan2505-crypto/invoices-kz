@@ -162,6 +162,32 @@ describe('K24: «Цена и остатки» сохраняет по город
     expect(text()).toContain('Отправлено')
   })
 
+  it('вторая правка в окне автозакрытия сравнивается с уже сохранённым: PP1 заново не уходит', async () => {
+    await mount()
+    await openModal()
+    await type(pointInputs('PP1').price, '1500')
+    await click(byText('button', 'Сохранить изменения'))
+    expect(posts()).toHaveLength(1)
+    expect(text()).toContain('Отправлено')
+    // окно ещё открыто (автозакрытие через 2 с): правим остаток у PP3 другого города
+    await type(pointInputs('PP3').stock, '9')
+    await click(byText('button', 'Сохранить изменения'))
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body.entries).toEqual([{ storeCode: 'PP3', cityId: 'AST', price: 1300, stockCount: 9 }])
+  })
+
+  it('после сохранения цены города правка остатка соседней точки уходит с новой ценой города, а не откатывает её', async () => {
+    await mount()
+    await openModal()
+    await type(pointInputs('PP1').price, '1500')
+    await click(byText('button', 'Сохранить изменения'))
+    await type(pointInputs('PP2').stock, '9')
+    expect(pointInputs('PP2').price.value).toBe('1500')
+    await click(byText('button', 'Сохранить изменения'))
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body.entries).toEqual([{ storeCode: 'PP2', cityId: 'ALM', price: 1500, stockCount: 9 }])
+  })
+
   it('ничего не меняли: запроса нет, сказано почему', async () => {
     await mount()
     await openModal()

@@ -33,5 +33,8 @@ export async function GET(req: NextRequest) {
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
   }
+  if (result.failed) {
+    return NextResponse.json({ error: `Не удалось получить счётчики возвратов от Kaspi${result.error ? ` (${result.error})` : ''}. Повторите позже.` }, { status: 502 })
+  }
   return NextResponse.json({ counts: result.counts })
 }

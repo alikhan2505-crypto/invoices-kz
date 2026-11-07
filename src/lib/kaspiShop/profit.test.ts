@@ -276,9 +276,12 @@ describe('computeProfitSummary', () => {
     const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, 10, fakeListOrders as any)
 
     const sku1 = summary.products.find(p => p.kaspiMasterSku === 'SKU1')!
-    expect(sku1.commissionRatePercent).toBe(null)
-    expect(sku1.commissionAmount).toBe(null)
-    expect(summary.commissionAmount).toBe(100) // treated as uncategorized -> flat 10%
+    // Неизвестная категория = товар без категории: комиссия по общей ставке 10%
+    // и на карточке товара, и в итоге (аудит K32: раньше карточка показывала null).
+    expect(sku1.commissionRatePercent).toBe(10)
+    expect(sku1.commissionSource).toBe('flat')
+    expect(sku1.commissionAmount).toBe(100)
+    expect(summary.commissionAmount).toBe(100)
   })
 
   it('stops immediately and reports sessionExpired when the session is dead', async () => {
@@ -307,5 +310,67 @@ describe('computeProfitSummary upstream failure', () => {
     const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: false, orders: [] }))
     const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], noAds, null, fakeListOrders as any)
     expect(summary.upstreamFailed).toBe(false)
+  })
+})
+
+describe('computeProfitSummary: комиссия товара и «предварительно» (аудит K32, K33)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'))
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const noAds = { amount: 0, otherAmount: 0, configured: false }
+  const oneSale = (code = 'SKU1', total = 1000) => vi.fn(async (_c: string, _m: string, status: string, _p = 0) =>
+    status === 'KASPI_DELIVERY_TRANSMITTED'
+      ? { total: 1, sessionExpired: false, failed: false, orders: [makeOrder('1', '2026-08-13T10:00:00.000Z', [{ code, name: 'Товар', imageUrl: null, quantity: 1, totalPrice: total }])] }
+      : { total: 0, sessionExpired: false, failed: false, orders: [] })
+
+  it('K32: у товара без категории прибыль вычитает общую комиссию, и сумма карточки сходится с итогом', async () => {
+    // выручка 1000, себестоимость 300, общая ставка 10%, категории нет
+    const summary = await computeProfitSummary('c', 'm', 7, [{ kaspiMasterSku: 'SKU1', trackedProductId: 't', cogsAmount: 300 }], noAds, 10, oneSale() as any)
+    const p = summary.products[0]
+    expect(p.commissionAmount).toBe(100)
+    expect(p.commissionRatePercent).toBe(10)
+    expect(p.commissionSource).toBe('flat')
+    expect(p.profit).toBe(600) // не 700
+    expect(summary.netProfit).toBe(600)
+    expect(p.profit).toBe(summary.netProfit)
+  })
+
+  it('K32: категорийная ставка по-прежнему главнее общей', async () => {
+    const summary = await computeProfitSummary('c', 'm', 7, [{ kaspiMasterSku: 'SKU1', trackedProductId: 't', cogsAmount: 0, commissionCategoryLabel: 'Автотовары' }], noAds, 10, oneSale() as any)
+    expect(summary.products[0].commissionSource).toBe('category')
+    expect(summary.products[0].commissionAmount).toBe(125)
+  })
+
+  it('K33: нет ни общей ставки, ни категории: commissionMissing и «предварительно», прибыль товара без комиссии помечена', async () => {
+    const summary = await computeProfitSummary('c', 'm', 7, [{ kaspiMasterSku: 'SKU1', trackedProductId: 't', cogsAmount: 300 }], noAds, null, oneSale() as any)
+    expect(summary.products[0].commissionAmount).toBeNull()
+    expect(summary.products[0].commissionSource).toBeNull()
+    expect(summary.commissionMissing).toBe(true)
+    expect(summary.isPreliminary).toBe(true)
+  })
+
+  it('K33: всё задано и список полный: не предварительно', async () => {
+    const summary = await computeProfitSummary('c', 'm', 7, [{ kaspiMasterSku: 'SKU1', trackedProductId: 't', cogsAmount: 300 }], noAds, 10, oneSale() as any)
+    expect(summary.commissionMissing).toBe(false)
+    expect(summary.isPreliminary).toBe(false)
+  })
+
+  it('K33: неполный список заказов делает прибыль предварительной, даже если комиссия и себестоимость есть', async () => {
+    const full = Array.from({ length: 10 }, (_, i) => makeOrder(`o${i}`, '2026-08-13T10:00:00.000Z', [{ code: 'SKU1', name: 'Т', imageUrl: null, quantity: 1, totalPrice: 100 }]))
+    const fake = vi.fn(async (_c: string, _m: string, status: string, _p = 0) =>
+      status === 'KASPI_DELIVERY_TRANSMITTED' ? { total: 5000, sessionExpired: false, failed: false, orders: full } : { total: 0, sessionExpired: false, failed: false, orders: [] })
+    const summary = await computeProfitSummary('c', 'm', 7, [{ kaspiMasterSku: 'SKU1', trackedProductId: 't', cogsAmount: 10 }], noAds, 10, fake as any)
+    expect(summary.truncated).toBe(true)
+    expect(summary.isPreliminary).toBe(true)
+  })
+
+  it('K33/K35: сбой Kaspi делает прибыль предварительной', async () => {
+    const fake = vi.fn(async () => ({ total: 0, sessionExpired: false, failed: true, orders: [] }))
+    const summary = await computeProfitSummary('c', 'm', 7, [], noAds, 10, fake as any)
+    expect(summary.upstreamFailed).toBe(true)
+    expect(summary.isPreliminary).toBe(true)
   })
 })

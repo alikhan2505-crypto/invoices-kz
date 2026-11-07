@@ -143,3 +143,78 @@ describe('buildReviewsRequestUrl', () => {
     expect(buildReviewsRequestUrl('114958921')).toContain('limit=50')
   })
 })
+
+import { aggregateReviewCache, type ReviewCacheRow, type ReviewProduct } from './reviews'
+
+describe('aggregateReviewCache (аудит K40, K42)', () => {
+  const rev = (rating: number) => ({ rating, text: '', authorName: null, date: null })
+  const products: ReviewProduct[] = [
+    { id: 'p1', name: 'Товар 1', masterSku: 'SKU1' },
+    { id: 'p2', name: 'Товар 2', masterSku: 'SKU2' },
+  ]
+  const row = (id: string, o: Partial<ReviewCacheRow> = {}): ReviewCacheRow => ({
+    trackedProductId: id, reviews: [rev(5)], fetchError: null, fetchedAt: '2026-11-06T10:00:00.000Z', avgRating: 4.5, totalCount: 100, ...o,
+  })
+
+  it('K40: заголовочные числа берутся из total_count и avg_rating карточек, средняя взвешена по числу отзывов', () => {
+    const agg = aggregateReviewCache(products, [
+      row('p1', { avgRating: 5, totalCount: 245, reviews: [rev(5), rev(5)] }),
+      row('p2', { avgRating: 4, totalCount: 5, reviews: [rev(4)] }),
+    ])
+    expect(agg.catalog.totalCount).toBe(250) // а не 3 загруженных отзыва
+    expect(agg.catalog.avgRating).toBe(5) // (5*245 + 4*5) / 250 = 4.98 -> 5.0
+    expect(agg.aggregated).toHaveLength(3)
+  })
+
+  it('K40: пока Kaspi не вернул числа, это null, а не 0', () => {
+    const agg = aggregateReviewCache(products, [row('p1', { avgRating: null, totalCount: null })])
+    expect(agg.catalog.totalCount).toBeNull()
+    expect(agg.catalog.avgRating).toBeNull()
+  })
+
+  it('дубли строк одного master SKU после переподключения не удваивают отзывы и числа', () => {
+    const dupes: ReviewProduct[] = [
+      { id: 'a', name: 'Товар', masterSku: 'SKU1' },
+      { id: 'b', name: 'Товар', masterSku: 'SKU1' },
+    ]
+    const agg = aggregateReviewCache(dupes, [
+      row('a', { totalCount: 100, fetchedAt: '2026-11-01T10:00:00.000Z' }),
+      row('b', { totalCount: 120, fetchedAt: '2026-11-06T10:00:00.000Z' }),
+    ])
+    expect(agg.catalog.totalCount).toBe(120) // свежая строка, не сумма
+    expect(agg.aggregated).toHaveLength(1)
+    expect(agg.catalog.productsCount).toBe(1)
+  })
+
+  it('K42: прогресс считается по строкам, обновлённым текущим запуском, а не по самой свежей строке всех товаров', () => {
+    const since = '2026-11-06T12:00:00.000Z'
+    // p1 обновлён уже новым запуском, p2 ещё старый: раньше хватало max(fetched_at) >= since,
+    // и обновление объявлялось законченным по первому же пришедшему товару
+    const agg = aggregateReviewCache(products, [
+      row('p1', { fetchedAt: '2026-11-06T12:00:30.000Z' }),
+      row('p2', { fetchedAt: '2026-11-06T09:00:00.000Z' }),
+    ], since)
+    expect(agg.refresh).toEqual({ expected: 2, updated: 1 })
+    const done = aggregateReviewCache(products, [
+      row('p1', { fetchedAt: '2026-11-06T12:00:30.000Z' }),
+      row('p2', { fetchedAt: '2026-11-06T12:01:00.000Z' }),
+    ], since)
+    expect(done.refresh).toEqual({ expected: 2, updated: 2 })
+  })
+
+  it('K42: since сравнивается как момент времени, формат Postgres (+00:00, микросекунды) не ломает сравнение', () => {
+    const agg = aggregateReviewCache([products[0]], [row('p1', { fetchedAt: '2026-11-06T12:00:00.123456+00:00' })], '2026-11-06T12:00:00.000Z')
+    expect(agg.refresh).toEqual({ expected: 1, updated: 1 })
+  })
+
+  it('без since прогресса нет; товар без кэша ожидается, но не обновлён', () => {
+    expect(aggregateReviewCache(products, [row('p1')]).refresh).toBeNull()
+    expect(aggregateReviewCache(products, [row('p1')], '2026-01-01T00:00:00.000Z').refresh).toEqual({ expected: 2, updated: 1 })
+  })
+
+  it('ошибки обновления считаются по выбранным строкам и не затирают отзывы', () => {
+    const agg = aggregateReviewCache(products, [row('p1', { fetchError: 'HTTP 429' }), row('p2')])
+    expect(agg.errorCount).toBe(1)
+    expect(agg.aggregated).toHaveLength(2)
+  })
+})

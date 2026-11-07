@@ -9,6 +9,8 @@ import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -29,6 +31,8 @@ export default function WholesaleModelsPage() {
   usePageDocumentTitle('Модели (оптовый каталог)')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
+  const [accessTry, setAccessTry] = useState(0)
   const [models, setModels] = useState<Model[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState('')
@@ -75,14 +79,15 @@ export default function WholesaleModelsPage() {
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
       const { data: { session } } = await supabase.auth.getSession()
-      const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-      const connData = await connRes.json().catch(() => null)
-      if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+      // Сбой запроса не равен «не подключён»: «Повторить», а не уход на окно подключения (K12).
+      const access = await checkKaspiConnection(session?.access_token)
+      if (access.kind === 'error') { setAccessError(access.message); return }
+      if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
       await load()
       setLoading(false)
     }
     init()
-  }, [router, load])
+  }, [router, load, accessTry])
 
   async function createModel() {
     const price = Number(newPrice)
@@ -161,7 +166,11 @@ export default function WholesaleModelsPage() {
     }
   }
 
-  if (loading) return <BrandLoader />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); setAccessTry(n => n + 1) }} />
+      : <BrandLoader />
+  }
 
   return (
     <DesktopShell>

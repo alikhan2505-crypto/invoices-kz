@@ -249,3 +249,57 @@ describe('computeBehavioralAnalytics', () => {
     expect(result.byWeekday.every(w => w.orderCount === 0)).toBe(true)
   })
 })
+
+describe('computeFinanceSummary: сутки по Алматы (аудит K37)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-06T10:00:00.000Z')) // 15:00 по Алматы
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const listOf = (orders: Order[]) => vi.fn(async (_c: string, _m: string, status: string, _p = 0) =>
+    status === 'KASPI_DELIVERY_TRANSMITTED' ? { total: orders.length, sessionExpired: false, failed: false, orders } : { total: 0, sessionExpired: false, failed: false, orders: [] })
+
+  it('заказ в 02:30 по Алматы 6 ноября (21:30Z 5 ноября) попадает в 6 ноября, а не в 5-е', async () => {
+    const summary = await computeFinanceSummary('c', 'm', 7, listOf([
+      makeOrder('late', 1000, '2026-11-05T21:30:00.000Z'),
+      makeOrder('day', 500, '2026-11-05T10:00:00.000Z'),
+    ]) as any)
+    expect(summary.byDay).toEqual([
+      { date: '2026-11-05', revenue: 500, orderCount: 1, unitsSold: 0 },
+      { date: '2026-11-06', revenue: 1000, orderCount: 1, unitsSold: 0 },
+    ])
+  })
+
+  it('«Свой период с 1 ноября» берёт ровно с 00:00 по Алматы: заказ 00:30 первого входит, 23:30 по Алматы 31 октября нет', async () => {
+    const since = Date.parse('2026-11-01T00:00:00+05:00')
+    const orders = [
+      makeOrder('in', 300, '2026-10-31T19:30:00.000Z'), // 00:30 1 ноября по Алматы
+      makeOrder('out', 700, '2026-10-31T18:30:00.000Z'), // 23:30 31 октября по Алматы
+    ]
+    const summary = await computeFinanceSummary('c', 'm', 6, listOf(orders) as any, { windowStartMs: since })
+    expect(summary.orderCount).toBe(1)
+    expect(summary.totalRevenue).toBe(300)
+    expect(summary.periodFrom).toBe('2026-11-01')
+  })
+
+  it('пресет 7 дней начинается с начала суток по Алматы, а не посреди суток', async () => {
+    // окно: с 31.10 00:00 Алматы (30.10 19:00Z); заказ 30.10 20:00Z уже внутри, 30.10 18:00Z нет
+    const summary = await computeFinanceSummary('c', 'm', 7, listOf([
+      makeOrder('in', 100, '2026-10-30T20:00:00.000Z'),
+      makeOrder('out', 900, '2026-10-30T18:00:00.000Z'),
+    ]) as any)
+    expect(summary.totalRevenue).toBe(100)
+    expect(summary.periodFrom).toBe('2026-10-31')
+  })
+
+  it('truncated не поднимается, если нужные заказы уже получены, а лишнее старше окна', async () => {
+    const orders = Array.from({ length: 10 }, (_, i) => makeOrder(`o${i}`, 10, new Date(Date.parse('2026-11-06T09:00:00Z') - i * 86_400_000 * 2).toISOString()))
+    const fake = vi.fn(async (_c: string, _m: string, status: string, _p = 0) =>
+      status === 'KASPI_DELIVERY_TRANSMITTED' ? { total: 5000, sessionExpired: false, failed: false, orders } : { total: 0, sessionExpired: false, failed: false, orders: [] })
+    const summary = await computeFinanceSummary('c', 'm', 7, fake as any)
+    expect(summary.truncated).toBe(false)
+    expect(summary.newestFirst).toBe(true)
+    expect(fake.mock.calls.filter(c => c[2] === 'KASPI_DELIVERY_TRANSMITTED')).toHaveLength(1)
+  })
+})

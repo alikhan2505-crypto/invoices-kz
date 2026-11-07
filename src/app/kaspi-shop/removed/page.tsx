@@ -310,6 +310,8 @@ export default function KaspiShopProductAvailability() {
   async function saveStockModal() {
     if (!stockModal || stockModal.saving) return
     const plan = currentStockPlan(stockModal)
+    // Снимок отправляемых значений: после успеха он становится новым «исходным».
+    const sentEdits: StockModalState['edits'] = JSON.parse(JSON.stringify(stockModal.edits))
     if (plan.errors.length > 0) {
       setStockModal(prev => prev ? { ...prev, error: plan.errors.join(' '), warnings: plan.warnings } : prev)
       return
@@ -336,7 +338,26 @@ export default function KaspiShopProductAvailability() {
       setStockModal(prev => prev ? { ...prev, saving: false, error: data.error || failMsg || 'Не удалось сохранить' } : prev)
       return
     }
-    setStockModal(prev => prev ? { ...prev, saving: false, saved: true } : prev)
+    // initial обновляем сохранёнными значениями: правка в окне автозакрытия (2 с)
+    // сравнивается уже с ними, а не со старым снимком, и не шлёт заново точки,
+    // которые только что ушли (это тратило бюджет изменений Kaspi). Цена в Kaspi одна
+    // на город, поэтому у ВСЕХ точек сохранённого города цена теперь новая городская
+    // (и у не тронутых соседей тоже): иначе правка остатка соседа ушла бы со старой
+    // ценой и откатила город назад.
+    const savedCityPrice = new Map(plan.entries.map(e => [e.cityId, String(e.price)]))
+    setStockModal(prev => {
+      if (!prev) return prev
+      const initial: StockModalState['initial'] = JSON.parse(JSON.stringify(sentEdits))
+      const edits = { ...prev.edits }
+      for (const e of prev.entries) {
+        const cityPrice = e.cityId ? savedCityPrice.get(e.cityId) : undefined
+        if (cityPrice === undefined || !initial[e.storeCode]) continue
+        const untouched = edits[e.storeCode]?.price === sentEdits[e.storeCode]?.price
+        initial[e.storeCode] = { ...initial[e.storeCode], price: cityPrice }
+        if (untouched) edits[e.storeCode] = { ...edits[e.storeCode], price: cityPrice }
+      }
+      return { ...prev, saving: false, saved: true, initial, edits }
+    })
     // Auto-close shortly after the success notice (founder request) --
     // unless the user already started editing again (any input resets
     // `saved`), in which case the modal stays put.

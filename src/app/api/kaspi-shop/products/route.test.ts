@@ -80,6 +80,35 @@ describe('PATCH /api/kaspi-shop/products', () => {
     expect(stored().max_price).toBeNull()
   })
 
+  it('floor more than 3x the current price: 400 with code floor_far_above_price and the numbers, nothing written', async () => {
+    const res = await PATCH(req('PATCH', { id: P1, floor_price: 60000, max_price: null }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json).toMatchObject({ code: 'floor_far_above_price', field: 'floor_price', floorPrice: 60000, ownPrice: 2000, factor: 3 })
+    expect(typeof json.error).toBe('string')
+    expect(updates()).toHaveLength(0)
+    expect(stored()).toMatchObject({ floor_price: 1000, max_price: 5000 })
+  })
+
+  it('the same floor with confirmFloor: true is saved, and confirmFloor itself is not written', async () => {
+    const res = await PATCH(req('PATCH', { id: P1, floor_price: 60000, max_price: null, confirmFloor: true }))
+    expect(res.status).toBe(200)
+    expect(stored().floor_price).toBe(60000)
+    expect('confirmFloor' in stored()).toBe(false)
+  })
+
+  it('max far below the current price: same code, field max_price', async () => {
+    const res = await PATCH(req('PATCH', { id: P1, floor_price: 100, max_price: 600 }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ code: 'floor_far_above_price', field: 'max_price', maxPrice: 600, ownPrice: 2000 })
+  })
+
+  it('an ordinary validation error carries no floor_far code', async () => {
+    const res = await PATCH(req('PATCH', { id: P1, floor_price: 0 }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBeUndefined()
+  })
+
   it('unknown keys such as user_id or own_current_price are not written', async () => {
     const res = await PATCH(req('PATCH', { id: P1, floor_price: 1100, user_id: 'attacker', own_current_price: 1 }))
     expect(res.status).toBe(200)

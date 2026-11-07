@@ -68,6 +68,7 @@ type World = {
   patch: (body: any) => { status: number; body: any }
   applyNow: { status: number; body: any }
   suggest: { status: number; body: any }
+  sync: { status: number; body: any }
   calls: Calls
 }
 
@@ -103,6 +104,7 @@ function installFetch() {
     if (url === '/api/kaspi-shop/connections') return json(200, { connections: world.connections })
     if (url === '/api/kaspi-shop/connections/switch') return json(200, { ok: true })
     if (url === '/api/kaspi-shop/apply-now') return json(world.applyNow.status, world.applyNow.body)
+    if (url === '/api/kaspi-shop/catalog/sync') return json(world.sync.status, world.sync.body)
     return json(404, { error: `unexpected ${method} ${url}` })
   }) as any
 }
@@ -163,6 +165,7 @@ beforeEach(() => {
     patch: () => ({ status: 200, body: { ok: true } }),
     applyNow: { status: 202, body: { ok: true, count: 1, cost: 5 } },
     suggest: { status: 200, body: { floorPrice: 900, undercutStep: 50, reasoning: 'Конкуренты дешевле на 5%.', estimate: true } },
+    sync: { status: 200, body: { ok: true, imported: 3, total: 3 } },
     calls: [],
   }
   installFetch()
@@ -339,12 +342,13 @@ describe('K13: ИИ-подбор цены', () => {
 })
 
 describe('K14/K15: стоимость запуска и расход', () => {
-  it('на шапке раскрыт реальный расход: 5 ₸, период около 20 минут, сумма в сутки', async () => {
+  it('на шапке раскрыт реальный расход: 5 ₸, период «не чаще, чем раз в 20 мин», сумма в сутки', async () => {
     world.products = [product(), product({ id: 'p2', product_name: 'Кабель' })]
     await mount()
     const hero = text()
     expect(hero).toContain('Каждая проверка цены стоит 5 ₸')
-    expect(hero).toContain('около 20 мин')
+    expect(hero).toContain('не чаще, чем раз в 20 мин')
+    expect(hero).not.toContain('Реальный период')
     // 2 товара × 72 проверки × 5 ₸
     expect(hero).toContain('720 ₸ в сутки на 2 товара')
   })
@@ -431,7 +435,102 @@ describe('K14/K15: стоимость запуска и расход', () => {
     const box = document.body.querySelector('[data-testid="bulk-cost"]')
     expect(box?.textContent).toContain('2 товара × 5 ₸ за проверку')
     expect(box?.textContent).toContain('720 ₸ в сутки')
-    expect(box?.textContent).toContain('около 20 мин')
+    expect(box?.textContent).toContain('не чаще, чем раз в 20 мин')
+  })
+})
+
+describe('ui2: снятые с продажи и пауза в расходе', () => {
+  const mixed = () => [
+    product(),
+    product({ id: 'p2', product_name: 'Кабель' }),
+    product({ id: 'p3', product_name: 'Чехол снятый', available_for_sale: false }),
+  ]
+
+  it('шапка, строка «Применить сейчас» и подтверждение считают только товары в продаже и совпадают с итогом', async () => {
+    world.products = mixed()
+    world.applyNow = { status: 202, body: { ok: true, count: 2, cost: 10 } }
+    await mount()
+    expect(text()).toContain('720 ₸ в сутки на 2 товара')
+    expect(text()).toContain('2 товара × 5 ₸ = 10 ₸')
+    expect(text()).not.toContain('3 товара × 5 ₸')
+    await click(byText('button', 'Применить сейчас'))
+    expect(text()).toContain('2 товара × 5 ₸ = 10 ₸ спишется с баланса')
+    await click(byText('button', 'Продолжить'))
+    expect(text()).toContain('Проверка запущена: 2 товара × 5 ₸ = 10 ₸.')
+  })
+
+  it('все включённые сняты с продажи: расхода нет, «Применить сейчас» недоступна', async () => {
+    world.products = [product({ available_for_sale: false })]
+    world.wallet = okWallet({ balance: 0 })
+    await mount()
+    expect(text()).not.toContain('Каждая проверка цены стоит')
+    expect(text()).not.toContain('Бот остановлен')
+    expect((byText('button', 'Применить сейчас') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('на паузе при включённых товарах строка расхода говорит «не списывается», а не обещает суммы в сутки', async () => {
+    world.wallet = okWallet({ paused: true })
+    await mount()
+    const hero = document.body.querySelector('[data-testid="running-cost"]')?.textContent || ''
+    expect(hero).toContain('на паузе')
+    expect(hero).toContain('деньги не списываются')
+    expect(hero).not.toContain('в сутки')
+    expect(document.body.querySelector('[data-testid="apply-now-cost"]')).toBeNull()
+  })
+})
+
+describe('ui2: минимум сильно выше цены', () => {
+  const far = { status: 400, body: { error: 'Минимум 60000 выше цены', code: 'floor_far_above_price', field: 'floor_price', floorPrice: 60000, ownPrice: 1500, factor: 3 } }
+
+  it('400 с кодом открывает подтверждение с числами; «Сохранить» повторяет запрос с confirmFloor: true', async () => {
+    world.patch = body => (body.confirmFloor ? { status: 200, body: { ok: true } } : far)
+    await mount()
+    await openCard()
+    await type(field('Минимальная цена'), '60000')
+    await click(byText('button', 'Сохранить'))
+    expect(text()).toContain('Минимум 60')
+    expect(text()).toContain('выше текущей цены 1')
+    expect(text()).toContain('более чем в 3 раза. Цена сразу поднимется до минимума. Сохранить?')
+    expect(countCalls('PATCH', '/api/kaspi-shop/products')).toBe(1)
+    await click(byText('button', 'Продолжить'))
+    const patches = world.calls.filter(c => c.method === 'PATCH')
+    expect(patches).toHaveLength(2)
+    expect(patches[0].body.confirmFloor).toBeUndefined()
+    expect(patches[1].body.confirmFloor).toBe(true)
+    expect(patches[1].body.floor_price).toBe(60000)
+    expect(text()).not.toContain('Настройки демпинга')
+  })
+
+  it('отказ в подтверждении: второго запроса нет, панель открыта с пояснением', async () => {
+    world.patch = () => far
+    await mount()
+    await openCard()
+    await type(field('Минимальная цена'), '60000')
+    await click(byText('button', 'Сохранить'))
+    await click(byText('button', 'Отмена'))
+    expect(countCalls('PATCH', '/api/kaspi-shop/products')).toBe(1)
+    expect(text()).toContain('Настройки демпинга')
+    expect(text()).toContain('Настройки не сохранены')
+  })
+})
+
+describe('ui2: «Обновить каталог» при неполном ответе', () => {
+  it('502 с partial и imported > 0: список перечитан, сообщение сервера показано', async () => {
+    world.sync = { status: 502, body: { error: 'Обновлено 200 товар(ов), остальные не обновлены (Kaspi ответил HTTP 500). Повторите через минуту.', imported: 200, total: 0, partial: true } }
+    await mount()
+    const before = countCalls('GET', '/api/kaspi-shop/products')
+    await click(byText('button', 'Обновить каталог'))
+    expect(countCalls('GET', '/api/kaspi-shop/products')).toBe(before + 1)
+    expect(text()).toContain('Обновлено 200 товар(ов), остальные не обновлены')
+  })
+
+  it('502 без записанных товаров: список не перечитывается', async () => {
+    world.sync = { status: 502, body: { error: 'Каталог не обновлён. Повторите через минуту.', imported: 0, total: 0, partial: true } }
+    await mount()
+    const before = countCalls('GET', '/api/kaspi-shop/products')
+    await click(byText('button', 'Обновить каталог'))
+    expect(countCalls('GET', '/api/kaspi-shop/products')).toBe(before)
+    expect(text()).toContain('Каталог не обновлён')
   })
 })
 

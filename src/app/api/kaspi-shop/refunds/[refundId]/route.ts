@@ -43,6 +43,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ refu
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
   }
+  // «Заявка не найдена» только когда Kaspi ответил; сбой запроса это 502, не 404.
+  if (result.failed) {
+    return NextResponse.json({ error: `Не удалось получить заявку от Kaspi${result.error ? ` (${result.error})` : ''}. Повторите позже.` }, { status: 502 })
+  }
   if (!result.detail) {
     return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 })
   }

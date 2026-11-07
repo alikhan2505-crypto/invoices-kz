@@ -10,6 +10,8 @@ import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -68,6 +70,7 @@ export default function KaspiShopNkt() {
   const [products, setProducts] = useState<NktProduct[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [accessError, setAccessError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<Record<string, string>>({})
 
@@ -88,9 +91,11 @@ export default function KaspiShopNkt() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
     loadProducts()
   }
@@ -101,9 +106,10 @@ export default function KaspiShopNkt() {
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/nkt', { headers })
-      const data = await res.json()
-      if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить товары'); setProducts([]); return }
-      setProducts(data.products || [])
+      // Тело не JSON (502 от шлюза): это сбой сервера, а не «проверьте соединение».
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) { setLoadError(data?.error || 'Не удалось загрузить товары. Попробуйте ещё раз.'); setProducts([]); return }
+      setProducts(Array.isArray(data.products) ? data.products : [])
     } catch {
       setLoadError('Не удалось загрузить товары. Проверьте соединение и попробуйте ещё раз.')
       setProducts([])
@@ -120,9 +126,9 @@ export default function KaspiShopNkt() {
       const res = await fetch('/api/kaspi-shop/nkt', {
         method: 'POST', headers, body: JSON.stringify({ action, trackedProductId }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setActionError(prev => ({ ...prev, [trackedProductId]: data.error || 'Не удалось выполнить действие' }))
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) {
+        setActionError(prev => ({ ...prev, [trackedProductId]: data?.error || 'Не удалось выполнить действие' }))
         return
       }
       setProducts(prev => prev.map(p => p.id === trackedProductId ? {
@@ -142,7 +148,11 @@ export default function KaspiShopNkt() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -170,6 +180,8 @@ export default function KaspiShopNkt() {
         {listLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем товары...</div>
         ) : products.length === 0 ? (
+          // После ошибки загрузки «товаров нет» не показываем: список просто не получен.
+          loadError ? null :
           <div className="nav-glass rounded-2xl p-8 text-center">
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Отслеживаемых товаров пока нет.</div>
           </div>

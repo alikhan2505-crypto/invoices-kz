@@ -89,7 +89,9 @@ export function computeRepriceCandidate({
       // Текущая цена НИЖЕ пола (пол подняли или цену сбили руками): сразу
       // на пол, а не ползком по шагу -- «ниже минимума» не должно держаться
       // несколько циклов. Ровно на полу -- шаг вверх, как раньше.
-      const recovered = ownCurrentPrice < floorPrice ? floorPrice : ownCurrentPrice + undercutStep
+      // Цены Kaspi -- целые тенге: шаг вверх округляется так же, как у
+      // конкурентной ветки, но не ниже пола (дробный пол округление не обходит).
+      const recovered = ownCurrentPrice < floorPrice ? floorPrice : Math.max(Math.round(ownCurrentPrice + undercutStep), floorPrice)
       // Cap the recovery step at maxPrice too, same as the pump branch
       // below, so a tight maxPrice/floorPrice gap (undercutStep larger than
       // the room between them) can't strand the price permanently above the
@@ -108,7 +110,10 @@ export function computeRepriceCandidate({
       ceiling !== undefined &&
       ownCurrentPrice < ceiling
     ) {
-      return { price: Math.min(ownCurrentPrice + undercutStep, ceiling), heldAtFloor: false, newStreak }
+      // Целые тенге (как в конкурентной ветке), округление -- до потолка,
+      // и не ниже пола.
+      const pumped = Math.max(Math.round(ownCurrentPrice + undercutStep), floorPrice)
+      return { price: Math.min(pumped, ceiling), heldAtFloor: false, newStreak }
     }
 
     // No competitors to react to and not yet pumping -- hold at whatever

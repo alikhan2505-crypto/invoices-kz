@@ -18,8 +18,8 @@ import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 import {
-  CHECK_PRICE_TENGE, apiErrorMessage, applyNowConfirmText, applyNowSuccessText, estimateDailyCost,
-  formatTenge, lowBalanceWarning, periodLabel, pluralProducts, runwayHours, runwayLabel,
+  CHECK_PRICE_TENGE, apiErrorMessage, applyNowConfirmText, applyNowSuccessText, catalogSyncShouldReload, estimateDailyCost,
+  floorFarConfirmText, formatTenge, isBilledProduct, isFloorFarResponse, lowBalanceWarning, periodLabel, pluralProducts, runwayHours, runwayLabel,
   suggestionBlockReason, validateBulkSettings, validateProductSettings,
 } from '@/lib/kaspiShop/dempingForm'
 
@@ -40,6 +40,9 @@ type Product = {
   undercut_step: number
   check_frequency_minutes: number
   enabled: boolean
+  // false = снят с продажи на Kaspi: бот такой товар не проверяет и денег не берёт.
+  // Пусто у старых строк = в продаже.
+  available_for_sale?: boolean | null
   last_checked_at: string | null
   last_competitor_price: number | null
   demping_strategy: string
@@ -796,19 +799,36 @@ export default function KaspiShop() {
     setSettingsError('')
     try {
       const headers = await authHeader()
-      const res = await fetch('/api/kaspi-shop/products', {
-        method: 'PATCH', headers,
-        body: JSON.stringify({
-          id,
-          floor_price: checked.floor,
-          max_price: checked.max,
-          undercut_step: checked.step,
-          demping_strategy: v.strategy,
-          excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
-          excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
+      const send = async (confirmFloor: boolean) => {
+        const res = await fetch('/api/kaspi-shop/products', {
+          method: 'PATCH', headers,
+          body: JSON.stringify({
+            id,
+            floor_price: checked.floor,
+            max_price: checked.max,
+            undercut_step: checked.step,
+            demping_strategy: v.strategy,
+            excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
+            excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
+            ...(confirmFloor ? { confirmFloor: true } : {}),
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        return { res, data }
+      }
+      let { res, data } = await send(false)
+      // Минимум сильно выше цены (или максимум сильно ниже): спрашиваем и, если
+      // продавец согласен, повторяем запрос с confirmFloor.
+      if (isFloorFarResponse(res.status, data)) {
+        const question = floorFarConfirmText(data)
+        if (question) {
+          if (!(await confirm(question))) {
+            setSettingsError('Настройки не сохранены: проверьте минимальную и максимальную цену.')
+            return
+          }
+          ;({ res, data } = await send(true))
+        }
+      }
       if (!res.ok) {
         setSettingsError(apiErrorMessage(res.status, data, 'Не удалось сохранить настройки.'))
         return
@@ -869,7 +889,9 @@ export default function KaspiShop() {
   // подтверждает; а запуск у большого списка идёт минутами, не «в течение минуты».
   async function applyNow() {
     if (applyingNow) return
-    const planned = stats?.activeCount ?? 0
+    // Считаем так же, как сервер: включённые И в продаже (снятые с продажи бот
+    // пропускает и не списывает). Иначе подтверждение и итог «N × 5 ₸» расходятся.
+    const planned = products.filter(isBilledProduct).length
     if (planned === 0) return
     if (!(await confirm(applyNowConfirmText(planned, balance)))) return
     setApplyingNow(true)
@@ -911,6 +933,8 @@ export default function KaspiShop() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setApplyNowMessage(apiErrorMessage(res.status, data, 'Не удалось обновить каталог'))
+        // Неполный импорт: часть товаров уже записана, без перечитывания их не видно.
+        if (catalogSyncShouldReload(false, data)) load()
         return
       }
       setApplyNowMessage(`Каталог обновлён: ${data.imported} товар(ов)`)
@@ -1270,7 +1294,9 @@ export default function KaspiShop() {
               </div>
               {costEstimate.count > 0 && (
                 <p data-testid="running-cost" className="text-[12px] mt-5 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
-                  {`Каждая проверка цены стоит ${CHECK_PRICE_TENGE} ₸. Реальный период проверки ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)} (запуски идут раз в 10 минут). Ориентировочно ${formatTenge(costEstimate.dailyCost)} в сутки на ${costEstimate.count} ${pluralProducts(costEstimate.count)}.`}
+                  {paused
+                    ? `Демпинг на паузе: проверки не идут, деньги не списываются. После включения бот проверяет цены ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)}.`
+                    : `Каждая проверка цены стоит ${CHECK_PRICE_TENGE} ₸. Бот проверяет цены ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)} (запуски идут раз в 10 минут). Ориентировочно ${formatTenge(costEstimate.dailyCost)} в сутки на ${costEstimate.count} ${pluralProducts(costEstimate.count)}.`}
                 </p>
               )}
             </motion.div>
@@ -1336,7 +1362,7 @@ export default function KaspiShop() {
                   className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
                   Добавить несколько
                 </button>
-                <button onClick={applyNow} disabled={applyingNow || !stats || stats.activeCount === 0}
+                <button onClick={applyNow} disabled={applyingNow || !stats || costEstimate.count === 0}
                   className="text-xs font-semibold rounded-full px-4 py-2 flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {applyingNow ? 'Проверяем...' : 'Применить сейчас'}
@@ -1345,9 +1371,9 @@ export default function KaspiShop() {
             </div>
             {applyNowMessage ? (
               <div role="status" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
-            ) : stats && stats.activeCount > 0 ? (
+            ) : stats && !paused && costEstimate.count > 0 ? (
               <div data-testid="apply-now-cost" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
-                {`«Применить сейчас»: ${stats.activeCount} ${pluralProducts(stats.activeCount)} × ${CHECK_PRICE_TENGE} ₸ = ${formatTenge(stats.activeCount * CHECK_PRICE_TENGE)}, списывается при запуске.`}
+                {`«Применить сейчас»: ${costEstimate.count} ${pluralProducts(costEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ = ${formatTenge(costEstimate.count * CHECK_PRICE_TENGE)}, списывается при запуске.`}
               </div>
             ) : null}
 
@@ -1774,7 +1800,7 @@ export default function KaspiShop() {
                         <div className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
                           {`Расход: ориентировочно ${formatTenge(bulkEstimate.dailyCost)} в сутки`}
                         </div>
-                        {`${bulkEstimate.count} ${pluralProducts(bulkEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ за проверку. Реальный период проверки ${periodLabel(bulkEstimate.minPeriod, bulkEstimate.maxPeriod)}: запуски идут раз в 10 минут. Деньги списываются с баланса (сейчас ${formatTenge(balance)}), когда он закончится, бот остановится.`}
+                        {`${bulkEstimate.count} ${pluralProducts(bulkEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ за проверку. Бот проверяет цены ${periodLabel(bulkEstimate.minPeriod, bulkEstimate.maxPeriod)} (запуски идут раз в 10 минут). Деньги списываются с баланса (сейчас ${formatTenge(balance)}), когда он закончится, бот остановится.`}
                         {bulkRunway !== null && bulkRunway < 24 && (
                           <div className="font-semibold mt-1" style={{ color: 'var(--nav-critical)' }}>
                             {`Баланса хватит ${runwayLabel(bulkRunway)}. Пополните баланс до запуска.`}

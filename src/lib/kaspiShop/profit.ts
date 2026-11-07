@@ -1,5 +1,6 @@
-import { listOrders, Order, PAGE_SIZE } from './cabinetApi'
+import { listOrders } from './cabinetApi'
 import { KASPI_CATEGORY_COMMISSIONS } from './margin'
+import { fetchRevenueOrders, windowStartForDays, almatyDateOf } from './revenueOrders'
 
 // Real unit economics per product/store -- revenue minus COGS minus ad
 // spend minus commission. Kaspi has no API for accurate commission or ad
@@ -26,7 +27,11 @@ export type ProductProfit = {
   // automatically from Kaspi's own raw category string). null means this
   // product still falls back to the catalog-wide flat rate below.
   commissionCategoryLabel: string | null
+  // Ставка, по которой реально посчитана комиссия этого товара: по категории или,
+  // если категории нет, общая ставка магазина. null -- ставки нет вообще, комиссия
+  // в прибыль товара не вычтена (аудит K32).
   commissionRatePercent: number | null
+  commissionSource: 'category' | 'flat' | null
   commissionAmount: number | null
   profit: number | null
 }
@@ -43,16 +48,29 @@ export type ProfitSummary = {
   adSpendConfigured: boolean
   commissionRatePercent: number | null
   commissionAmount: number
+  // Есть выручка без какой-либо ставки комиссии (нет ни общей, ни категории):
+  // netProfit тогда завышен на эту комиссию.
+  commissionMissing: boolean
   netProfit: number
+  // «Предварительно»: чего-то не хватает (себестоимости у части товаров, ставки
+  // комиссии) или список заказов неполный (K33).
+  isPreliminary: boolean
   truncated: boolean
   sessionExpired: boolean
   // См. FinanceSummary.upstreamFailed: Kaspi не ответил на страницу заказов, выручка и
   // прибыль неполные или неизвестны.
   upstreamFailed: boolean
+  // С какой даты (по Алматы) посчитан период и по каким данным (см. FinanceSummary).
+  periodFrom: string
+  fetchedOrders: number
+  newestFirst: boolean
 }
 
-const REVENUE_STATUSES = ['KASPI_DELIVERY_TRANSMITTED', 'ARCHIVED']
-const MAX_PAGES_PER_STATUS = 20
+export type ProfitOptions = {
+  windowStartMs?: number
+  cacheKey?: string
+  nowMs?: number
+}
 
 export async function computeProfitSummary(
   sessionCookies: string,
@@ -61,38 +79,15 @@ export async function computeProfitSummary(
   catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null; commissionCategoryLabel?: string | null }[],
   adSpend: { amount: number; otherAmount: number; configured: boolean },
   commissionRatePercent: number | null,
-  listOrdersFn: typeof listOrders = listOrders
+  listOrdersFn: typeof listOrders = listOrders,
+  opts: ProfitOptions = {}
 ): Promise<ProfitSummary> {
-  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000
-  const allOrders: Order[] = []
-  let truncated = false
-  let sessionExpired = false
-  let upstreamFailed = false
+  const nowMs = opts.nowMs ?? Date.now()
+  const cutoffMs = opts.windowStartMs ?? windowStartForDays(sinceDays, nowMs)
+  const fetched = await fetchRevenueOrders(sessionCookies, merchantId, cutoffMs, listOrdersFn, { cacheKey: opts.cacheKey, nowMs })
+  const { truncated, sessionExpired, upstreamFailed } = fetched
 
-  statusLoop: for (const status of REVENUE_STATUSES) {
-    let page = 0
-    let fetchedForStatus = 0
-    let totalForStatus = 0
-    while (page < MAX_PAGES_PER_STATUS) {
-      const result = await listOrdersFn(sessionCookies, merchantId, status, page)
-      if (result.sessionExpired) {
-        sessionExpired = true
-        break statusLoop
-      }
-      if (result.failed) {
-        upstreamFailed = true
-        break statusLoop
-      }
-      allOrders.push(...result.orders)
-      fetchedForStatus += result.orders.length
-      totalForStatus = result.total
-      page += 1
-      if (result.orders.length < PAGE_SIZE) break
-    }
-    if (fetchedForStatus < totalForStatus) truncated = true
-  }
-
-  const inWindow = allOrders.filter(o => new Date(o.creationTime).getTime() >= cutoffMs)
+  const inWindow = fetched.orders.filter(o => Date.parse(o.creationTime) >= cutoffMs)
 
   const catalogBySku = new Map(catalog.map(c => [c.kaspiMasterSku, c]))
   const bySku = new Map<string, { unitsSold: number; revenue: number; name: string; imageUrl: string | null }>()
@@ -108,11 +103,8 @@ export async function computeProfitSummary(
   const products: ProductProfit[] = []
   let totalCogsKnown = 0
   let productsWithoutCogsCount = 0
-  // Revenue already covered by a per-product category rate -- subtracted
-  // from the flat-rate bucket below so a seller can categorize their top
-  // products gradually without double-charging commission on that revenue.
-  let categorizedRevenue = 0
-  let categorizedCommission = 0
+  let commissionTotal = 0
+  let revenueWithoutRate = 0
   for (const [sku, agg] of bySku.entries()) {
     const catalogEntry = catalogBySku.get(sku)
     const cogsAmount = catalogEntry?.cogsAmount ?? null
@@ -124,11 +116,14 @@ export async function computeProfitSummary(
     const categoryRate = commissionCategoryLabel
       ? KASPI_CATEGORY_COMMISSIONS.find(c => c.label === commissionCategoryLabel)?.ratePercent ?? null
       : null
-    const productCommission = categoryRate !== null ? agg.revenue * (categoryRate / 100) : null
-    if (productCommission !== null) {
-      categorizedRevenue += agg.revenue
-      categorizedCommission += productCommission
-    }
+    // Ставка товара: по его категории, а без категории общая ставка магазина
+    // (раньше такой товар показывал прибыль без комиссии, а итог её вычитал, и
+    // суммы карточек расходились с итогом: аудит K32).
+    const rate = categoryRate ?? commissionRatePercent
+    const commissionSource: ProductProfit['commissionSource'] = categoryRate !== null ? 'category' : commissionRatePercent !== null ? 'flat' : null
+    const productCommission = rate !== null ? agg.revenue * (rate / 100) : null
+    if (productCommission !== null) commissionTotal += productCommission
+    else revenueWithoutRate += agg.revenue
 
     products.push({
       kaspiMasterSku: sku,
@@ -140,7 +135,8 @@ export async function computeProfitSummary(
       cogsAmount,
       cogsTotal,
       commissionCategoryLabel,
-      commissionRatePercent: categoryRate,
+      commissionRatePercent: rate,
+      commissionSource,
       commissionAmount: productCommission,
       profit: cogsTotal !== null ? agg.revenue - cogsTotal - (productCommission ?? 0) : null,
     })
@@ -151,10 +147,13 @@ export async function computeProfitSummary(
   // from order.totalPrice) so this number always reconciles with the
   // per-product breakdown shown below it in the UI.
   const totalRevenue = products.reduce((sum, p) => sum + p.revenue, 0)
-  const uncategorizedRevenue = totalRevenue - categorizedRevenue
-  const blendedCommission = commissionRatePercent !== null ? uncategorizedRevenue * (commissionRatePercent / 100) : 0
-  const commissionAmount = categorizedCommission + blendedCommission
+  // Итоговая комиссия -- сумма по товарам: категорийная ставка там, где категория
+  // задана, общая на остальное. Тот же результат, что давала прежняя формула
+  // «категорийная часть + общая ставка на остаток выручки».
+  const commissionAmount = commissionTotal
+  const commissionMissing = revenueWithoutRate > 0
   const netProfit = totalRevenue - totalCogsKnown - adSpend.amount - adSpend.otherAmount - commissionAmount
+  const isPreliminary = productsWithoutCogsCount > 0 || commissionMissing || truncated || upstreamFailed
 
   return {
     products,
@@ -166,9 +165,14 @@ export async function computeProfitSummary(
     adSpendConfigured: adSpend.configured,
     commissionRatePercent,
     commissionAmount,
+    commissionMissing,
     netProfit,
+    isPreliminary,
     truncated,
     sessionExpired,
     upstreamFailed,
+    periodFrom: almatyDateOf(cutoffMs),
+    fetchedOrders: fetched.fetchedCount,
+    newestFirst: fetched.newestFirst,
   }
 }

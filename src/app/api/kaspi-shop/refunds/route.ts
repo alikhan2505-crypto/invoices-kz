@@ -27,7 +27,11 @@ export async function GET(req: NextRequest) {
   if (!tab || !REFUND_TABS.includes(tab)) {
     return NextResponse.json({ error: `tab обязателен и должен быть одним из: ${REFUND_TABS.join(', ')}` }, { status: 400 })
   }
-  const page = Number(req.nextUrl.searchParams.get('page')) || 0
+  const pageRaw = req.nextUrl.searchParams.get('page')
+  const page = pageRaw === null || pageRaw === '' ? 0 : Number(pageRaw)
+  if (!Number.isInteger(page) || page < 0 || page > 1000) {
+    return NextResponse.json({ error: 'page должен быть целым числом от 0' }, { status: 400 })
+  }
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
@@ -38,6 +42,10 @@ export async function GET(req: NextRequest) {
   if (result.sessionExpired) {
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
+  }
+  // Сбой Kaspi это не «заявок нет»: 502 с причиной (аудит K35).
+  if (result.failed) {
+    return NextResponse.json({ error: `Не удалось получить заявки от Kaspi${result.error ? ` (${result.error})` : ''}. Повторите позже.` }, { status: 502 })
   }
   return NextResponse.json({ refunds: result.refunds, total: result.total })
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,8 @@ import { REFUND_ATTENTION_TABS } from '@/lib/kaspiShop/refunds'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -94,13 +96,29 @@ export default function KaspiShopRefundsPage() {
   const [tab, setTab] = useState<RefundTab>('NEW')
   const [refunds, setRefunds] = useState<RefundListItem[]>([])
   const [listLoading, setListLoading] = useState(false)
+  // Сколько заявок во вкладке по ответу Kaspi и сколько страниц уже загружено
+  // («Показать ещё»: раньше грузилась одна страница из 10 и всё, аудит K30).
+  const [total, setTotal] = useState(0)
+  const [nextPage, setNextPage] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState('')
+  // Ошибка последней подгрузки: «Повторить» тогда догружает страницу, а не сбрасывает список.
+  const [moreFailed, setMoreFailed] = useState(false)
+  const [countsError, setCountsError] = useState('')
+  // Номер последнего запроса списка: ответ на устаревший (другая вкладка) не затирает новый.
+  const reqId = useRef(0)
+  // Номер последней подгрузки: её finally снимает «Загружаем…» только если за это время
+  // не началась новая загрузка списка или другая подгрузка (смена вкладки в полёте).
+  const moreReqId = useRef(0)
+  const [accessError, setAccessError] = useState('')
   const [detail, setDetail] = useState<RefundDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
 
   useEffect(() => { init() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!loading) loadList(tab) }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  // loading в зависимостях: начальная вкладка «Новые» не меняется при выборе первой
+  // занятой, и эффект только от tab не срабатывал, список оставался пустым (аудит K28).
+  useEffect(() => { if (!loading) loadList(tab) }, [tab, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -117,16 +135,18 @@ export default function KaspiShopRefundsPage() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
 
     const headers = await authHeader()
     try {
       const res = await fetch('/api/kaspi-shop/refunds/counts', { headers })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setLoadError(data.error || 'Не удалось загрузить счётчики')
+        setCountsError(data.error || 'Не удалось загрузить счётчики')
       } else {
         const byTab: Record<string, number> = {}
         for (const c of data.counts || []) byTab[c.tab] = c.total
@@ -137,30 +157,80 @@ export default function KaspiShopRefundsPage() {
         setTab(firstBusy || 'CLOSED')
       }
     } catch {
-      setLoadError('Не удалось загрузить данные. Проверьте соединение.')
+      setCountsError('Не удалось загрузить счётчики. Проверьте соединение.')
     }
     setLoading(false)
   }
 
   async function loadList(t: RefundTab) {
+    const id = ++reqId.current
+    // Новая загрузка списка отменяет подгрузку из прошлой вкладки: её флаг не должен
+    // оставаться включённым и блокировать «Показать ещё» на новой вкладке.
+    moreReqId.current++
+    setLoadingMore(false)
     setListLoading(true)
     setLoadError('')
+    setMoreFailed(false)
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/refunds?tab=${t}&page=0`, { headers })
       const data = await res.json().catch(() => ({}))
+      if (id !== reqId.current) return
       if (!res.ok) {
         if (res.status === 400 && /сесси/i.test(data.error || '')) setSessionExpired(true)
         setLoadError(data.error || 'Не удалось загрузить заявки')
         setRefunds([])
+        setTotal(0)
       } else {
         setRefunds(data.refunds || [])
+        setTotal(Number(data.total) || 0)
+        setNextPage(1)
       }
     } catch {
+      if (id !== reqId.current) return
       setLoadError('Не удалось загрузить заявки. Проверьте соединение.')
       setRefunds([])
+      setTotal(0)
     } finally {
-      setListLoading(false)
+      if (id === reqId.current) setListLoading(false)
+    }
+  }
+
+  async function loadMore() {
+    if (loadingMore || listLoading) return
+    const id = reqId.current
+    const moreId = ++moreReqId.current
+    setLoadingMore(true)
+    setLoadError('')
+    setMoreFailed(false)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/refunds?tab=${tab}&page=${nextPage}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (id !== reqId.current) return
+      if (!res.ok) {
+        if (res.status === 400 && /сесси/i.test(data.error || '')) setSessionExpired(true)
+        setLoadError(data.error || 'Не удалось загрузить ещё заявки')
+        setMoreFailed(true)
+        return
+      }
+      const more: RefundListItem[] = data.refunds || []
+      // Кнопка заблокирована на время запроса, а смена вкладки обнуляет reqId, поэтому
+      // refunds из этого замыкания и есть текущий список.
+      const seen = new Set(refunds.map(r => r.refundId))
+      const merged = [...refunds, ...more.filter(r => !seen.has(r.refundId))]
+      setRefunds(merged)
+      // Пустая страница, а «всего» больше: дальше листать нечего, кнопку убираем.
+      setTotal(more.length === 0 ? merged.length : (Number(data.total) || merged.length))
+      setNextPage(p => p + 1)
+    } catch {
+      if (id !== reqId.current) return
+      setLoadError('Не удалось загрузить ещё заявки. Проверьте соединение.')
+      setMoreFailed(true)
+    } finally {
+      // Данные устаревшему ответу писать нельзя (guard выше), а флаг снимаем всегда,
+      // если это ещё последняя подгрузка.
+      if (moreId === moreReqId.current) setLoadingMore(false)
     }
   }
 
@@ -184,7 +254,11 @@ export default function KaspiShopRefundsPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); init() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -212,20 +286,30 @@ export default function KaspiShopRefundsPage() {
           })}
         </div>
 
+        {countsError && (
+          <div className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
+            Числа у вкладок не загрузились: {countsError}
+          </div>
+        )}
+
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadList(tab)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => (moreFailed ? loadMore() : loadList(tab))} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         {listLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заявки...</div>
         ) : refunds.length === 0 ? (
-          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-            Заявок в этой вкладке нет.
-          </div>
+          // Ошибка загрузки показана выше; «заявок нет» говорим только когда Kaspi ответил.
+          loadError ? null : (
+            <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+              Заявок в этой вкладке нет.
+            </div>
+          )
         ) : (
+          <>
           <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
             {refunds.map((r, i) => {
               const colors = statusColor(r.statusText)
@@ -251,6 +335,17 @@ export default function KaspiShopRefundsPage() {
               )
             })}
           </div>
+          <div className="flex items-center justify-center gap-3 flex-wrap mt-4">
+            <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Показано {refunds.length} из {Math.max(total, refunds.length)}</span>
+            {refunds.length < total && (
+              <button onClick={loadMore} disabled={loadingMore}
+                className="text-xs font-semibold rounded-full px-4 py-2 disabled:opacity-50"
+                style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+                {loadingMore ? 'Загружаем…' : 'Показать ещё'}
+              </button>
+            )}
+          </div>
+          </>
         )}
       </PageContainer>
 

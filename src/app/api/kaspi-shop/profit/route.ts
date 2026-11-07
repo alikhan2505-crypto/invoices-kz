@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
   }
   const adSpend = { amount: Number(adSpendRow?.amount) || 0, otherAmount: Number(adSpendRow?.other_amount) || 0, configured: !!adSpendRow }
 
-  const summary = await computeProfitSummary(connection.sessionCookies, connection.merchantId, days, catalog, adSpend, commissionRatePercent)
+  const summary = await computeProfitSummary(connection.sessionCookies, connection.merchantId, days, catalog, adSpend, commissionRatePercent, undefined, { cacheKey: connection.id })
   if (summary.sessionExpired) await markSessionExpired(connection.id)
   return NextResponse.json(summary)
 }

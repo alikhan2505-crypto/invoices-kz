@@ -11,6 +11,8 @@ import { ORDER_STATUS_TABS, PACKING_STATUS, WORKING_ORDER_STATUSES } from '@/lib
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 // "Обзор" of Kaspi Bot (founder's mock, 21.09.2026): three numbers, the orders in
 // work, and the hand-offs to the neighbouring products. Everything here reads
@@ -43,6 +45,9 @@ export default function KaspiShopOverview() {
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)
+  // Сбой запроса /wallet: «Повторить» вместо ухода на окно подключения (K12). accessTry перезапускает загрузку.
+  const [accessError, setAccessError] = useState('')
+  const [accessTry, setAccessTry] = useState(0)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [counts, setCounts] = useState<Record<string, number> | null>(null)
   const [products, setProducts] = useState<ProductRow[] | null>(null)
@@ -55,6 +60,8 @@ export default function KaspiShopOverview() {
   const [ordersListFailed, setOrdersListFailed] = useState(false)
   // Прибыль не посчитана, потому что Kaspi не отдал заказы: «—» с причиной, а не 0 ₸.
   const [profitFailed, setProfitFailed] = useState(false)
+  // Список товаров не получен: «0 из 0» и «упёрлись в минимум: 0» не должны читаться как данные.
+  const [productsFailed, setProductsFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -69,20 +76,27 @@ export default function KaspiShopOverview() {
       if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
 
       const headers = await authHeader()
-      const walletRes = await fetch('/api/kaspi-shop/wallet', { headers })
-      const wallet = await walletRes.json().catch(() => null)
-      // Not connected yet: the repricer page owns the connect flow.
-      if (!wallet?.connected) { router.push('/kaspi-shop'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const access = await checkKaspiConnection(session?.access_token)
       if (!alive) return
-      const expired = wallet.sessionStatus === 'session_expired'
+      if (access.kind === 'error') { setAccessError(access.message); return }
+      // Not connected yet: the repricer page owns the connect flow. Истёкшая сессия не уводит:
+      // Обзор показывает плашку «Переподключить» и товары из нашей базы.
+      if (access.kind === 'redirect' && access.reason === 'not_connected') { router.push('/kaspi-shop'); return }
+      setAccessError('')
+      const expired = access.kind === 'redirect'
       setSessionExpired(expired)
       setReady(true)
 
       // Products come from our own database: instant.
       fetch('/api/kaspi-shop/products', { headers })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (alive) setProducts(d?.products ?? []) })
-        .catch(() => { if (alive) setProducts([]) })
+        .then((d) => {
+          if (!alive) return
+          if (!d || !Array.isArray(d.products)) { setProductsFailed(true); setProducts([]); return }
+          setProducts(d.products)
+        })
+        .catch(() => { if (alive) { setProductsFailed(true); setProducts([]) } })
 
       if (expired) { setCounts({}); setProfit(null); setOrders([]); return }
 
@@ -111,27 +125,33 @@ export default function KaspiShopOverview() {
         .catch(() => { if (alive) { setCounts({}); setOrders([]); setOrdersFailed(true) } })
 
       fetch('/api/kaspi-shop/profit?days=7', { headers })
-        .then((r) => (r.ok ? r.json() : null))
+        // Сбой тоже читаем с телом: без sessionExpired это «не удалось посчитать», а не молчаливое «—».
+        .then(async (r) => (r.ok ? r.json() : { __failed: true, ...(await r.json().catch(() => ({}))) }))
         .then((d) => {
           if (!alive) return
-          if (!d || d.sessionExpired) { setProfit(null); return }
+          if (d?.sessionExpired) { setProfit(null); return }
+          if (!d || d.__failed) { setProfitFailed(true); setProfit(null); return }
           // Kaspi не ответил на страницу заказов: выручка и прибыль неполные или неизвестны.
           if (d.upstreamFailed) { setProfitFailed(true); setProfit(null); return }
           setProfit({ net: Number(d.netProfit) || 0, revenue: Number(d.totalRevenue) || 0, missingCogs: Number(d.productsWithoutCogsCount) || 0 })
         })
-        .catch(() => { if (alive) setProfit(null) })
+        .catch(() => { if (alive) { setProfitFailed(true); setProfit(null) } })
     }
     void load()
     return () => { alive = false }
-  }, [router])
+  }, [router, accessTry])
 
-  if (!ready) return <LoadingSpinner />
+  if (!ready) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); setAccessTry(n => n + 1) }} />
+      : <LoadingSpinner />
+  }
 
   // Нули при мёртвой сессии или ошибке Kaspi - не данные: показываем «—» и причину.
   const ordersUnavailable = sessionExpired || ordersFailed
   const inWork = counts && !ordersUnavailable ? WORKING_STATUSES.reduce((s, k) => s + (counts[k] ?? 0), 0) : null
-  const winning = products ? products.filter((p) => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length : null
-  const atFloor = products ? products.filter((p) => p.own_current_price <= p.floor_price + 0.01).length : null
+  const winning = products && !productsFailed ? products.filter((p) => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length : null
+  const atFloor = products && !productsFailed ? products.filter((p) => p.own_current_price <= p.floor_price + 0.01).length : null
 
   const back = '/kaspi-shop/overview'
   // Карточки про витрину сняты, пока витрина закрыта («скоро», 15.10.2026).
@@ -167,7 +187,7 @@ export default function KaspiShopOverview() {
           <div className="nav-glass rounded-2xl flex flex-wrap overflow-hidden">
             {kpi('Заказов в работе', ordersUnavailable ? '—' : inWork === null ? null : String(inWork),
               sessionExpired ? 'сессия Kaspi истекла' : ordersFailed ? 'не удалось получить из Kaspi' : counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
-            {kpi('Дешевле конкурентов', winning === null || products === null ? null : `${winning} из ${products.length}`, atFloor === null ? '' : `упёрлись в минимум: ${atFloor}`)}
+            {kpi('Дешевле конкурентов', productsFailed ? '—' : winning === null || products === null ? null : `${winning} из ${products.length}`, productsFailed ? 'не удалось загрузить товары' : atFloor === null ? '' : `упёрлись в минимум: ${atFloor}`)}
             {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : profitFailed ? 'не удалось получить заказы из Kaspi' : 'после комиссии и расходов')}
           </div>
 

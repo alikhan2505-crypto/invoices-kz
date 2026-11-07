@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { fetchOfferDetails, extractOfferPointInfo, listCatalogWithStatus } from '@/lib/kaspiShop/cabinetApi'
+import { fetchOffersDetailsChecked, extractOfferPointInfo, listCatalogWithStatus } from '@/lib/kaspiShop/cabinetApi'
 import { savePointStockPrice } from '@/lib/kaspiShop/cabinetPricePush'
 import { getCachedMerchantPoints } from '@/lib/kaspiShop/merchantPoints'
 
@@ -49,8 +49,15 @@ export async function GET(req: NextRequest) {
   const connection = await loadConnection(user.id)
   if (!connection?.sessionCookies) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
 
-  const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, sku)
-  if (!details) return NextResponse.json({ error: 'Не удалось получить карточку товара из Kaspi' }, { status: 502 })
+  const detailsRes = await fetchOffersDetailsChecked(connection.sessionCookies, connection.merchantId, [sku])
+  if (detailsRes.sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь', sessionExpired: true }, { status: 400 })
+  }
+  const details = detailsRes.items[0] ?? null
+  if (!details) {
+    return NextResponse.json({ error: `Не удалось получить карточку товара из Kaspi${detailsRes.error ? ` (${detailsRes.error})` : ''}` }, { status: 502 })
+  }
 
   const entriesMap = new Map<string, PointEntry>()
   for (const info of extractOfferPointInfo(details, connection.merchantId)) {
@@ -76,12 +83,28 @@ export async function GET(req: NextRequest) {
 
   // Остаток per point from the list row (searching the active side first,
   // the removed side as a fallback -- the modal opens from either tab).
+  // Остаток живёт только в строке списка. Если список не прочитан, поля остатка в модалке остались
+  // бы пустыми, и сохранение с пустым остатком стёрло бы его (а запомненный остаток точки удалился
+  // бы из kaspi_shop_point_stocks): поэтому сбой чтения списка это 502, а не «остатка нет».
   try {
     const activeList = await listCatalogWithStatus(connection.sessionCookies, connection.merchantId, true)
     let listOffer = activeList.offers.find(o => o.sku === sku)
+    let listsOk = activeList.complete && !activeList.failed
+    let listsExpired = activeList.sessionExpired
+    let listsError = activeList.error
     if (!listOffer) {
       const removedList = await listCatalogWithStatus(connection.sessionCookies, connection.merchantId, false)
       listOffer = removedList.offers.find(o => o.sku === sku)
+      listsOk = listsOk && removedList.complete && !removedList.failed
+      listsExpired = listsExpired || removedList.sessionExpired
+      listsError = listsError || removedList.error
+    }
+    if (!listOffer && !listsOk) {
+      if (listsExpired) {
+        await markSessionExpired(connection.id)
+        return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь', sessionExpired: true }, { status: 400 })
+      }
+      return NextResponse.json({ error: `Не удалось получить остатки из Kaspi${listsError ? ` (${listsError})` : ''}. Повторите через минуту.` }, { status: 502 })
     }
     for (const a of listOffer?.availabilities || []) {
       const code = a.storeId.startsWith(`${connection.merchantId}_`) ? a.storeId.slice(connection.merchantId.length + 1) : a.storeId

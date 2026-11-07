@@ -83,8 +83,25 @@ function checkStringArray(v: unknown, label: string): Check<string[]> {
   return { ok: true, value: v as string[] }
 }
 
-export type StoredProductSettings = { floor_price?: unknown; max_price?: unknown }
-export type PatchValidation = { ok: true; patch: Record<string, any> } | { ok: false; error: string }
+export type StoredProductSettings = { floor_price?: unknown; max_price?: unknown; own_current_price?: unknown }
+
+// Пол/максимум, сильно расходящиеся с текущей ценой товара, почти всегда опечатка
+// (50000 вместо 5000): бот на следующем цикле (через ~10 минут) поставил бы такую
+// цену в Kaspi. Порог -- во сколько раз пол выше цены (или цена выше максимума).
+// Продавец может подтвердить осознанно: тело PATCH с confirmFloor: true.
+export const FLOOR_FAR_FACTOR = 3
+export const FLOOR_FAR_ERROR_CODE = 'floor_far_above_price'
+
+export type FloorFarDetails = {
+  field: 'floor_price' | 'max_price'
+  floorPrice: number | null
+  maxPrice: number | null
+  ownPrice: number
+  factor: number
+}
+export type PatchValidation =
+  | { ok: true; patch: Record<string, any> }
+  | { ok: false; error: string; code?: typeof FLOOR_FAR_ERROR_CODE; details?: FloorFarDetails }
 
 // Что можно менять PATCH-ом (остальные ключи тела игнорируются, как и раньше).
 const PATCH_KEYS = ['floor_price', 'undercut_step', 'check_frequency_minutes', 'enabled', 'stock_count', 'demping_strategy', 'excluded_city_codes', 'excluded_merchant_ids', 'max_price'] as const
@@ -141,6 +158,39 @@ export function validateProductPatch(updates: Record<string, unknown>, stored: S
     const storedMax = toFiniteNumber(stored.max_price)
     if (storedMax !== null && storedMax > 0 && storedMax <= patch.floor_price) {
       return { ok: false, error: 'max_price должен быть больше floor_price' }
+    }
+  }
+
+  // Пол сильно выше текущей цены (или максимум сильно ниже неё) -- вероятная
+  // опечатка. Проверяем только то, что пришло в этом запросе, и только когда у
+  // товара известна текущая цена; confirmFloor: true -- осознанное подтверждение.
+  // Форма шлёт ВСЕ поля при каждом сохранении, поэтому «пришло в запросе» не значит
+  // «меняется»: проверяем пол/максимум, только если значение отличается от того, что
+  // уже стоит в базе (иначе правка шага или частоты упиралась бы в старый пол,
+  // который продавец когда-то сознательно подтвердил).
+  const ownPrice = toFiniteNumber(stored.own_current_price)
+  if (updates.confirmFloor !== true && ownPrice !== null && ownPrice > 0) {
+    const storedFloorRounded = storedFloor !== null ? Math.round(storedFloor) : null
+    const storedMaxRaw = toFiniteNumber(stored.max_price)
+    const storedMaxRounded = storedMaxRaw !== null && storedMaxRaw > 0 ? Math.round(storedMaxRaw) : null
+    const floorNew = 'floor_price' in patch && patch.floor_price !== storedFloorRounded ? (patch.floor_price as number) : null
+    const maxNew = 'max_price' in patch && patch.max_price !== storedMaxRounded ? (patch.max_price as number | null) : null
+    const base = { floorPrice: effectiveFloor, maxPrice: 'max_price' in patch ? (patch.max_price as number | null) : (storedMaxRaw ?? null), ownPrice, factor: FLOOR_FAR_FACTOR }
+    if (floorNew !== null && floorNew > ownPrice * FLOOR_FAR_FACTOR) {
+      return {
+        ok: false,
+        code: FLOOR_FAR_ERROR_CODE,
+        error: `Минимальная цена ${floorNew} ₸ больше текущей цены товара ${ownPrice} ₸ более чем в ${FLOOR_FAR_FACTOR} раза. Проверьте, нет ли опечатки.`,
+        details: { field: 'floor_price', ...base },
+      }
+    }
+    if (maxNew !== null && ownPrice > maxNew * FLOOR_FAR_FACTOR) {
+      return {
+        ok: false,
+        code: FLOOR_FAR_ERROR_CODE,
+        error: `Максимальная цена ${maxNew} ₸ меньше текущей цены товара ${ownPrice} ₸ более чем в ${FLOOR_FAR_FACTOR} раза. Проверьте, нет ли опечатки.`,
+        details: { field: 'max_price', ...base },
+      }
     }
   }
 

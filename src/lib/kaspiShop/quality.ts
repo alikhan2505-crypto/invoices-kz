@@ -52,6 +52,15 @@ function mapDetails(details: any): MetricSummary {
   }
 }
 
+// Любой вызов Kaspi: таймаут и перехват сетевой ошибки, чтобы сбой был явным
+// failed, а не исключением на всю страницу и не пустым «ничего нет» (аудит K35).
+const QUALITY_TIMEOUT_MS = 15_000
+
+function qualityFailure(err: unknown): string {
+  const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+  return timedOut ? 'Kaspi не ответил вовремя' : (err instanceof Error ? err.message : 'Неизвестная ошибка')
+}
+
 export type QualityOverview = {
   rating: MetricSummary & { statistics: { oneCount: number; twoCount: number; threeCount: number; fourCount: number; fiveCount: number } }
   returns: MetricSummary
@@ -81,21 +90,29 @@ export async function getQualityOverview(
   sessionCookies: string,
   merchantId: string,
   fetchFn: typeof fetch = fetch
-): Promise<{ overview: QualityOverview | null; sessionExpired: boolean }> {
-  const res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getSingleMetricDetails', {
-    method: 'POST',
-    headers: { ...COMMON_HEADERS, cookie: sessionCookies },
-    body: JSON.stringify({
-      operationName: 'getSingleMetricDetails',
-      variables: { id: merchantId, version: 'V2' },
-      query: GET_SINGLE_METRIC_DETAILS_QUERY,
-    }),
-  })
+): Promise<{ overview: QualityOverview | null; sessionExpired: boolean; failed?: boolean; error?: string }> {
+  let res: Response
+  try {
+    res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getSingleMetricDetails', {
+      method: 'POST',
+      headers: { ...COMMON_HEADERS, cookie: sessionCookies },
+      body: JSON.stringify({
+        operationName: 'getSingleMetricDetails',
+        variables: { id: merchantId, version: 'V2' },
+        query: GET_SINGLE_METRIC_DETAILS_QUERY,
+      }),
+      signal: AbortSignal.timeout(QUALITY_TIMEOUT_MS),
+    })
+  } catch (err) {
+    return { overview: null, sessionExpired: false, failed: true, error: qualityFailure(err) }
+  }
   if (res.status === 401 || res.status === 403) return { overview: null, sessionExpired: true }
-  if (!res.ok) return { overview: null, sessionExpired: false }
+  if (!res.ok) return { overview: null, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
   const json = await res.json().catch(() => null)
   const qc = json?.data?.merchant?.qualityControl
-  if (!qc) return { overview: null, sessionExpired: false }
+  if (!qc || !qc.ratingWithStatistics?.details || !qc.returned?.details || !qc.lateKaspiDelivery?.details || !qc.cancelled?.details) {
+    return { overview: null, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
+  }
   return {
     overview: {
       rating: { ...mapDetails(qc.ratingWithStatistics.details), statistics: qc.ratingWithStatistics.statistics },
@@ -146,6 +163,8 @@ const GET_QC_BY_CATEGORIES_QUERY = `query getQCByCategories($merchantUid: String
   }
 }`
 
+export const QUALITY_CATEGORIES_PAGE_SIZE = 10
+
 const METRIC_FIELD_BY_TAB: Record<QualityTab, 'rating' | 'returns' | 'delivery' | 'cancels'> = {
   rating: 'rating',
   returns: 'returns',
@@ -159,35 +178,41 @@ export async function getQualityCategories(
   tab: QualityTab,
   page: number,
   fetchFn: typeof fetch = fetch
-): Promise<{ categories: CategoryRow[]; total: number; sessionExpired: boolean }> {
+): Promise<{ categories: CategoryRow[]; total: number; sessionExpired: boolean; failed?: boolean; error?: string }> {
   const tabConfig = QUALITY_TABS[tab]
   if (!tabConfig) {
     throw new Error(`Invalid quality tab "${tab}" -- must be one of ${Object.keys(QUALITY_TABS).join(', ')}`)
   }
-  const res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getQCByCategories', {
-    method: 'POST',
-    headers: { ...COMMON_HEADERS, cookie: sessionCookies },
-    body: JSON.stringify({
-      operationName: 'getQCByCategories',
-      variables: {
-        merchantUid: merchantId,
-        page,
-        size: 10,
-        metricType: tabConfig.metricType,
-        isCancelled: tabConfig.isCancelled,
-        isReturned: tabConfig.isReturned,
-        isLateKaspiDelivery: tabConfig.isLateKaspiDelivery,
-        isRating: tabConfig.isRating,
-      },
-      query: GET_QC_BY_CATEGORIES_QUERY,
-    }),
-  })
+  let res: Response
+  try {
+    res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getQCByCategories', {
+      method: 'POST',
+      headers: { ...COMMON_HEADERS, cookie: sessionCookies },
+      body: JSON.stringify({
+        operationName: 'getQCByCategories',
+        variables: {
+          merchantUid: merchantId,
+          page,
+          size: QUALITY_CATEGORIES_PAGE_SIZE,
+          metricType: tabConfig.metricType,
+          isCancelled: tabConfig.isCancelled,
+          isReturned: tabConfig.isReturned,
+          isLateKaspiDelivery: tabConfig.isLateKaspiDelivery,
+          isRating: tabConfig.isRating,
+        },
+        query: GET_QC_BY_CATEGORIES_QUERY,
+      }),
+      signal: AbortSignal.timeout(QUALITY_TIMEOUT_MS),
+    })
+  } catch (err) {
+    return { categories: [], total: 0, sessionExpired: false, failed: true, error: qualityFailure(err) }
+  }
   if (res.status === 401 || res.status === 403) return { categories: [], total: 0, sessionExpired: true }
-  if (!res.ok) return { categories: [], total: 0, sessionExpired: false }
+  if (!res.ok) return { categories: [], total: 0, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
   const json = await res.json().catch(() => null)
   const categories = json?.data?.merchant?.qualityControl?.categories
   const items = categories?.items
-  if (!Array.isArray(items)) return { categories: [], total: 0, sessionExpired: false }
+  if (!Array.isArray(items)) return { categories: [], total: 0, sessionExpired: false, failed: true, error: 'Kaspi вернул неожиданный ответ' }
   const metricField = METRIC_FIELD_BY_TAB[tab]
   return {
     categories: items.map((item: any) => ({

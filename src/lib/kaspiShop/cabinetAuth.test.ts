@@ -307,3 +307,21 @@ describe('startPhoneLogin', () => {
     if (result.status === 'otp_required') expect(isResumeToken(result.otpToken)).toBe(false)
   })
 })
+
+describe('startPhoneLogin input handling (K48)', () => {
+  it.each([
+    ['an object', { $ne: 1 }],
+    ['a number', 77771234567],
+    ['an array', ['+77001112233']],
+    ['null', null],
+    ['undefined', undefined],
+    ['an empty string', ''],
+    ['a short string', '777'],
+    ['text', 'not a phone'],
+  ])('refuses %s before any request to Kaspi (no SMS is triggered)', async (_name, value) => {
+    fetchMock.mockClear()
+    const result = await startPhoneLogin(value as any)
+    expect(result).toMatchObject({ status: 'error', code: 'phone_rejected' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

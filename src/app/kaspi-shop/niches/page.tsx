@@ -11,6 +11,8 @@ import Source1688Button from '@/components/kaspiShop/Source1688Button'
 import { getActivePlan } from '@/lib/plan'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -171,6 +173,7 @@ function TrendingProductsTable({ products, showCategory, emptyLabel }: { product
 export default function KaspiShopNiches() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
   const [query, setQuery] = useState('')
   const [searchedQuery, setSearchedQuery] = useState('')
   const [summary, setSummary] = useState<NicheSummary | null>(null)
@@ -220,9 +223,11 @@ export default function KaspiShopNiches() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
     loadWalletBalance()
   }
@@ -255,7 +260,7 @@ export default function KaspiShopNiches() {
       }
       try {
         const res = await fetch(`/api/kaspi-shop/niches/result?checkId=${encodeURIComponent(checkId)}`, { headers })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) { stopPolling(); setSearching(false); setLoadError(data.error || 'Не удалось получить результат'); return }
         if (data.status === 'done') {
           stopPolling()
@@ -283,8 +288,8 @@ export default function KaspiShopNiches() {
       const params = new URLSearchParams({ page: String(page) })
       if (category) params.set('category', category)
       const res = await fetch(`/api/kaspi-shop/niches/trends?${params.toString()}`, { headers })
-      const data = await res.json()
-      if (!res.ok) { setTrendsError(data.error || 'Не удалось загрузить тренды'); setTrendsLoading(false); return }
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data || !Array.isArray(data.categories)) { setTrendsError(data?.error || 'Не удалось загрузить тренды'); setTrendsLoading(false); return }
       setTrends(data)
       setTrendsLoading(false)
     } catch {
@@ -313,7 +318,7 @@ export default function KaspiShopNiches() {
       const res = await fetch('/api/kaspi-shop/niches/request', {
         method: 'POST', headers, body: JSON.stringify({ query: query.trim() }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setSearching(false)
         setLoadError(data.error === 'insufficient_balance'
@@ -328,7 +333,11 @@ export default function KaspiShopNiches() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   const isEmpty = !!summary && summary.total === 0 && summary.products.length === 0
 

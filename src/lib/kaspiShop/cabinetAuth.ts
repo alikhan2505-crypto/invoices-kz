@@ -18,6 +18,7 @@
 // works before trusting it in production.
 
 import { connectErrorMessage, type ConnectErrorCode, type ConnectStep } from './connectMessages'
+import { normalizeKzPhone } from '@/lib/kzPhone'
 
 type CookieJar = Map<string, string>
 
@@ -203,6 +204,12 @@ const LOGIN_URL = `${IDMC_BASE}/api/p/login`
 const MC_URL = 'https://mc.shop.kaspi.kz/oauth2/authorization/1?redirectUrl=' + encodeURIComponent('https://kaspi.kz/mc/')
 
 export async function startPhoneLogin(phone: string): Promise<LoginResult> {
+  // K48: вторая линия защиты после проверки в маршруте. Этот вызов заставляет
+  // Kaspi слать SMS: в него не попадает ни не-строка (объект, число, массив),
+  // ни текст, из которого не получается казахстанский номер.
+  if (typeof phone !== 'string' || !normalizeKzPhone(phone)) {
+    return { status: 'error', code: 'phone_rejected', message: 'Некорректный номер телефона' }
+  }
   const jar: CookieJar = new Map()
 
   // A real browser has already collected whatever cookies the login page

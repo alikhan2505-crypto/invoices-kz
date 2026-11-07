@@ -42,6 +42,16 @@ describe('POST /api/kaspi-shop/catalog/sync', () => {
     expect(body.partial).toBe(true)
   })
 
+  it('a cut-off catalog list (total unknown = 0) does not claim a total, and the body keeps partial and imported for the page reload', async () => {
+    importCatalogProducts.mockResolvedValue(result({ imported: 200, total: 0, complete: false, error: 'Kaspi ответил HTTP 500' }))
+    const res = await POST(req())
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.error).toMatch(/Обновлено 200 товар\(ов\)/)
+    expect(body.error).not.toMatch(/ из /)
+    expect(body).toMatchObject({ partial: true, imported: 200 })
+  })
+
   it('a dead session marks the connection expired', async () => {
     importCatalogProducts.mockResolvedValue(result({ complete: false, sessionExpired: true }))
     const res = await POST(req())

@@ -161,7 +161,7 @@ export async function PATCH(req: NextRequest) {
   // сверялся с полом только если оба пришли в одном запросе).
   const { data: row, error: rowError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('stock_count, floor_price, max_price')
+    .select('stock_count, floor_price, max_price, own_current_price')
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -169,7 +169,12 @@ export async function PATCH(req: NextRequest) {
   if (!row) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
 
   const checked = validateProductPatch(updates, row)
-  if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
+  if (!checked.ok) {
+    // Пол сильно выше цены: стабильный код и числа, чтобы форма спросила
+    // продавца и повторила запрос с confirmFloor: true.
+    if (checked.code) return NextResponse.json({ error: checked.error, code: checked.code, ...checked.details }, { status: 400 })
+    return NextResponse.json({ error: checked.error }, { status: 400 })
+  }
   const patch = checked.patch
 
   const { error } = await supabase

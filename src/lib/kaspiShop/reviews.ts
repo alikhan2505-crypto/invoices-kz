@@ -178,3 +178,120 @@ export function computeReviewStats(ratings: number[]): ReviewStats {
 export function filterByStars<T extends { rating: number }>(reviews: T[], stars: number | null): T[] {
   return stars === null ? reviews : reviews.filter(r => r.rating === stars)
 }
+
+// --- Сборка страницы «Отзывы» из кэша (аудит K40, K42) ----------------------
+
+export type ReviewProduct = { id: string; name: string; masterSku: string | null }
+export type ReviewCacheRow = {
+  trackedProductId: string
+  reviews: unknown
+  fetchError: string | null
+  fetchedAt: string | null
+  avgRating: number | null
+  totalCount: number | null
+}
+export type AggregatedReview = RawReview & { trackedProductId: string; productName: string }
+
+export type ReviewCatalogSummary = {
+  // Сумма total_count по карточкам: сколько отзывов на самих карточках Kaspi (общих
+  // для всех продавцов карточки), а не сколько загружено. null -- ни у одной карточки
+  // Kaspi не вернул число.
+  totalCount: number | null
+  // Средняя оценка карточек, взвешенная по total_count. null -- считать не по чему.
+  avgRating: number | null
+  // По скольким карточкам есть и число отзывов, и средняя оценка.
+  productsWithTotals: number
+  // Сколько карточек (без дублей по master SKU) есть в кэше.
+  productsCount: number
+}
+
+export type ReviewsAggregation = {
+  aggregated: AggregatedReview[]
+  lastFetchedAt: string | null
+  errorCount: number
+  catalog: ReviewCatalogSummary
+  // Только когда передан since: сколько карточек ждём и сколько из них обновлено
+  // текущим запуском (строка с fetched_at не раньше since).
+  refresh: { expected: number; updated: number } | null
+}
+
+function ts(iso: string | null): number {
+  const n = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(n) ? n : -Infinity
+}
+
+// После переподключения каталог мог импортироваться повторно, и у одного master SKU
+// несколько строк: их отзывы и числа считались бы дважды. Берём по одной строке кэша
+// на master SKU, самую свежую по fetched_at.
+export function aggregateReviewCache(
+  products: ReviewProduct[],
+  cacheRows: ReviewCacheRow[],
+  sinceIso: string | null = null,
+): ReviewsAggregation {
+  const groupOfProduct = new Map<string, string>()
+  const nameOfProduct = new Map<string, string>()
+  const groups = new Map<string, { masterSku: string | null; chosen: ReviewCacheRow | null }>()
+  for (const p of products) {
+    const gKey = p.masterSku ? `sku:${p.masterSku}` : `id:${p.id}`
+    groupOfProduct.set(p.id, gKey)
+    nameOfProduct.set(p.id, p.name)
+    if (!groups.has(gKey)) groups.set(gKey, { masterSku: p.masterSku, chosen: null })
+  }
+  for (const row of cacheRows) {
+    const g = groups.get(groupOfProduct.get(row.trackedProductId) ?? '')
+    if (!g) continue
+    if (!g.chosen || ts(row.fetchedAt) > ts(g.chosen.fetchedAt)) g.chosen = row
+  }
+
+  const aggregated: AggregatedReview[] = []
+  let lastMs = -Infinity
+  let lastFetchedAt: string | null = null
+  let errorCount = 0
+  let totalSum = 0
+  let weighted = 0
+  let weightSum = 0
+  let productsWithTotals = 0
+  let productsCount = 0
+  let anyTotal = false
+  let expected = 0
+  let updated = 0
+  const sinceMs = sinceIso ? Date.parse(sinceIso) : NaN
+
+  for (const g of groups.values()) {
+    if (g.masterSku) {
+      expected += 1
+      if (Number.isFinite(sinceMs) && g.chosen && ts(g.chosen.fetchedAt) >= sinceMs) updated += 1
+    }
+    const row = g.chosen
+    if (!row) continue
+    productsCount += 1
+    const t = ts(row.fetchedAt)
+    if (t > lastMs) { lastMs = t; lastFetchedAt = row.fetchedAt }
+    if (row.fetchError) errorCount += 1
+    const name = nameOfProduct.get(row.trackedProductId) || ''
+    const reviews = Array.isArray(row.reviews) ? (row.reviews as RawReview[]) : []
+    for (const r of reviews) aggregated.push({ ...r, trackedProductId: row.trackedProductId, productName: name })
+    if (row.totalCount !== null && Number.isFinite(row.totalCount) && row.totalCount >= 0) {
+      anyTotal = true
+      totalSum += row.totalCount
+      if (row.avgRating !== null && Number.isFinite(row.avgRating) && row.totalCount > 0) {
+        productsWithTotals += 1
+        weighted += row.avgRating * row.totalCount
+        weightSum += row.totalCount
+      }
+    }
+  }
+
+  return {
+    aggregated,
+    lastFetchedAt,
+    errorCount,
+    catalog: {
+      totalCount: anyTotal ? totalSum : null,
+      avgRating: weightSum > 0 ? Math.round((weighted / weightSum) * 10) / 10 : null,
+      productsWithTotals,
+      productsCount,
+    },
+    refresh: Number.isFinite(sinceMs) ? { expected, updated } : null,
+  }
+}

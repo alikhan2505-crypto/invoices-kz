@@ -8,9 +8,12 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
+import { almatyDateOf, shiftAlmatyDate, MAX_PERIOD_DAYS } from '@/lib/kaspiShop/almatyDates'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -47,6 +50,26 @@ type FinanceSummary = {
   bySize: AttributeSlice[]
   truncated: boolean
   sessionExpired: boolean
+  // Kaspi не ответил хотя бы на одну страницу заказов: цифры неполные или неизвестны.
+  upstreamFailed?: boolean
+  // С какой даты по Алматы посчитан период, сколько заказов получено от Kaspi и шли ли
+  // они от новых к старым (определено по данным).
+  periodFrom?: string
+  fetchedOrders?: number
+  newestFirst?: boolean
+}
+
+// Период: последние N суток (пресеты) или «с даты» (YYYY-MM-DD, 00:00 по Алматы).
+type Period = { kind: 'days'; days: number } | { kind: 'since'; since: string }
+
+function periodQuery(p: Period): string {
+  return p.kind === 'days' ? `days=${p.days}` : `since=${p.since}`
+}
+
+// «2026-11-01» -> «01.11.2026» (дата без часового пояса: Date тут не нужен).
+function ruDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
 }
 
 const ABC_COLORS: Record<'A' | 'B' | 'C', string> = {
@@ -130,10 +153,9 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
   // 90-day view stays readable instead of jamming in 90 overlapping dates.
   const tickEvery = Math.max(1, Math.ceil(byDay.length / 8))
   const dateTickIndices = byDay.map((_, i) => i).filter(i => i % tickEvery === 0 || i === byDay.length - 1)
-  const formatTick = (isoDate: string) => {
-    const d = new Date(isoDate)
-    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
-  }
+  // Дата уже по Алматы (YYYY-MM-DD): разбираем строку, а не Date, чтобы пояс браузера
+  // не сдвигал день.
+  const formatTick = (isoDate: string) => `${isoDate.slice(8, 10)}.${isoDate.slice(5, 7)}`
   const revenueGridSteps = [0, 0.25, 0.5, 0.75, 1]
 
   const x = (i: number) => padLeft + i * (barWidth + gap) + gap / 2
@@ -221,15 +243,19 @@ export default function KaspiShopFinance() {
   usePageDocumentTitle('Финансы')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [days, setDays] = useState(30)
+  const [period, setPeriod] = useState<Period>({ kind: 'days', days: 30 })
   const [customDaysOpen, setCustomDaysOpen] = useState(false)
   const [customSinceDate, setCustomSinceDate] = useState('')
   const [summary, setSummary] = useState<FinanceSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [accessError, setAccessError] = useState('')
+  // Номер последнего запроса сводки: ответ на устаревший (другой период) не затирает новый.
+  const summaryReqId = useRef(0)
 
   useEffect(() => { checkAccess() }, [])
-  useEffect(() => { if (!loading) loadSummary(days) }, [days, loading])
+  const periodKey = periodQuery(period)
+  useEffect(() => { if (!loading) loadSummary(period) }, [periodKey, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -246,30 +272,39 @@ export default function KaspiShopFinance() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
-  async function loadSummary(forDays: number) {
+  async function loadSummary(forPeriod: Period) {
+    const id = ++summaryReqId.current
     setSummaryLoading(true)
     setLoadError('')
     try {
       const headers = await authHeader()
-      const res = await fetch(`/api/kaspi-shop/finance?days=${forDays}`, { headers })
+      const res = await fetch(`/api/kaspi-shop/finance?${periodQuery(forPeriod)}`, { headers })
       const data = await res.json()
+      if (id !== summaryReqId.current) return
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить финансы'); setSummary(null); return }
       setSummary(data)
     } catch {
+      if (id !== summaryReqId.current) return
       setLoadError('Не удалось загрузить финансы. Проверьте соединение и попробуйте ещё раз.')
       setSummary(null)
     } finally {
-      setSummaryLoading(false)
+      if (id === summaryReqId.current) setSummaryLoading(false)
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -283,19 +318,33 @@ export default function KaspiShopFinance() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadSummary(days)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => loadSummary(period)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+          </div>
+        )}
+
+        {/* Kaspi не ответил на заказы: цифры ниже неполные или неизвестны, и 0 ₸ тут
+            не значит «не продавали» (аудит K35). */}
+        {summary?.upstreamFailed && !summary.sessionExpired && (
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>
+              Kaspi не ответил на часть запросов к заказам, поэтому {summary.orderCount > 0 ? 'цифры ниже неполные' : 'цифры неизвестны'}. Не считайте их итогом, попробуйте ещё раз через минуту.
+            </span>
+            <button onClick={() => loadSummary(period)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="flex items-start justify-end gap-4 mb-6 flex-wrap">
+          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+            <div className="text-xs min-w-0" style={{ color: 'var(--nav-text-muted)' }}>
+              {summary?.periodFrom ? `с ${ruDate(summary.periodFrom)} по сегодня, время Алматы` : 'Время Алматы'}
+            </div>
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
               <div className="flex items-center gap-1 nav-glass rounded-full p-1">
                 {PERIODS.map(p => {
-                  const active = !customDaysOpen && days === p
+                  const active = !customDaysOpen && period.kind === 'days' && period.days === p
                   return (
-                    <button key={p} onClick={() => { setCustomDaysOpen(false); setDays(p) }}
+                    <button key={p} onClick={() => { setCustomDaysOpen(false); setPeriod({ kind: 'days', days: p }) }}
                       className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
                       style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
                       {active && (
@@ -309,31 +358,29 @@ export default function KaspiShopFinance() {
                 {/* Custom period (founder request 2026-08-22, refined to a
                     calendar date rather than a raw day count after founder
                     feedback -- "лучше выбрать дату с какого периода
-                    считать"): pick a start date, days is computed from it.
-                    Backend still accepts any 1-365 day count. */}
+                    считать"): на сервер уходит сама дата since=YYYY-MM-DD, граница
+                    считается там как 00:00 по Алматы (аудит K37). */}
                 <button onClick={() => {
-                  const d = new Date()
-                  d.setDate(d.getDate() - days)
-                  setCustomSinceDate(d.toISOString().slice(0, 10))
+                  const today = almatyDateOf(Date.now())
+                  const from = period.kind === 'since' ? period.since : shiftAlmatyDate(today, -(period.days - 1))
+                  setCustomSinceDate(from)
                   setCustomDaysOpen(true)
                 }}
                   className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
                   style={{ color: customDaysOpen ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: customDaysOpen ? 'var(--nav-accent)' : 'transparent' }}>
-                  {customDaysOpen ? `${days} дн.` : 'Свой период'}
+                  {customDaysOpen && period.kind === 'since' ? `с ${ruDate(period.since)}` : 'Свой период'}
                 </button>
               </div>
               {customDaysOpen && (
                 <form className="flex items-center gap-1.5" onSubmit={e => {
                   e.preventDefault()
                   if (!customSinceDate) return
-                  const since = new Date(customSinceDate + 'T00:00:00')
-                  const n = Math.round((Date.now() - since.getTime()) / 86400000)
-                  if (Number.isFinite(n) && n >= 1 && n <= 365) setDays(n)
+                  setPeriod({ kind: 'since', since: customSinceDate })
                 }}>
                   <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>с</span>
                   <input type="date" value={customSinceDate} onChange={e => setCustomSinceDate(e.target.value)}
-                    max={new Date().toISOString().slice(0, 10)}
-                    min={new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)}
+                    max={almatyDateOf(Date.now())}
+                    min={shiftAlmatyDate(almatyDateOf(Date.now()), -(MAX_PERIOD_DAYS - 1))}
                     autoFocus
                     className="text-xs rounded-full px-3 py-1.5 outline-none"
                     style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
@@ -344,31 +391,49 @@ export default function KaspiShopFinance() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3 lg:gap-6">
-            <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
-            </div>
-            <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary?.orderCount ?? 0}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>заказов</div>
-            </div>
-            <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{Math.round(summary?.averageOrderValue ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ средний чек</div>
-            </div>
-          </div>
+          {(() => {
+            // «—» вместо нулей, когда Kaspi не ответил или сессия мертва: 0 ₸ это ложь.
+            const unknown = !summary || summary.sessionExpired || (summary.upstreamFailed && summary.orderCount === 0)
+            const dash = <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
+            // Телефон: выручка на всю ширину (7 и больше знаков не помещаются в треть
+            // карточки на 390 px и налезали на соседей), заказы и средний чек в два столбца (K39).
+            const numCls = 'font-black font-mono tabular-nums leading-tight min-w-0 [overflow-wrap:anywhere]'
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-4 lg:gap-6">
+                <div className="col-span-2 sm:col-span-1 min-w-0">
+                  <div className={`text-3xl lg:text-4xl ${numCls}`} style={{ color: 'var(--nav-text-primary)' }}>{unknown ? dash : summary!.totalRevenue.toLocaleString('ru-KZ')}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-2xl sm:text-3xl lg:text-4xl ${numCls}`} style={{ color: 'var(--nav-text-primary)' }}>{unknown ? dash : summary!.orderCount}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>заказов</div>
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-2xl sm:text-3xl lg:text-4xl ${numCls}`} style={{ color: 'var(--nav-text-primary)' }}>{unknown ? dash : Math.round(summary!.averageOrderValue).toLocaleString('ru-KZ')}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ средний чек</div>
+                </div>
+              </div>
+            )
+          })()}
           {summary?.truncated && (
-            <div className="text-[11px] mt-4" style={{ color: 'var(--nav-text-muted)' }}>Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
+            <div className="text-[11px] mt-4" style={{ color: 'var(--nav-text-muted)' }}>
+              {summary.newestFirst
+                ? `Период длиннее, чем мы успеваем загрузить: учтены самые свежие заказы (до 200 на статус, получено ${summary.fetchedOrders ?? 200}). Более ранние заказы периода в сумму не вошли.`
+                : `Kaspi отдаёт заказы не от новых к старым, а мы загружаем не больше 200 на статус, поэтому учтена только часть заказов периода. Суммы занижены.`}
+            </div>
           )}
         </motion.div>
 
         {summaryLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Считаем...</div>
         ) : !summary || summary.byDay.length === 0 ? (
-          <div className="nav-glass rounded-2xl p-8 text-center">
-            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период выполненных заказов нет.</div>
-          </div>
+          // «Заказов нет» только когда Kaspi ответил на все запросы: при сбое или мёртвой
+          // сессии это не правда, и баннер сверху уже объясняет причину.
+          loadError || summary?.upstreamFailed || summary?.sessionExpired ? null : (
+            <div className="nav-glass rounded-2xl p-8 text-center">
+              <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период выполненных заказов нет.</div>
+            </div>
+          )
         ) : (
           <>
             {/* xl+: график слева (2/3), список по дням справа (1/3); уже xl -- друг под другом */}

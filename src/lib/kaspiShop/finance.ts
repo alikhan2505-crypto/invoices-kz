@@ -1,4 +1,5 @@
-import { listOrders, Order, PAGE_SIZE } from './cabinetApi'
+import { listOrders, Order } from './cabinetApi'
+import { fetchRevenueOrders, windowStartForDays, almatyDateOf, KZ_OFFSET_MS } from './revenueOrders'
 import { computeAbc, computeAttributeSlices, AbcRow, AttributeSlice } from './salesAnalytics'
 
 // Real Kaspi cabinet's own nav has no finance section (confirmed live
@@ -18,12 +19,21 @@ export type FinanceSummary = {
   abc: AbcRow[]
   byColor: AttributeSlice[]
   bySize: AttributeSlice[]
+  // Окно выбора не закрыто целиком: Kaspi отдал не все заказы периода (потолок
+  // страниц, порядок листания не «новые первыми»). Суммы тогда занижены.
   truncated: boolean
   sessionExpired: boolean
   // Kaspi не ответил (не-2xx, таймаут, неверная форма) хотя бы на одной странице
   // заказов: суммы выше посчитаны по неполным данным или не посчитаны вовсе, и
   // экран обязан сказать об этом, а не показывать 0 ₸ / «заказов нет» (аудит K35).
   upstreamFailed: boolean
+  // С какой даты (по Алматы, YYYY-MM-DD, включительно) посчитан период.
+  periodFrom: string
+  // Сколько заказов получено от Kaspi до отбора по окну и в каком порядке они шли
+  // (newestFirst подтверждён по данным): нужно, чтобы подпись про неполноту была
+  // точной, а не «последние 200».
+  fetchedOrders: number
+  newestFirst: boolean
 }
 
 export type BehavioralAnalytics = {
@@ -41,7 +51,6 @@ export type BehavioralAnalytics = {
 // offset (no DST observed) before reading UTC getters gives a real,
 // environment-independent Kazakhstan-local hour/weekday/day-of-month
 // instead of silently reporting UTC ones.
-const KZ_OFFSET_MS = 5 * 60 * 60 * 1000
 function toKzLocal(iso: string): Date {
   return new Date(new Date(iso).getTime() + KZ_OFFSET_MS)
 }
@@ -138,60 +147,33 @@ export function computeBehavioralAnalytics(orders: Order[]): BehavioralAnalytics
   return { byWeekday, byHour, beforePayday, afterPayday, genderEstimate, holidayOrders }
 }
 
-// Only these two statuses represent fulfilled/completed orders -- an order
-// still in NEW or UPAKOVKA hasn't happened yet and shouldn't count as
-// revenue.
-const REVENUE_STATUSES = ['KASPI_DELIVERY_TRANSMITTED', 'ARCHIVED']
-
-// Per status, per request -- a real, deliberate v1 limit, not an oversight.
-// A seller past this volume in the selected window sees a totalRevenue
-// computed from a subset, with truncated:true telling the UI to say so.
-const MAX_PAGES_PER_STATUS = 20
+export type FinanceOptions = {
+  // Начало окна (мс). Не задано -- последние sinceDays суток по Алматы, считая сегодняшние.
+  windowStartMs?: number
+  // Ключ кэша (id подключения). Без ключа кэша нет.
+  cacheKey?: string
+  nowMs?: number
+}
 
 export async function computeFinanceSummary(
   sessionCookies: string,
   merchantId: string,
   sinceDays: number,
-  listOrdersFn: typeof listOrders = listOrders
+  listOrdersFn: typeof listOrders = listOrders,
+  opts: FinanceOptions = {}
 ): Promise<FinanceSummary> {
-  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000
-  const allOrders: Order[] = []
-  let truncated = false
-  let sessionExpired = false
-  let upstreamFailed = false
+  const nowMs = opts.nowMs ?? Date.now()
+  const cutoffMs = opts.windowStartMs ?? windowStartForDays(sinceDays, nowMs)
+  const fetched = await fetchRevenueOrders(sessionCookies, merchantId, cutoffMs, listOrdersFn, { cacheKey: opts.cacheKey, nowMs })
+  const { truncated, sessionExpired, upstreamFailed } = fetched
 
-  statusLoop: for (const status of REVENUE_STATUSES) {
-    let page = 0
-    let fetchedForStatus = 0
-    let totalForStatus = 0
-    while (page < MAX_PAGES_PER_STATUS) {
-      const result = await listOrdersFn(sessionCookies, merchantId, status, page)
-      if (result.sessionExpired) {
-        // A dead session won't recover mid-loop -- stop paginating
-        // entirely rather than burning MAX_PAGES_PER_STATUS more 401s.
-        sessionExpired = true
-        break statusLoop
-      }
-      if (result.failed) {
-        // Сбой страницы НЕ превращается в «заказов нет» и не затирает totalForStatus нулём:
-        // всё, что набрано, помечено как неполное. Дальше не листаем (Kaspi уже не отвечает).
-        upstreamFailed = true
-        break statusLoop
-      }
-      allOrders.push(...result.orders)
-      fetchedForStatus += result.orders.length
-      totalForStatus = result.total
-      page += 1
-      if (result.orders.length < PAGE_SIZE) break // real last page (short of a full page)
-    }
-    if (fetchedForStatus < totalForStatus) truncated = true
-  }
-
-  const inWindow = allOrders.filter(o => new Date(o.creationTime).getTime() >= cutoffMs)
+  const inWindow = fetched.orders.filter(o => Date.parse(o.creationTime) >= cutoffMs)
 
   const byDayMap = new Map<string, { revenue: number; orderCount: number; unitsSold: number }>()
   for (const o of inWindow) {
-    const date = o.creationTime.slice(0, 10) // YYYY-MM-DD, real creationTime is ISO 8601
+    // Сутки по Алматы, как часы и дни недели ниже (раньше шли сутки UTC: заказ в 02:30
+    // по Алматы попадал в предыдущую дату).
+    const date = toKzLocal(o.creationTime).toISOString().slice(0, 10)
     const bucket = byDayMap.get(date) || { revenue: 0, orderCount: 0, unitsSold: 0 }
     bucket.revenue += o.totalPrice
     bucket.orderCount += 1
@@ -209,5 +191,11 @@ export async function computeFinanceSummary(
   const abc = computeAbc(inWindow)
   const { byColor, bySize } = computeAttributeSlices(inWindow)
 
-  return { totalRevenue, orderCount, averageOrderValue, byDay, behavioral, abc, byColor, bySize, truncated, sessionExpired, upstreamFailed }
+  return {
+    totalRevenue, orderCount, averageOrderValue, byDay, behavioral, abc, byColor, bySize,
+    truncated, sessionExpired, upstreamFailed,
+    periodFrom: almatyDateOf(cutoffMs),
+    fetchedOrders: fetched.fetchedCount,
+    newestFirst: fetched.newestFirst,
+  }
 }

@@ -118,7 +118,7 @@ describe('importCatalogProducts: result honesty (K22)', () => {
     fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: true, sessionExpired: false })
     const result = await importCatalogProducts('conn', 'user', 'cookie', 'm')
     expect(result.imported).toBe(1)
-    expect(result.total).toBe(1)
+    expect(result.total).toBe(0) // неизвестно: прочитанный кусок не общее число товаров
     expect(result.complete).toBe(false)
   })
 
@@ -127,5 +127,23 @@ describe('importCatalogProducts: result honesty (K22)', () => {
     fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: true, sessionExpired: false })
     const result = await importCatalogProducts('conn', 'user', 'cookie', 'm')
     expect(result).toMatchObject({ imported: 2, total: 2, skipped: 0, complete: true, sessionExpired: false })
+  })
+})
+
+describe('importCatalogProducts: total при оборванном списке', () => {
+  it('список оборвался: imported есть, а total неизвестен (0), чтобы не писать «из N» по прочитанному куску', async () => {
+    listCatalogWithStatus.mockResolvedValue({ offers: [offer('a'), offer('b')], sessionExpired: false, complete: false, failed: false, error: 'Kaspi ответил HTTP 500' })
+    fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: true, sessionExpired: false })
+    const result = await importCatalogProducts('conn', 'user', 'cookie', 'm')
+    expect(result.imported).toBe(2)
+    expect(result.complete).toBe(false)
+    expect(result.total).toBe(0)
+  })
+
+  it('список полный: total = сколько вернул Kaspi', async () => {
+    listCatalogWithStatus.mockResolvedValue(okList([offer('a'), offer('b'), offer('c')]))
+    fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: true, sessionExpired: false })
+    const result = await importCatalogProducts('conn', 'user', 'cookie', 'm')
+    expect(result).toMatchObject({ imported: 3, total: 3, complete: true })
   })
 })

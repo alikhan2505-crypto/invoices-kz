@@ -20,13 +20,18 @@ const h = vi.hoisted(() => ({
   debits: [] as any[],
   debitThrows: false,
   accessDenied: new Set<string>(),
+  notifyProfileCalls: 0,
+  markExpiredCalls: [] as string[],
+  markExpiredThrows: false,
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from(table: string) {
-      let op: 'select' | 'update' | 'insert' = 'select'
+      let op: 'select' | 'update' | 'insert' | 'delete' = 'select'
       let payload: any = {}
+      let newestFirst = false
+      let limitN: number | null = null
       const filters: Array<(r: any) => boolean> = []
       const rows = () => (h.tables[table] ||= [])
       const embed = (r: any) => {
@@ -39,12 +44,16 @@ vi.mock('@supabase/supabase-js', () => ({
         if (op === 'insert') {
           const failure = h.insertFailure?.(table, payload)
           if (failure) return { data: null, error: failure }
-          rows().push({ ...payload })
+          if (Array.isArray(payload)) rows().push(...payload.map(r => ({ ...r })))
+          else rows().push({ ...payload })
           return { data: null, error: null }
         }
         if (op === 'select' && h.failSelectTable === table) return { data: null, error: { message: 'boom' } }
-        const hit = rows().filter(r => filters.every(f => f(r)))
+        let hit = rows().filter(r => filters.every(f => f(r)))
+        if (newestFirst) hit = [...hit].reverse()
+        if (limitN !== null) hit = hit.slice(0, limitN)
         if (op === 'update') for (const r of hit) Object.assign(r, payload)
+        if (op === 'delete') h.tables[table] = rows().filter(r => !hit.includes(r))
         const out = hit.map(embed)
         if (mode === 'many') return { data: out, error: null }
         if (mode === 'single' && out.length === 0) return { data: null, error: { message: 'no rows' } }
@@ -54,11 +63,13 @@ vi.mock('@supabase/supabase-js', () => ({
         select() { return b },
         update(p: any) { op = 'update'; payload = p; return b },
         insert(p: any) { op = 'insert'; payload = p; return b },
+        delete() { op = 'delete'; return b },
         eq(c: string, v: any) { filters.push(r => r[c] === v); return b },
         in(c: string, vs: any[]) { filters.push(r => vs.includes(r[c])); return b },
         gte(c: string, v: any) { filters.push(r => r[c] !== undefined && r[c] !== null && r[c] >= v); return b },
         or() { return b },
-        order() { return b },
+        order(_c: string, o?: { ascending?: boolean }) { newestFirst = o?.ascending === false; return b },
+        limit(n: number) { limitN = n; return b },
         maybeSingle: () => Promise.resolve(run('maybeSingle')),
         single: () => Promise.resolve(run('single')),
         then: (res: any, rej: any) => Promise.resolve(run('many')).then(res, rej),
@@ -80,7 +91,16 @@ vi.mock('./wallet', () => ({
     return 0
   },
 }))
-vi.mock('./connection', () => ({ getKey: () => Buffer.alloc(32) }))
+vi.mock('./connection', () => ({
+  getKey: () => Buffer.alloc(32),
+  // Настоящий markSessionExpired пишет статус и шлёт продавцу уведомление; здесь только статус и журнал вызовов.
+  markSessionExpired: async (connectionId: string) => {
+    h.markExpiredCalls.push(connectionId)
+    if (h.markExpiredThrows) throw new Error('markSessionExpired failed')
+    const c = (h.tables.kaspi_shop_connections || []).find(x => x.id === connectionId)
+    if (c) c.session_status = 'session_expired'
+  },
+}))
 vi.mock('@/lib/kaspiPay/crypto', () => ({ decryptAtRest: () => Buffer.from('cookie=1') }))
 vi.mock('./cabinetPricePush', () => ({
   pushOfferState: async (params: any) => {
@@ -97,7 +117,7 @@ vi.mock('./planGate', () => ({
     items.filter(i => profiles.get(ownerOf(i) as string)?.ok),
 }))
 vi.mock('@/lib/telegramNotify', () => ({ sendTelegramNotification: async () => true }))
-vi.mock('@/lib/notificationPrefsServer', () => ({ isMissingSchemaError: () => false, loadNotifyProfile: async () => null }))
+vi.mock('@/lib/notificationPrefsServer', () => ({ isMissingSchemaError: () => false, loadNotifyProfile: async () => { h.notifyProfileCalls += 1; return null } }))
 
 import { applyPriceCheckResult, getDueTrackedProducts, isSessionActive } from './checkCycle'
 
@@ -139,6 +159,9 @@ beforeEach(() => {
   h.debits = []
   h.debitThrows = false
   h.accessDenied = new Set()
+  h.notifyProfileCalls = 0
+  h.markExpiredCalls = []
+  h.markExpiredThrows = false
   seed()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -352,6 +375,18 @@ describe('applyPriceCheckResult: a price is recorded only after Kaspi accepted i
     expect(h.tables.kaspi_shop_connections[0].session_status).toBe('session_expired')
     expect(product().own_current_price).toBe(1000)
     expect(checks()[0].action).toBe('push_failed')
+    // Продавца предупреждает markSessionExpired (Telegram + колокольчик), а не только запись статуса.
+    expect(h.markExpiredCalls).toEqual(['c1'])
+  })
+
+  it('a failing markSessionExpired does not crash the cycle: still a push_failed, free', async () => {
+    h.pushResult = { success: false, reason: 'session_expired', message: 'HTTP 401' }
+    h.markExpiredThrows = true
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.markExpiredCalls).toEqual(['c1'])
+    expect(checks()[0].action).toBe('push_failed')
+    expect(h.debits).toHaveLength(0)
+    expect(product().own_current_price).toBe(1000)
   })
 
   it('a push that hit the 250 per 30 min budget is a push_failed (price kept)', async () => {
@@ -382,20 +417,230 @@ describe('applyPriceCheckResult: a price is recorded only after Kaspi accepted i
     expect(checks()[0].action).toBe('push_failed')
   })
 
-  it('without city rows there is nothing to push to: push_failed, no price written, no charge', async () => {
-    seed({ cityRows: [] })
-    await applyPriceCheckResult('p1', legacyOffer(900), null)
-    expect(h.pushCalls).toHaveLength(0)
-    expect(product().own_current_price).toBe(1000)
-    expect(checks()[0].action).toBe('push_failed')
-    expect(h.debits).toHaveLength(0)
-  })
-
   it('respects maxPrice end to end: a competitor above the ceiling is pushed at the ceiling', async () => {
     seed({ product: { max_price: 20000, own_current_price: 15000, floor_price: 5000 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 15000, no_competitor_streak: 0 }] })
     await applyPriceCheckResult('p1', legacyOffer(50000), null)
     expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 20000 }])
     expect(product().own_current_price).toBe(20000)
+  })
+})
+
+describe('applyPriceCheckResult: legacy branch heals desynced products (engine2, item 1)', () => {
+  it('own price 950, city row and Kaspi at 1000, decision 950: pushes, fixes the city row, charges once', async () => {
+    seed({ product: { own_current_price: 950 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 1000, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', legacyOffer(1050), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 950 }])
+    expect(h.tables.kaspi_shop_product_city_prices[0]).toMatchObject({ own_current_price: 950 })
+    expect(h.tables.kaspi_shop_product_city_prices[0].last_pushed_at).toBeTruthy()
+    expect(product().own_current_price).toBe(950)
+    expect(checks()).toHaveLength(1)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1, own_price_before: 950, own_price_after: 950 })
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('the cycle after the heal is a plain no_change: no second push, charged once more as usual', async () => {
+    seed({ product: { own_current_price: 950 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 1000, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', legacyOffer(1050), null)
+    await applyPriceCheckResult('p1', legacyOffer(1050), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(checks().map(c => c.action)).toEqual(['updated', 'no_change'])
+    expect(h.debits).toHaveLength(2)
+  })
+
+  it('a failed heal push keeps everything, is push_failed and free; the next cycle retries and heals', async () => {
+    seed({ product: { own_current_price: 950 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 1000, no_competitor_streak: 0 }] })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 502' }
+    await applyPriceCheckResult('p1', legacyOffer(1050), null)
+    expect(checks()[0]).toMatchObject({ action: 'push_failed', credit_cost: 0 })
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(1000)
+    expect(h.debits).toHaveLength(0)
+    h.pushResult = { success: true }
+    await applyPriceCheckResult('p1', legacyOffer(1050), null)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(950)
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('one stale city among synced ones triggers a push that carries every city', async () => {
+    seed({
+      product: { own_current_price: 1000 },
+      cityRows: [
+        { tracked_product_id: 'p1', city_code: 'A', own_current_price: 1000, no_competitor_streak: 0 },
+        { tracked_product_id: 'p1', city_code: 'B', own_current_price: 1200, no_competitor_streak: 0 },
+      ],
+    })
+    await applyPriceCheckResult('p1', legacyOffer(1100), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: 'A', value: 1000 }, { cityId: 'B', value: 1000 }])
+  })
+
+  it('everything in sync and nothing to change: still no push', async () => {
+    await applyPriceCheckResult('p1', legacyOffer(1100), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 1 })
+  })
+})
+
+describe('applyPriceCheckResult: legacy product without city rows (engine2, item 2)', () => {
+  it('no rows and no known point cities: ONE error row, no push, no price written, no charge, last_checked_at moves', async () => {
+    seed({ cityRows: [] })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(product().own_current_price).toBe(1000)
+    expect(product().last_checked_at).toBeTruthy()
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(0)
+    expect(checks()).toHaveLength(1)
+    expect(checks()[0]).toMatchObject({ action: 'error', credit_cost: 0, own_price_before: 1000, own_price_after: 1000 })
+    expect(checks()[0].error_message).toContain('Обновить каталог')
+  })
+
+  it('the same skip on the next cycles does not write a row every time (was one push_failed row per cycle)', async () => {
+    seed({ cityRows: [] })
+    for (let i = 0; i < 5; i++) await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(checks()).toHaveLength(1)
+    expect(h.debits).toHaveLength(0)
+    expect(checks().some(c => c.action === 'push_failed')).toBe(false)
+  })
+
+  it('a competitor-less cycle with no rows is the same skip, not a charged no_change', async () => {
+    seed({ cityRows: [] })
+    await applyPriceCheckResult('p1', { competitorOffers: [] }, null)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0].action).toBe('error')
+  })
+
+  it('no rows but known point cities: rows are created from them, the price is pushed and recorded', async () => {
+    seed({ product: { point_city_codes: ['750000000', '710000000'] }, cityRows: [] })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    const rows = h.tables.kaspi_shop_product_city_prices
+    expect(rows.map(r => r.city_code).sort()).toEqual(['710000000', '750000000'])
+    expect(h.pushCalls).toHaveLength(1)
+    expect([...h.pushCalls[0].cityPrices].sort((a: any, b: any) => a.cityId.localeCompare(b.cityId))).toEqual([{ cityId: '710000000', value: 800 }, { cityId: '750000000', value: 800 }])
+    expect(rows.every(r => r.own_current_price === 800 && r.last_pushed_at)).toBe(true)
+    expect(product().own_current_price).toBe(800)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('push failed right after creating the rows: the created rows are removed, so nothing looks confirmed and nothing is charged', async () => {
+    seed({ product: { point_city_codes: ['750000000', '710000000'] }, cityRows: [] })
+    h.pushResult = { success: false, reason: 'error', message: 'HTTP 500' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'push_failed', credit_cost: 0 })
+    expect(h.debits).toHaveLength(0)
+    expect(product().own_current_price).toBe(1000)
+  })
+
+  it('the next cycle after that failure creates the rows again and pushes, even when the decided price equals the product price', async () => {
+    seed({ product: { point_city_codes: ['750000000'] }, cityRows: [] })
+    h.pushResult = { success: false, reason: 'error', message: 'HTTP 500' }
+    await applyPriceCheckResult('p1', legacyOffer(1100), null) // решение = 1000 = цена товара
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(0)
+    h.pushResult = { success: true }
+    h.pushCalls = []
+    await applyPriceCheckResult('p1', legacyOffer(1100), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 1000 }])
+    const rows = h.tables.kaspi_shop_product_city_prices
+    expect(rows).toHaveLength(1)
+    expect(rows[0].last_pushed_at).toBeTruthy()
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('push failure with PRE-EXISTING city rows leaves those rows alone', async () => {
+    seed()
+    h.pushResult = { success: false, reason: 'error', message: 'HTTP 500' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(1)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(1000)
+  })
+
+  it('failing to create the city rows is its own message, not the «Обновить каталог» one, free and unpushed', async () => {
+    seed({ product: { point_city_codes: ['750000000'] }, cityRows: [] })
+    h.insertFailure = table => (table === 'kaspi_shop_product_city_prices' ? { message: 'insert failed' } : null)
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0].action).toBe('error')
+    expect(checks()[0].error_message).toContain('Не удалось подготовить цены по городам')
+    expect(checks()[0].error_message).toContain('повторим на следующей проверке')
+    expect(checks()[0].error_message).not.toContain('Обновить каталог')
+  })
+
+  it('created rows are pushed even when the decided price equals the product price (Kaspi side is unknown)', async () => {
+    seed({ product: { point_city_codes: ['750000000'] }, cityRows: [] })
+    await applyPriceCheckResult('p1', legacyOffer(1100), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 1000 }])
+  })
+
+  it('excluded point cities get rows but are not pushed', async () => {
+    seed({ product: { point_city_codes: ['750000000', '710000000'], excluded_city_codes: ['710000000'] }, cityRows: [] })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 800 }])
+  })
+
+  it('every city excluded: a distinct skip with its own text, no charge', async () => {
+    seed({ product: { excluded_city_codes: ['750000000'] } })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0].action).toBe('error')
+    expect(checks()[0].error_message).toContain('исключены')
+  })
+
+  it('a different later error is still logged (the dedupe only collapses an identical last row)', async () => {
+    seed({ cityRows: [] })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    await applyPriceCheckResult('p1', null, 'HTTP 429')
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(checks()).toHaveLength(3)
+  })
+})
+
+describe('applyPriceCheckResult: a push_failed cycle does not claim the floor (engine2, item 3)', () => {
+  const perCityFloor = { perCityOffers: { '750000000': [{ merchantId: 'X', price: 900 }] } }
+
+  it('legacy: floor binds, push refused: held_at_floor stays false, no floor alert', async () => {
+    seed({ product: { floor_price: 950 } })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 503' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(checks()[0].action).toBe('push_failed')
+    expect(product().held_at_floor).toBe(false)
+    expect(h.notifyProfileCalls).toBe(0)
+  })
+
+  it('per-city: floor binds, push refused: held_at_floor stays false, no floor alert', async () => {
+    seed({ product: { floor_price: 950 } })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 503' }
+    await applyPriceCheckResult('p1', perCityFloor, null)
+    expect(checks()[0].action).toBe('push_failed')
+    expect(product().held_at_floor).toBe(false)
+    expect(h.notifyProfileCalls).toBe(0)
+  })
+
+  it('a previously true held_at_floor is not overwritten by a failed push either', async () => {
+    seed({ product: { floor_price: 950, held_at_floor: true } })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 503' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(product().held_at_floor).toBe(true)
+  })
+
+  it('legacy: when the push succeeds the floor is recorded and the alert path runs', async () => {
+    seed({ product: { floor_price: 950 } })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(checks()[0].action).toBe('held_at_floor')
+    expect(product().held_at_floor).toBe(true)
+    expect(h.notifyProfileCalls).toBe(1)
+  })
+
+  it('per-city: when the push succeeds the floor is recorded and the alert path runs', async () => {
+    seed({ product: { floor_price: 950 } })
+    await applyPriceCheckResult('p1', perCityFloor, null)
+    expect(product().held_at_floor).toBe(true)
+    expect(h.notifyProfileCalls).toBe(1)
   })
 })
 

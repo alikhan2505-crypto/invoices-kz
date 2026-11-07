@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
+import { readMoneyBody } from '@/lib/kaspiShop/moneyBody'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
@@ -27,10 +28,12 @@ export async function PATCH(req: NextRequest) {
   if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
-  const commissionRatePercent = body?.commissionRatePercent === null ? null : Number(body?.commissionRatePercent)
-  if (commissionRatePercent !== null && !(commissionRatePercent >= 0 && commissionRatePercent <= 100)) {
+  // null -- осознанное «сбросить ставку»; нечисловое значение это ошибка, а не сброс (K34).
+  const rate = readMoneyBody(body?.commissionRatePercent, { nullable: true, min: 0, max: 100 })
+  if (!rate.ok) {
     return NextResponse.json({ error: 'Ставка комиссии должна быть от 0 до 100' }, { status: 400 })
   }
+  const commissionRatePercent = rate.value
 
   const connection = await loadConnection(user.id)
   if (!connection) return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })

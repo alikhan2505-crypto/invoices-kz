@@ -33,5 +33,9 @@ export async function GET(req: NextRequest) {
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
   }
+  // Сбой Kaspi это не «показателей нет»: 502 с причиной, страница покажет ошибку.
+  if (result.failed || !result.overview) {
+    return NextResponse.json({ error: `Не удалось получить показатели качества от Kaspi${result.error ? ` (${result.error})` : ''}. Повторите позже.` }, { status: 502 })
+  }
   return NextResponse.json({ overview: result.overview })
 }

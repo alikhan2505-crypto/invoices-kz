@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   // Теперь неполный импорт (ответ Kaspi оборвался, часть товаров не записана) это 502 с цифрами.
   if (!result.complete) {
     const done = result.imported > 0
-      ? `Обновлено ${result.imported}${result.total > 0 ? ` из ${result.total}` : ''} товар(ов), остальное не получено`
+      ? `Обновлено ${result.imported}${result.total > 0 ? ` из ${result.total}` : ''} товар(ов), остальные не обновлены`
       : 'Каталог не обновлён'
     return NextResponse.json({
       error: `${done}${result.error ? ` (${result.error})` : ''}. Повторите через минуту.`,

@@ -369,6 +369,11 @@ export const notificationEventTexts: Record<NotificationEventKey, EventTexts> = 
     kk: { label: 'Баға ең төменгі шекке жетті', desc: 'Бәсекелес арзанырақ, ал сіздің ең төмен бағаңыздан түсіруге болмайды. Бір тауарға тәулігіне бір реттен жиі емес.', requires: 'Про тарифі' },
     en: { label: 'Price hit your minimum', desc: 'A competitor is cheaper, but the price can’t go below your minimum. At most once a day per product.', requires: 'Pro plan' },
   },
+  kaspi_session_expired: {
+    ru: { label: 'Сессия кабинета Kaspi истекла', desc: 'Kaspi разлогинил кабинет: цены не меняются и заказы не загружаются, пока вы не переподключите магазин. Не чаще раза в сутки и не больше трёх раз за один обрыв; в приложении появляется ещё и уведомление.', requires: 'тариф Про' },
+    kk: { label: 'Kaspi кабинетінің сессиясы аяқталды', desc: 'Kaspi кабинеттен шығарып тастады: дүкенді қайта қоспайынша бағалар өзгермейді, тапсырыстар жүктелмейді. Тәулігіне бір реттен жиі емес және бір үзіліске үш реттен артық емес; қосымшада хабарландыру да шығады.', requires: 'Про тарифі' },
+    en: { label: 'Kaspi cabinet session expired', desc: 'Kaspi signed the cabinet out: prices stop changing and orders stop loading until you reconnect the store. At most once a day and three times per outage; an in-app notice appears too.', requires: 'Pro plan' },
+  },
   // ---------- ИИ-агент ----------
   ai_operator_requested: {
     ru: { label: 'Клиент попросил оператора', desc: 'Клиент хочет говорить с человеком — агент замолчал в этом диалоге.' },

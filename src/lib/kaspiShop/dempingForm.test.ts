@@ -3,7 +3,7 @@ import {
   CHECK_PRICE_TENGE, CRON_INTERVAL_MINUTES, effectiveCheckPeriodMinutes, checksPerDay, dailyCostPerProduct,
   estimateDailyCost, lowBalanceWarning, runwayHours, runwayLabel, periodLabel, applyNowConfirmText,
   applyNowSuccessText, parseApplyNowResponse, apiErrorMessage, validateProductSettings, validateBulkSettings,
-  suggestionBlockReason, pluralProducts,
+  suggestionBlockReason, pluralProducts, isBilledProduct, isFloorFarResponse, floorFarConfirmText, catalogSyncShouldReload,
 } from './dempingForm'
 
 // wallet.ts тянет серверный клиент Supabase: подменяем нижний слой, нужна только константа.
@@ -24,15 +24,33 @@ describe('реальный период проверки (запуски раз 
     expect(effectiveCheckPeriodMinutes(15)).toBe(20)
   })
 
-  it('кратные 10 остаются, остальные округляются вверх до следующего запуска', () => {
-    expect(effectiveCheckPeriodMinutes(10)).toBe(10)
-    expect(effectiveCheckPeriodMinutes(20)).toBe(20)
+  it('кратные 10 проверяются на втором тике: last_checked_at пишется В СЕРЕДИНЕ запуска (10 -> 20, 20 -> 30)', () => {
+    expect(effectiveCheckPeriodMinutes(10)).toBe(20)
+    expect(effectiveCheckPeriodMinutes(20)).toBe(30)
+    expect(effectiveCheckPeriodMinutes(60)).toBe(70)
+  })
+
+  it('остальные округляются вверх до следующего запуска', () => {
+    expect(effectiveCheckPeriodMinutes(5)).toBe(10)
+    expect(effectiveCheckPeriodMinutes(12)).toBe(20)
     expect(effectiveCheckPeriodMinutes(21)).toBe(30)
-    expect(effectiveCheckPeriodMinutes(60)).toBe(60)
+  })
+
+  it('совпадает с настоящим isCheckDue: товар, записанный посреди запуска, созревает именно на этом тике', async () => {
+    // Симуляция: тики cron каждые 10 минут, запись last_checked_at через 2 минуты после тика.
+    const { isCheckDue } = await import('./checkCycle')
+    const MIN = 60_000
+    for (const freq of [5, 10, 15, 20, 25, 30, 45, 60]) {
+      const wroteAt = 2 * MIN
+      let tick = 10
+      while (!isCheckDue(new Date(wroteAt).toISOString(), freq, tick * MIN)) tick += 10
+      // реальный интервал от записи до следующей проверки: tick - 2; нижняя граница
+      // из формулы не больше (tick) и не меньше реального периода от тика до тика
+      expect(effectiveCheckPeriodMinutes(freq)).toBe(tick)
+    }
   })
 
   it('чаще раза в 10 минут не бывает; пустое и мусор = значение по умолчанию (15, то есть 20)', () => {
-    expect(effectiveCheckPeriodMinutes(5)).toBe(10)
     expect(effectiveCheckPeriodMinutes(1)).toBe(10)
     expect(effectiveCheckPeriodMinutes(null)).toBe(20)
     expect(effectiveCheckPeriodMinutes(undefined)).toBe(20)
@@ -61,11 +79,11 @@ describe('estimateDailyCost', () => {
       { enabled: true, check_frequency_minutes: 10 },
       { enabled: true, check_frequency_minutes: 60 },
     ])
-    expect(e.minPeriod).toBe(10)
-    expect(e.maxPeriod).toBe(60)
-    expect(e.dailyCost).toBe(144 * 5 + 24 * 5)
-    expect(periodLabel(e.minPeriod, e.maxPeriod)).toBe('от 10 до 60 мин')
-    expect(periodLabel(20, 20)).toBe('около 20 мин')
+    expect(e.minPeriod).toBe(20)
+    expect(e.maxPeriod).toBe(70)
+    expect(e.dailyCost).toBe(72 * 5 + 21 * 5)
+    expect(periodLabel(e.minPeriod, e.maxPeriod)).toBe('не чаще, чем раз в 20-70 мин, в зависимости от товара')
+    expect(periodLabel(20, 20)).toBe('не чаще, чем раз в 20 мин')
   })
 
   it('нет включённых: нули', () => {
@@ -76,6 +94,67 @@ describe('estimateDailyCost', () => {
   it('100 товаров в массовом режиме: 36 000 ₸ в сутки (пример из аудита)', () => {
     const e = estimateDailyCost(Array.from({ length: 100 }, () => ({ enabled: true, check_frequency_minutes: 15 })))
     expect(e.dailyCost).toBe(36000)
+  })
+})
+
+describe('estimateDailyCost: товары, снятые с продажи, не списывают', () => {
+  it('available_for_sale = false не считается; null и пусто считаются в продаже', () => {
+    const e = estimateDailyCost([
+      { enabled: true, available_for_sale: true, check_frequency_minutes: 15 },
+      { enabled: true, available_for_sale: null, check_frequency_minutes: 15 },
+      { enabled: true, check_frequency_minutes: 15 },
+      { enabled: true, available_for_sale: false, check_frequency_minutes: 15 },
+      { enabled: true, available_for_sale: false, check_frequency_minutes: 15 },
+    ])
+    expect(e.count).toBe(3)
+    expect(e.dailyCost).toBe(3 * 360)
+  })
+
+  it('isBilledProduct совпадает с серверным условием apply-now (enabled и не false)', () => {
+    expect(isBilledProduct({ enabled: true })).toBe(true)
+    expect(isBilledProduct({ enabled: true, available_for_sale: false })).toBe(false)
+    expect(isBilledProduct({ enabled: false, available_for_sale: true })).toBe(false)
+  })
+
+  it('плашка «баланс заканчивается» считается только по товарам в продаже', () => {
+    const onlyOffSale = estimateDailyCost([{ enabled: true, available_for_sale: false }])
+    expect(lowBalanceWarning(0, onlyOffSale, false)).toBeNull()
+  })
+})
+
+describe('floor_far_above_price: подтверждение', () => {
+  it('минимум выше цены: вопрос с числами', () => {
+    const data = { code: 'floor_far_above_price', field: 'floor_price', floorPrice: 60000, ownPrice: 2000, factor: 3 }
+    expect(isFloorFarResponse(400, data)).toBe(true)
+    const t = floorFarConfirmText(data)!
+    expect(t).toContain('Минимум 60')
+    expect(t).toContain('выше текущей цены 2')
+    expect(t).toContain('более чем в 3 раза')
+    expect(t).toContain('Цена сразу поднимется до минимума. Сохранить?')
+  })
+
+  it('максимум ниже цены: вопрос про максимум', () => {
+    const t = floorFarConfirmText({ code: 'floor_far_above_price', field: 'max_price', maxPrice: 600, ownPrice: 2000, factor: 3 })!
+    expect(t).toContain('Максимум 600 ₸ ниже текущей цены')
+    expect(t).toContain('Цена сразу опустится до максимума')
+  })
+
+  it('другие ответы и ответ без чисел не открывают подтверждение', () => {
+    expect(isFloorFarResponse(500, { code: 'floor_far_above_price' })).toBe(false)
+    expect(isFloorFarResponse(400, { error: 'x' })).toBe(false)
+    expect(floorFarConfirmText({ code: 'floor_far_above_price', field: 'floor_price' })).toBeNull()
+  })
+})
+
+describe('«Обновить каталог»: когда перечитывать список', () => {
+  it('успех и неполный импорт с записанными товарами: да', () => {
+    expect(catalogSyncShouldReload(true, { ok: true, imported: 0 })).toBe(true)
+    expect(catalogSyncShouldReload(false, { partial: true, imported: 200 })).toBe(true)
+  })
+  it('полный провал: нет', () => {
+    expect(catalogSyncShouldReload(false, { partial: true, imported: 0 })).toBe(false)
+    expect(catalogSyncShouldReload(false, { error: 'x' })).toBe(false)
+    expect(catalogSyncShouldReload(false, {})).toBe(false)
   })
 })
 

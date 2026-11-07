@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
+import { readMoneyBody } from '@/lib/kaspiShop/moneyBody'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
@@ -30,13 +31,15 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => null)
   const days = Number(body?.days)
-  const amount = Number(body?.amount)
+  const adParsed = readMoneyBody(body?.amount)
   // «Прочие расходы» периода (аренда, электроэнергия, упаковка…) --
   // optional so the legacy ad-only callers keep working; omitted = 0.
-  const otherAmount = body?.otherAmount === undefined ? 0 : Number(body?.otherAmount)
-  if (!VALID_DAYS.includes(days) || !(amount >= 0) || !(otherAmount >= 0)) {
+  const otherParsed = body?.otherAmount === undefined ? { ok: true as const, value: 0 } : readMoneyBody(body?.otherAmount)
+  if (!VALID_DAYS.includes(days) || !adParsed.ok || !otherParsed.ok) {
     return NextResponse.json({ error: 'days (7/30/90) и корректные amount/otherAmount обязательны' }, { status: 400 })
   }
+  const amount = adParsed.value as number
+  const otherAmount = otherParsed.value as number
 
   const connection = await loadConnection(user.id)
   if (!connection) return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
-import { computeReviewStats, filterByStars, RawReview } from '@/lib/kaspiShop/reviews'
+import { aggregateReviewCache, computeReviewStats, filterByStars, type ReviewCacheRow, type ReviewProduct } from '@/lib/kaspiShop/reviews'
 import { loadConnection } from '@/lib/kaspiShop/connection'
+import { claimDispatchSlot, releaseDispatchSlot } from '@/lib/kaspiShop/dispatchGuard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,48 +22,45 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-type AggregatedReview = RawReview & { trackedProductId: string; productName: string }
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
 
 // Scoped to the user's ACTIVE connection -- a user_id-wide query mixed both
 // stores' products once multi-store support landed (2026-08-21).
-async function loadAggregatedReviews(userId: string) {
+async function loadAggregatedReviews(userId: string, sinceIso: string | null) {
   const connection = await loadConnection(userId)
-  if (!connection) {
-    return { aggregated: [] as AggregatedReview[], fetchedAtValues: [] as string[], errorCount: 0 }
-  }
+  if (!connection) return aggregateReviewCache([], [], sinceIso)
   const { data: products, error: productsError } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('id, product_name, kaspi_master_sku')
     .eq('connection_id', connection.id)
   if (productsError) throw new Error(productsError.message)
 
-  const productIds = (products || []).map(p => p.id)
-  const nameById = new Map((products || []).map(p => [p.id, p.product_name as string]))
-
-  if (productIds.length === 0) {
-    return { aggregated: [] as AggregatedReview[], fetchedAtValues: [] as string[], errorCount: 0 }
-  }
+  const productList: ReviewProduct[] = (products || []).map(p => ({
+    id: p.id as string,
+    name: (p.product_name as string) || '',
+    masterSku: (p.kaspi_master_sku as string | null) || null,
+  }))
+  if (productList.length === 0) return aggregateReviewCache([], [], sinceIso)
 
   const { data: cacheRows, error: cacheError } = await supabase
     .from('kaspi_shop_product_reviews')
-    .select('tracked_product_id, reviews, fetch_error, fetched_at')
-    .in('tracked_product_id', productIds)
+    .select('tracked_product_id, reviews, fetch_error, fetched_at, avg_rating, total_count')
+    .in('tracked_product_id', productList.map(p => p.id))
   if (cacheError) throw new Error(cacheError.message)
 
-  const aggregated: AggregatedReview[] = []
-  const fetchedAtValues: string[] = []
-  let errorCount = 0
-  for (const row of cacheRows || []) {
-    if (row.fetched_at) fetchedAtValues.push(row.fetched_at as string)
-    if (row.fetch_error) errorCount += 1
-    const productName = nameById.get(row.tracked_product_id) || ''
-    const reviews = Array.isArray(row.reviews) ? (row.reviews as RawReview[]) : []
-    for (const r of reviews) {
-      aggregated.push({ ...r, trackedProductId: row.tracked_product_id, productName })
-    }
-  }
-
-  return { aggregated, fetchedAtValues, errorCount }
+  const rows: ReviewCacheRow[] = (cacheRows || []).map(r => ({
+    trackedProductId: r.tracked_product_id as string,
+    reviews: r.reviews,
+    fetchError: (r.fetch_error as string | null) || null,
+    fetchedAt: (r.fetched_at as string | null) || null,
+    avgRating: numOrNull(r.avg_rating),
+    totalCount: numOrNull(r.total_count),
+  }))
+  return aggregateReviewCache(productList, rows, sinceIso)
 }
 
 export async function GET(req: NextRequest) {
@@ -75,9 +73,14 @@ export async function GET(req: NextRequest) {
   const stars = starsParam ? Number(starsParam) : null
   const validStars = stars !== null && Number.isFinite(stars) && stars >= 1 && stars <= 5 ? stars : null
 
+  // since -- момент запуска обновления (его отдаёт POST): по нему считается прогресс
+  // ИМЕННО этого запуска, а не «самая свежая строка по всем товарам» (аудит K42).
+  const sinceParam = req.nextUrl.searchParams.get('since')
+  const sinceIso = sinceParam && Number.isFinite(Date.parse(sinceParam)) ? new Date(sinceParam).toISOString() : null
+
   let aggregation
   try {
-    aggregation = await loadAggregatedReviews(user.id)
+    aggregation = await loadAggregatedReviews(user.id, sinceIso)
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Не удалось загрузить отзывы' }, { status: 500 })
   }
@@ -90,11 +93,17 @@ export async function GET(req: NextRequest) {
   const reviews = filterByStars(aggregation.aggregated, validStars)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
-  const lastFetchedAt = aggregation.fetchedAtValues.length > 0
-    ? aggregation.fetchedAtValues.reduce((max, v) => (v > max ? v : max))
-    : null
-
-  return NextResponse.json({ stats, reviews, lastFetchedAt, productErrorCount: aggregation.errorCount })
+  // stats -- по загруженной выборке (до 50 самых популярных отзывов на товар: Kaspi
+  // принимает только сортировку POPULARITY). catalog -- настоящие числа карточек
+  // из total_count и avg_rating, средняя взвешена по числу отзывов (аудит K40).
+  return NextResponse.json({
+    stats,
+    catalog: aggregation.catalog,
+    reviews,
+    lastFetchedAt: aggregation.lastFetchedAt,
+    productErrorCount: aggregation.errorCount,
+    refresh: aggregation.refresh,
+  })
 }
 
 // Static -- this repo never changes owner/name, matching niches/request's
@@ -102,6 +111,11 @@ export async function GET(req: NextRequest) {
 const GITHUB_OWNER = 'alikhan2505-crypto'
 const GITHUB_REPO = 'invoices-kz'
 const GITHUB_WORKFLOW = 'kaspi-shop-reviews-check.yml'
+
+// Окно между запусками обновления отзывов: не короче самого длинного запуска
+// (timeout-minutes: 9 в workflow). Подробности -- dispatchGuard.ts.
+const REVIEWS_RUN_WINDOW_MS = 10 * 60_000
+const REVIEWS_PREFIX = 'kaspireviews'
 
 // Kaspi's review-view endpoint 429s from Vercel's IP ranges (confirmed live
 // 2026-08-21 -- 61/61 products failed identically), the same block class as
@@ -127,9 +141,16 @@ export async function POST(req: NextRequest) {
     .eq('connection_id', connection.id)
   if (productsError) return NextResponse.json({ error: productsError.message }, { status: 500 })
 
-  const withSku = (products || [])
-    .filter((p): p is { id: string; kaspi_master_sku: string } => !!p.kaspi_master_sku)
-    .map(p => ({ trackedProductId: p.id, masterSku: p.kaspi_master_sku }))
+  // По одному запросу в Kaspi на master SKU: после переподключения у SKU бывает
+  // несколько строк, и раньше раннер ходил за одним и тем же дважды.
+  const seenSkus = new Set<string>()
+  const withSku: { trackedProductId: string; masterSku: string }[] = []
+  for (const p of products || []) {
+    const sku = p.kaspi_master_sku as string | null
+    if (!sku || seenSkus.has(sku)) continue
+    seenSkus.add(sku)
+    withSku.push({ trackedProductId: p.id as string, masterSku: sku })
+  }
 
   if (withSku.length === 0) {
     return NextResponse.json({ error: 'Нет товаров с известным master SKU для проверки отзывов' }, { status: 400 })
@@ -141,22 +162,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Обновление отзывов временно недоступно' }, { status: 500 })
   }
 
-  const dispatchRes = await fetch(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ ref: 'main', inputs: { products: JSON.stringify(withSku) } }),
+  // Не чаще одного запуска за окно на продавца и без параллельных запусков (K42):
+  // каждый запуск до 9 минут ходит в Kaspi с одного IP раннера, токен общий.
+  // Слот занимаем ДО запуска и возвращаем, если GitHub отказал.
+  const claim = await claimDispatchSlot(supabase, REVIEWS_PREFIX, `${user.id}|${connection.id}`, REVIEWS_RUN_WINDOW_MS)
+  if (!claim.ok) {
+    if (claim.reason === 'running') {
+      // Слот держит прошлый запуск. Идёт он ещё или уже закончился, говорим по данным:
+      // если все карточки обновлены после его начала, это не «идёт», а «уже обновлено».
+      let finished = false
+      try {
+        const agg = await loadAggregatedReviews(user.id, claim.since)
+        finished = !!agg.refresh && agg.refresh.expected > 0 && agg.refresh.updated >= agg.refresh.expected
+      } catch { /* не смогли проверить: считаем, что идёт */ }
+      return NextResponse.json(
+        {
+          error: finished
+            ? `Отзывы уже обновлены. Новый запуск можно не раньше чем через ${Math.ceil(claim.retryAfterSeconds / 60)} мин.`
+            : 'Обновление отзывов уже идёт, дождитесь окончания. Страница сама покажет свежие данные.',
+          alreadyRunning: !finished,
+          retryAfterSeconds: claim.retryAfterSeconds,
+          since: claim.since,
+          dispatchedCount: withSku.length,
+        },
+        { status: 429, headers: { 'Retry-After': String(claim.retryAfterSeconds) } }
+      )
     }
-  )
-  if (!dispatchRes.ok) {
-    console.error('kaspi-shop reviews: GitHub dispatch failed', dispatchRes.status, await dispatchRes.text().catch(() => ''))
-    return NextResponse.json({ error: 'Не удалось запустить обновление отзывов' }, { status: 500 })
+    return NextResponse.json({ error: 'Не удалось проверить лимит запуска, попробуйте через минуту' }, { status: 503 })
   }
 
-  return NextResponse.json({ ok: true, dispatchedCount: withSku.length, skippedCount: (products || []).length - withSku.length }, { status: 202 })
+  let dispatchRes: Response | null = null
+  try {
+    dispatchRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main', inputs: { products: JSON.stringify(withSku) } }),
+      }
+    )
+  } catch (err: any) {
+    console.error('kaspi-shop reviews: GitHub dispatch threw', err?.message)
+  }
+  if (!dispatchRes || !dispatchRes.ok) {
+    if (dispatchRes) console.error('kaspi-shop reviews: GitHub dispatch failed', dispatchRes.status, await dispatchRes.text().catch(() => ''))
+    await releaseDispatchSlot(supabase, claim.slotKey)
+    return NextResponse.json({ error: 'Не удалось запустить обновление отзывов' }, { status: 502 })
+  }
+
+  // since -- серверное время запуска: по нему страница считает прогресс этого запуска.
+  return NextResponse.json({
+    ok: true,
+    dispatchedCount: withSku.length,
+    skippedCount: (products || []).filter(p => !p.kaspi_master_sku).length,
+    since: claim.since,
+  }, { status: 202 })
 }

@@ -92,7 +92,7 @@ describe('defaults = behaviour before notification_prefs', () => {
 
   it('telegram follows the old notify_telegram master switch', () => {
     for (const key of ['invoice_viewed', 'invoice_marked_paid', 'invoice_paid_kaspi', 'invoice_due_tomorrow', 'invoice_overdue',
-      'kaspi_daily_digest', 'kaspi_floor_price', 'ai_operator_requested', 'ai_review_draft', 'ai_wallet_empty',
+      'kaspi_daily_digest', 'kaspi_floor_price', 'kaspi_session_expired', 'ai_operator_requested', 'ai_review_draft', 'ai_wallet_empty',
       'ai_training_exit', 'ai_pro_lapsed', 'salon_booking_pending'] as const) {
       expect(wantsNotification(tgOn, key, 'telegram')).toBe(true)
       expect(wantsNotification({ ...tgOn, notify_telegram: false }, key, 'telegram')).toBe(false)

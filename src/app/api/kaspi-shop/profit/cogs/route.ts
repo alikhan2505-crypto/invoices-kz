@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
+import { readMoneyBody } from '@/lib/kaspiShop/moneyBody'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,10 +28,13 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => null)
   const trackedProductId = body?.trackedProductId
-  const cogsAmount = body?.cogsAmount === null ? null : Number(body?.cogsAmount)
-  if (cogsAmount !== null && !(cogsAmount >= 0)) {
+  // null -- осознанное «очистить себестоимость»; пустое, нечисловое и отрицательное
+  // значение это не «очистить», а ошибка (аудит K34).
+  const cogs = readMoneyBody(body?.cogsAmount, { nullable: true })
+  if (!cogs.ok) {
     return NextResponse.json({ error: 'Корректная cogsAmount обязательна' }, { status: 400 })
   }
+  const cogsAmount = cogs.value
 
   // Primary key for себестоимость is kaspi_master_sku (works for ANY sold
   // product, tracked in демпинг or not -- founder 2026-08-21: «не везде

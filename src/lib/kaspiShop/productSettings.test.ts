@@ -207,3 +207,79 @@ describe('partitionBulkRows (K18: one floor for products of different prices)', 
     expect(skipped).toEqual([])
   })
 })
+
+// Engine2: пол сильно выше цены (или максимум сильно ниже) -- вероятная опечатка.
+describe('validateProductPatch: floor far from the current price', () => {
+  const withOwn = { floor_price: 1000, max_price: 5000, own_current_price: 2000 }
+
+  it('floor more than 3x the price is refused with a stable code and the numbers', () => {
+    const r = validateProductPatch({ floor_price: 6001, max_price: null }, withOwn)
+    expect(r).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'floor_price', floorPrice: 6001, ownPrice: 2000, factor: 3 } })
+  })
+
+  it('exactly 3x is allowed', () => {
+    expect(validateProductPatch({ floor_price: 6000, max_price: null }, withOwn).ok).toBe(true)
+  })
+
+  it('floor 50000 for a 5000 item is refused (the typo case)', () => {
+    const r = validateProductPatch({ floor_price: '50000', max_price: null }, { floor_price: 1000, max_price: null, own_current_price: 5000 })
+    expect(r).toMatchObject({ ok: false, code: 'floor_far_above_price' })
+  })
+
+  it('confirmFloor: true lets it through and is not written into the patch', () => {
+    const r = validateProductPatch({ floor_price: 50000, max_price: null, confirmFloor: true }, { floor_price: 1000, max_price: null, own_current_price: 5000 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.patch.floor_price).toBe(50000)
+      expect('confirmFloor' in r.patch).toBe(false)
+    }
+  })
+
+  it.each(['true', 1, 'yes', null])('confirmFloor %p is not a confirmation', v => {
+    expect(validateProductPatch({ floor_price: 50000, max_price: null, confirmFloor: v }, { floor_price: 1000, max_price: null, own_current_price: 5000 })).toMatchObject({ ok: false, code: 'floor_far_above_price' })
+  })
+
+  it('max more than 3x below the price is refused; the details name the field', () => {
+    const r = validateProductPatch({ max_price: 1500 }, { floor_price: 100, max_price: null, own_current_price: 5000 })
+    expect(r).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'max_price', maxPrice: 1500, ownPrice: 5000 } })
+  })
+
+  it('max exactly price/3 is allowed', () => {
+    expect(validateProductPatch({ max_price: 2000 }, { floor_price: 100, max_price: null, own_current_price: 6000 }).ok).toBe(true)
+  })
+
+  it('a patch that touches neither floor nor max is not blocked by an old crazy floor', () => {
+    expect(validateProductPatch({ undercut_step: 50 }, { floor_price: 90000, max_price: null, own_current_price: 1000 }).ok).toBe(true)
+  })
+
+  it('the form sends every field each time: an unchanged old crazy floor does not block editing the step', () => {
+    const stored = { floor_price: 90000, max_price: null, own_current_price: 1000 }
+    const r = validateProductPatch({ floor_price: 90000, max_price: null, undercut_step: 50, check_frequency_minutes: 20 }, stored)
+    expect(r.ok).toBe(true)
+    // То же значение строкой и с дробной частью: после округления это тот же пол.
+    expect(validateProductPatch({ floor_price: '90000', undercut_step: 50 }, stored).ok).toBe(true)
+    expect(validateProductPatch({ floor_price: 90000.4, undercut_step: 50 }, stored).ok).toBe(true)
+  })
+
+  it('an unchanged old crazy max does not block either, a changed one still does', () => {
+    const stored = { floor_price: 100, max_price: 1500, own_current_price: 5000 }
+    expect(validateProductPatch({ floor_price: 100, max_price: 1500, undercut_step: 10 }, stored).ok).toBe(true)
+    expect(validateProductPatch({ floor_price: 100, max_price: 1400, undercut_step: 10 }, stored)).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'max_price' } })
+  })
+
+  it('a changed floor is still checked even when the other fields are unchanged', () => {
+    const stored = { floor_price: 1000, max_price: null, own_current_price: 5000 }
+    expect(validateProductPatch({ floor_price: 50000, max_price: null, undercut_step: 10 }, stored)).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'floor_price' } })
+    expect(validateProductPatch({ floor_price: 50000, max_price: null, undercut_step: 10, confirmFloor: true }, stored).ok).toBe(true)
+  })
+
+  it('an unknown current price skips the check (nothing to compare with)', () => {
+    expect(validateProductPatch({ floor_price: 99999 }, { floor_price: 1000, max_price: null }).ok).toBe(true)
+    expect(validateProductPatch({ floor_price: 99999 }, { floor_price: 1000, max_price: null, own_current_price: 0 }).ok).toBe(true)
+  })
+
+  it('an ordinary floor change is untouched', () => {
+    const r = validateProductPatch({ floor_price: 1500 }, withOwn)
+    expect(r.ok).toBe(true)
+  })
+})

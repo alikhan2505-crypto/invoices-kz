@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -8,9 +8,12 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
+import { metricDisplay, averageFromStatistics, type RatingStatistics } from '@/lib/kaspiShop/qualityView'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { TWO_COL_CLS } from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -27,6 +30,7 @@ type MetricSummary = {
   goodValue: number
   violationValue: number
   zonePercentage: number
+  percentage: number
   daysPerPeriod: number
   from: string
   to: string
@@ -36,7 +40,7 @@ type MetricSummary = {
 }
 
 type QualityOverview = {
-  rating: MetricSummary
+  rating: MetricSummary & { statistics?: RatingStatistics }
   returns: MetricSummary
   lateDelivery: MetricSummary
   cancellations: MetricSummary
@@ -75,9 +79,23 @@ export default function KaspiShopQualityPage() {
   const [tab, setTab] = useState<QualityTab>('rating')
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(false)
+  // Всего категорий по ответу Kaspi и сколько страниц уже загружено («Показать ещё»,
+  // раньше грузилась одна страница из 10, аудит K30).
+  const [categoriesTotal, setCategoriesTotal] = useState(0)
+  const [categoriesNextPage, setCategoriesNextPage] = useState(0)
+  const [categoriesLoadingMore, setCategoriesLoadingMore] = useState(false)
+  const [categoriesError, setCategoriesError] = useState('')
+  // Номер последнего запроса категорий: ответ на устаревший (другая вкладка) не затирает новый.
+  const catReqId = useRef(0)
+  // Номер последней подгрузки: её finally снимает «Загружаем…» только если за это время
+  // не началась новая загрузка категорий или другая подгрузка (смена вкладки в полёте).
+  const catMoreReqId = useRef(0)
+  const [accessError, setAccessError] = useState('')
 
   useEffect(() => { init() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!loading) loadCategories(tab) }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  // loading в зависимостях: начальная вкладка «rating» не меняется после загрузки, и
+  // эффект только от tab никогда не загружал таблицу при первом открытии (аудит K29).
+  useEffect(() => { if (!loading) loadCategories(tab) }, [tab, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -94,9 +112,11 @@ export default function KaspiShopQualityPage() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
 
     try {
       const headers = await authHeader()
@@ -114,22 +134,78 @@ export default function KaspiShopQualityPage() {
     setLoading(false)
   }
 
+  // Category table is supplementary -- a failure here shouldn't block the top
+  // banner (the number that actually matters), но и молча «Категорий пока нет» он
+  // больше не пишет: ошибка видна над таблицей.
   async function loadCategories(t: QualityTab) {
+    const id = ++catReqId.current
+    // Новая загрузка категорий отменяет подгрузку из прошлой вкладки: её флаг не должен
+    // оставаться включённым и блокировать «Показать ещё» на новой вкладке.
+    catMoreReqId.current++
+    setCategoriesLoadingMore(false)
     setCategoriesLoading(true)
+    setCategoriesError('')
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/quality/categories?tab=${t}&page=0`, { headers })
       const data = await res.json().catch(() => ({}))
-      if (res.ok) setCategories(data.categories || [])
+      if (id !== catReqId.current) return
+      if (!res.ok) {
+        if (res.status === 400 && /сесси/i.test(data.error || '')) setSessionExpired(true)
+        setCategoriesError(data.error || 'Не удалось загрузить категории')
+        setCategories([])
+        setCategoriesTotal(0)
+      } else {
+        setCategories(data.categories || [])
+        setCategoriesTotal(Number(data.total) || 0)
+        setCategoriesNextPage(1)
+      }
     } catch {
-      // Category table is supplementary -- a failure here shouldn't block
-      // the top banner (the number that actually matters) from showing.
+      if (id !== catReqId.current) return
+      setCategoriesError('Не удалось загрузить категории. Проверьте соединение.')
+      setCategories([])
+      setCategoriesTotal(0)
     } finally {
-      setCategoriesLoading(false)
+      if (id === catReqId.current) setCategoriesLoading(false)
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  async function loadMoreCategories() {
+    if (categoriesLoadingMore || categoriesLoading) return
+    const id = catReqId.current
+    const moreId = ++catMoreReqId.current
+    setCategoriesLoadingMore(true)
+    setCategoriesError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/quality/categories?tab=${tab}&page=${categoriesNextPage}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (id !== catReqId.current) return
+      if (!res.ok) {
+        setCategoriesError(data.error || 'Не удалось загрузить ещё категории')
+        return
+      }
+      const more: CategoryRow[] = data.categories || []
+      const seen = new Set(categories.map(c => c.categoryCode))
+      const merged = [...categories, ...more.filter(c => !seen.has(c.categoryCode))]
+      setCategories(merged)
+      setCategoriesTotal(more.length === 0 ? merged.length : (Number(data.total) || merged.length))
+      setCategoriesNextPage(p => p + 1)
+    } catch {
+      if (id !== catReqId.current) return
+      setCategoriesError('Не удалось загрузить ещё категории. Проверьте соединение.')
+    } finally {
+      // Данные устаревшему ответу писать нельзя (guard выше), а флаг снимаем всегда,
+      // если это ещё последняя подгрузка.
+      if (moreId === catMoreReqId.current) setCategoriesLoadingMore(false)
+    }
+  }
+
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); init() }} />
+      : <LoadingSpinner />
+  }
 
   const metric = overview?.[tab]
   const activeTab = TABS.find(t => t.value === tab)!
@@ -178,22 +254,25 @@ export default function KaspiShopQualityPage() {
 
         {/* xl+: карточка показателя слева, список категорий справа; уже xl -- друг под другом */}
         <div className={`${TWO_COL_CLS} xl:items-start`}>
-        {metric && (
+        {metric && (() => {
+          const display = metricDisplay(activeTab.unit, metric, overview?.rating?.statistics)
+          const isRating = activeTab.unit === 'rating'
+          const sample = isRating ? averageFromStatistics(overview?.rating?.statistics).count : 0
+          return (
           <div className="nav-glass rounded-2xl p-5">
-            {metric.notEnoughData ? (
-              <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-                Показатель сформируется после {metric.denominator > 0 ? metric.denominator : 10}{' '}
-                {activeTab.unit === 'rating' ? 'оценок' : 'заказов'}.
+            {metric.notEnoughData || display.value === null ? (
+              <div className="text-sm mb-2" style={{ color: 'var(--nav-text-secondary)' }}>
+                Kaspi пока не считает этот показатель: данных за период недостаточно.
               </div>
             ) : (
-              <div className="flex items-center gap-4 mb-2">
+              <div className="flex items-center gap-4 mb-2 flex-wrap">
                 <div className="font-mono font-bold text-3xl tabular-nums" style={{ color: zoneColor(metric.zonePercentage) }}>
-                  {activeTab.unit === 'rating' ? metric.goodValue.toFixed(1) : `${metric.goodValue}%`}
+                  {isRating ? display.value.toFixed(1) : `${display.value.toLocaleString('ru-KZ', { maximumFractionDigits: 1 })}%`}
                 </div>
                 <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                  {activeTab.unit === 'rating'
-                    ? `не должен быть ниже ${metric.violationValue.toFixed(1)}`
-                    : `не должно превышать ${metric.violationValue}%`}
+                  {isRating
+                    ? `цель Kaspi: не ниже ${display.target.toFixed(1)}; санкции ниже ${display.limit.toFixed(1)}`
+                    : `цель Kaspi: не выше ${display.target}%; санкции выше ${display.limit}%`}
                 </div>
               </div>
             )}
@@ -205,22 +284,32 @@ export default function KaspiShopQualityPage() {
                   Abil-Sisters' real 245-review history, previously untested
                   since earlier captures only had trivial rating data), which
                   rendered as the nonsensical "245 из 0". */}
-              {activeTab.unit === 'rating'
-                ? `${metric.numerator} оценок за последние ${metric.daysPerPeriod} дней`
+              {isRating
+                ? `${metric.numerator} оценок за последние ${metric.daysPerPeriod} дней${sample > 0 && sample !== metric.numerator ? `, среднее по ${sample} оценкам` : ''}`
                 : `${metric.numerator} из ${metric.denominator} за последние ${metric.daysPerPeriod} дней`}
               {metric.from && metric.to && ` (${formatDateRu(metric.from)} — ${formatDateRu(metric.to)})`}
             </div>
           </div>
-        )}
+          )
+        })()}
 
         <div className={`nav-glass rounded-2xl overflow-hidden min-w-0 ${metric ? '' : 'xl:col-span-2'}`}>
           <div className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--nav-text-primary)', borderBottom: '1px solid var(--nav-border-soft)' }}>
             По категориям
           </div>
+          {categoriesError && (
+            <div className="px-4 py-3 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+              <span className="text-xs" style={{ color: 'var(--nav-critical)' }}>{categoriesError}</span>
+              <button onClick={() => (categories.length > 0 ? loadMoreCategories() : loadCategories(tab))}
+                className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            </div>
+          )}
           {categoriesLoading ? (
             <div className="p-6 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем...</div>
           ) : categories.length === 0 ? (
-            <div className="p-6 text-center text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Категорий пока нет.</div>
+            categoriesError ? null : (
+              <div className="p-6 text-center text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Категорий пока нет.</div>
+            )
           ) : (
             categories.map(c => (
               <div key={c.categoryCode} className="px-4 py-3 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
@@ -237,6 +326,18 @@ export default function KaspiShopQualityPage() {
                 </div>
               </div>
             ))
+          )}
+          {!categoriesLoading && categories.length > 0 && (
+            <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Показано {categories.length} из {Math.max(categoriesTotal, categories.length)}</span>
+              {categories.length < categoriesTotal && (
+                <button onClick={loadMoreCategories} disabled={categoriesLoadingMore}
+                  className="text-xs font-semibold rounded-full px-4 py-2 disabled:opacity-50"
+                  style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+                  {categoriesLoadingMore ? 'Загружаем…' : 'Показать ещё'}
+                </button>
+              )}
+            </div>
           )}
         </div>
         </div>

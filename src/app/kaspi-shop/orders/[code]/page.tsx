@@ -10,6 +10,9 @@ import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -41,6 +44,8 @@ type OrderDetail = {
   customerFirstName: string
   customerLastName: string
   cityName: string | null
+  // Город покупателя; cityName выше это город точки продавца
+  destinationCityName?: string | null
   plannedDeliveryDate: string | null
   items: { code: string; name: string; imageUrl: string | null; quantity: number }[]
 }
@@ -53,8 +58,11 @@ export default function KaspiShopOrderDetail() {
   const pageTitle = typeof code === 'string' ? `Заказ № ${code}` : 'Заказ'
   usePageDocumentTitle(pageTitle)
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
+  const [orderLoading, setOrderLoading] = useState(false)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading && code) loadOrder() }, [loading, code])
@@ -74,26 +82,42 @@ export default function KaspiShopOrderDetail() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
   async function loadOrder() {
     setLoadError('')
+    setSessionExpired(false)
+    setOrderLoading(true)
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/orders/${code}`, { headers })
-      const data = await res.json()
-      if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказ'); return }
+      const data = await res.json().catch(() => null)
+      // Сбой приходит как 502 {error, sessionExpired}: показываем текст сервера и, если сессия
+      // кабинета истекла, плашку переподключения (аудит Kaspi K3).
+      if (!res.ok) {
+        if (data?.sessionExpired) setSessionExpired(true)
+        setLoadError(data?.error || 'Не удалось загрузить заказ')
+        return
+      }
       setOrder(data)
     } catch {
       setLoadError('Не удалось загрузить заказ. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setOrderLoading(false)
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -108,12 +132,22 @@ export default function KaspiShopOrderDetail() {
           onBack={() => { if (window.history.length > 1) router.back(); else router.push('/kaspi-shop/orders') }}
         />
 
+        {sessionExpired && <SessionExpiredBanner />}
         {loadError && (
-          <div className="nav-glass rounded-2xl p-4 text-sm mb-4" style={{ color: 'var(--nav-critical)' }}>{loadError}</div>
+          <div role="alert" className="nav-glass rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm flex-1 min-w-[200px]" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
+            {!sessionExpired && (
+              <button type="button" onClick={() => loadOrder()} disabled={orderLoading}
+                className="text-xs font-semibold rounded-lg px-3 py-2 flex-shrink-0 disabled:opacity-60" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            )}
+          </div>
         )}
 
         {!order ? (
-          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказ...</div>
+          // После ошибки «Загружаем заказ...» не показываем: загрузка закончилась, заказа нет.
+          loadError ? null : (
+            <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказ...</div>
+          )
         ) : (
           <>
             {/* xl+: карточка заказа слева (420px), позиции справа (2 колонки с 2xl);
@@ -122,7 +156,14 @@ export default function KaspiShopOrderDetail() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
               className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4 xl:mb-0">
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-                {order.cityName && <div className="flex items-center gap-1.5"><PinIcon />{order.cityName}</div>}
+                {order.cityName && order.destinationCityName && order.destinationCityName !== order.cityName ? (
+                  <>
+                    <div className="flex items-center gap-1.5"><PinIcon />Точка: {order.cityName}</div>
+                    <div className="flex items-center gap-1.5"><PinIcon />Доставка: {order.destinationCityName}</div>
+                  </>
+                ) : (order.cityName || order.destinationCityName) ? (
+                  <div className="flex items-center gap-1.5"><PinIcon />{order.cityName || order.destinationCityName}</div>
+                ) : null}
                 {order.plannedDeliveryDate && <div className="flex items-center gap-1.5"><TruckIcon />до {new Date(order.plannedDeliveryDate).toLocaleDateString('ru-KZ')}</div>}
                 <div>{new Date(order.creationTime).toLocaleString('ru-KZ')}</div>
               </div>

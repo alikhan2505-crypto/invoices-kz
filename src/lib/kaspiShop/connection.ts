@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
+import { notifySessionExpired, resetSessionExpiredNotices } from '@/lib/kaspiShop/sessionExpiredNotice'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,8 +160,21 @@ export async function loadConnectionById(connectionId: string): Promise<KaspiSho
 // should call this so /api/kaspi-shop/wallet's sessionStatus (read by the
 // Демпинг page's reconnect banner) reflects reality promptly.
 export async function markSessionExpired(connectionId: string): Promise<void> {
-  const { error } = await supabase.from('kaspi_shop_connections').update({ session_status: 'session_expired' }).eq('id', connectionId)
+  const { data, error } = await supabase
+    .from('kaspi_shop_connections')
+    .update({ session_status: 'session_expired' })
+    .eq('id', connectionId)
+    .select('user_id, company_name')
   if (error) throw new Error(`kaspi_shop_connections markSessionExpired failed for ${connectionId}: ${error.message}`)
+
+  // K45: сообщаем продавцу (Telegram по настройке + колокольчик). Раз в сутки на
+  // продавца, не больше трёх раз за обрыв -- см. sessionExpiredNotice.ts.
+  // Уведомление -- побочное: сбой не должен ломать ответ маршруту, который
+  // только что получил 401 от Kaspi.
+  const row = Array.isArray(data) ? data[0] : null
+  if (row?.user_id) {
+    await notifySessionExpired(supabase, row.user_id, [row.company_name || ''])
+  }
 }
 
 export async function saveConnection(params: {
@@ -199,7 +213,78 @@ export async function saveConnection(params: {
   const { error } = await supabase.from('kaspi_shop_connections').upsert(row, { onConflict: 'user_id,merchant_id' })
   if (error) throw new Error(`kaspi_shop_connections save failed for user ${params.userId}: ${error.message}`)
 
+  // Новая рабочая сессия: следующий обрыв снова вправе уведомить продавца
+  // (счётчик «не больше трёх за обрыв», см. sessionExpiredNotice.ts).
+  if (params.sessionCookies) await resetSessionExpiredNotices(supabase, params.userId)
+
   // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend
   // now debits the shared profiles.kaspi_wallet_balance, which always exists
   // (every user has a profiles row) and reads as 0 via COALESCE when untouched.
+}
+
+const CHUNK = 100
+
+function chunks<T>(items: T[]): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += CHUNK) out.push(items.slice(i, i + CHUNK))
+  return out
+}
+
+export type PurgeKaspiResult =
+  | { ok: true; connections: number; rowsRemoved: boolean }
+  | { ok: false; error: string }
+
+// K47: полное удаление Kaspi-данных пользователя при удалении аккаунта. Сессия
+// кабинета (session_cookies) и токен (api_token_enc) -- живой доступ к чужому
+// кабинету продавца, страница /data-deletion обещает их удаление.
+//
+// Порядок:
+//  1. СНАЧАЛА затираем секреты у всех соединений пользователя (cookies и токен в
+//     null, session_expired, error, пауза): что бы ни случилось дальше, живого
+//     доступа не остаётся. Не удалось -- ok:false, вызывающий НЕ удаляет аккаунт.
+//  2. Затем то же, что делает DELETE в settings/route.ts, но для всех магазинов:
+//     цены по городам -> отслеживаемые товары -> соединения (по зависимостям, без
+//     расчёта на ON DELETE CASCADE). Сбой здесь не блокирует удаление аккаунта
+//     (секретов уже нет): rowsRemoved:false, вызывающий пишет громкий лог.
+// Финансовый журнал (wallet_ledger) не трогаем: он привязан к пользователю, а не
+// к соединению, и в этой функции его нет.
+export async function purgeKaspiConnectionsForUser(userId: string): Promise<PurgeKaspiResult> {
+  const { data: conns, error: listError } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
+    .eq('user_id', userId)
+  if (listError) return { ok: false, error: `kaspi_shop_connections lookup failed: ${listError.message}` }
+  const connectionIds = (conns || []).map((c: { id: string }) => c.id)
+  if (connectionIds.length === 0) return { ok: true, connections: 0, rowsRemoved: true }
+
+  const { error: wipeError } = await supabase
+    .from('kaspi_shop_connections')
+    .update({ session_cookies: null, api_token_enc: null, session_status: 'session_expired', status: 'error', paused: true })
+    .eq('user_id', userId)
+  if (wipeError) return { ok: false, error: `kaspi_shop_connections secrets wipe failed: ${wipeError.message}` }
+
+  try {
+    for (const idChunk of chunks(connectionIds)) {
+      const { data: products, error: productsError } = await supabase
+        .from('kaspi_shop_tracked_products')
+        .select('id')
+        .in('connection_id', idChunk)
+      if (productsError) throw new Error(`tracked products lookup failed: ${productsError.message}`)
+      const productIds = (products || []).map((p: { id: string }) => p.id)
+      for (const productChunk of chunks(productIds)) {
+        const { error } = await supabase.from('kaspi_shop_product_city_prices').delete().in('tracked_product_id', productChunk)
+        if (error) throw new Error(`city prices delete failed: ${error.message}`)
+      }
+      if (productIds.length > 0) {
+        const { error } = await supabase.from('kaspi_shop_tracked_products').delete().in('connection_id', idChunk)
+        if (error) throw new Error(`tracked products delete failed: ${error.message}`)
+      }
+    }
+    const { error: deleteError } = await supabase.from('kaspi_shop_connections').delete().eq('user_id', userId)
+    if (deleteError) throw new Error(`connections delete failed: ${deleteError.message}`)
+  } catch (err: any) {
+    console.error('CRITICAL: kaspi purge for user', userId, 'wiped secrets but could not delete rows:', err?.message || err)
+    return { ok: true, connections: connectionIds.length, rowsRemoved: false }
+  }
+  return { ok: true, connections: connectionIds.length, rowsRemoved: true }
 }

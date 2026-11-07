@@ -115,3 +115,43 @@ describe('getQualityCategories', () => {
     expect(result).toEqual({ categories: [], total: 0, sessionExpired: true })
   })
 })
+
+describe('quality: сбой Kaspi это failed, а не «ничего нет» (аудит K35)', () => {
+  it('overview: HTTP 500 даёт failed с причиной', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 500))
+    const result = await getQualityOverview('c', '30067228', fetchFn as any)
+    expect(result).toMatchObject({ overview: null, sessionExpired: false, failed: true })
+    expect(result.error).toMatch(/500/)
+  })
+
+  it('overview: сетевая ошибка и таймаут не выбрасывают исключение', async () => {
+    const down = vi.fn().mockRejectedValue(new Error('ECONNRESET'))
+    expect(await getQualityOverview('c', 'm', down as any)).toMatchObject({ overview: null, failed: true, error: 'ECONNRESET' })
+    const timeout = vi.fn().mockRejectedValue(Object.assign(new Error('t'), { name: 'TimeoutError' }))
+    expect(await getQualityOverview('c', 'm', timeout as any)).toMatchObject({ failed: true, error: 'Kaspi не ответил вовремя' })
+  })
+
+  it('overview: неожиданная форма ответа это failed', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ data: { merchant: { qualityControl: { returned: null } } } }))
+    expect(await getQualityOverview('c', 'm', fetchFn as any)).toMatchObject({ overview: null, failed: true })
+  })
+
+  it('categories: HTTP 500, неверная форма и сеть это failed, а не пустой список', async () => {
+    expect(await getQualityCategories('c', 'm', 'rating', 0, vi.fn().mockResolvedValue(jsonResponse({}, 500)) as any)).toMatchObject({ categories: [], total: 0, failed: true })
+    expect(await getQualityCategories('c', 'm', 'rating', 0, vi.fn().mockResolvedValue(jsonResponse({ data: {} })) as any)).toMatchObject({ failed: true })
+    expect(await getQualityCategories('c', 'm', 'rating', 0, vi.fn().mockRejectedValue(new Error('boom')) as any)).toMatchObject({ failed: true, error: 'boom' })
+  })
+
+  it('categories: честный пустой ответ Kaspi не помечается как сбой', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ data: { merchant: { qualityControl: { categories: { totalCount: 0, items: [] } } } } }))
+    const result = await getQualityCategories('c', 'm', 'rating', 0, fetchFn as any)
+    expect(result.failed).toBeUndefined()
+    expect(result.total).toBe(0)
+  })
+
+  it('categories: номер страницы уходит в запрос (пагинация, K30)', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ data: { merchant: { qualityControl: { categories: { totalCount: 25, items: [] } } } } }))
+    await getQualityCategories('c', 'm', 'returns', 2, fetchFn as any)
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body).variables.page).toBe(2)
+  })
+})

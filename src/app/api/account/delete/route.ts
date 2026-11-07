@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { purgeKaspiConnectionsForUser } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,6 +53,27 @@ async function stopBackgroundActivity(userId: string) {
   })
 }
 
+// K47: Kaspi-подключения удаляются целиком, а не только ставятся на паузу:
+// session_cookies и api_token_enc -- живой доступ к кабинету продавца, а
+// страница /data-deletion обещает их удалить. Секреты затираются первыми
+// (purgeKaspiConnectionsForUser); если их затереть не удалось, аккаунт НЕ
+// удаляем -- ответ 500, всё безопасно повторить.
+async function purgeKaspi(userId: string): Promise<boolean> {
+  try {
+    const res = await purgeKaspiConnectionsForUser(userId)
+    if (!res.ok) {
+      console.error('account delete: kaspi purge failed for', userId, ':', res.error)
+      return false
+    }
+    return true
+  } catch (e: any) {
+    console.error('account delete: kaspi purge threw for', userId, ':', e?.message || e)
+    return false
+  }
+}
+
+const KASPI_PURGE_FAILED = { error: 'Не удалось отключить Kaspi, попробуйте ещё раз', code: 'kaspi_purge_failed' }
+
 // Soft delete (founder-approved, 2026-08-21): the profile row is kept with
 // deleted_at set -- it's how a later signup with the same email gets
 // recognised as a returning customer (see onboarding/page.tsx) and how
@@ -91,6 +113,7 @@ export async function POST(req: NextRequest) {
     // deletion below failed last time. Retry just that step, silently, no
     // duplicate stats/Telegram noise.
     await stopBackgroundActivity(user.id)
+    if (!(await purgeKaspi(user.id))) return NextResponse.json(KASPI_PURGE_FAILED, { status: 500 })
     const { error: retryError } = await supabase.auth.admin.deleteUser(user.id)
     if (retryError) {
       console.error('CRITICAL: account delete retry failed for', user.id, ':', retryError.message)
@@ -113,6 +136,7 @@ export async function POST(req: NextRequest) {
   // (and spending the account's wallet balance) with no owner left to see
   // it. Best-effort: a failure here must not block the deletion itself.
   await stopBackgroundActivity(user.id)
+  if (!(await purgeKaspi(user.id))) return NextResponse.json(KASPI_PURGE_FAILED, { status: 500 })
 
   try {
     const statsLine = daysAsCustomer !== null

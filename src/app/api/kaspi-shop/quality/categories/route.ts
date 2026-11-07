@@ -27,7 +27,11 @@ export async function GET(req: NextRequest) {
   if (!tab || !(tab in QUALITY_TABS)) {
     return NextResponse.json({ error: `tab обязателен и должен быть одним из: ${Object.keys(QUALITY_TABS).join(', ')}` }, { status: 400 })
   }
-  const page = Number(req.nextUrl.searchParams.get('page')) || 0
+  const pageRaw = req.nextUrl.searchParams.get('page')
+  const page = pageRaw === null || pageRaw === '' ? 0 : Number(pageRaw)
+  if (!Number.isInteger(page) || page < 0 || page > 1000) {
+    return NextResponse.json({ error: 'page должен быть целым числом от 0' }, { status: 400 })
+  }
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
@@ -38,6 +42,9 @@ export async function GET(req: NextRequest) {
   if (result.sessionExpired) {
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин' }, { status: 400 })
+  }
+  if (result.failed) {
+    return NextResponse.json({ error: `Не удалось получить категории от Kaspi${result.error ? ` (${result.error})` : ''}. Повторите позже.` }, { status: 502 })
   }
   return NextResponse.json({ categories: result.categories, total: result.total })
 }

@@ -29,13 +29,18 @@ export function formatTenge(n: number): string {
 
 // ---------- Расход на проверки ----------
 
-// Настоящий период между проверками: товар «созревает» через check_frequency_minutes,
-// но запуски идут только раз в 10 минут, и last_checked_at пишется в конце цикла.
-// Поэтому 15 минут на деле означают около 20 (при долгом запуске бывает и 30).
+// Настоящий период между проверками. Товар «созревает» через check_frequency_minutes
+// после last_checked_at, но запуски идут только раз в 10 минут, а last_checked_at
+// пишется В СЕРЕДИНЕ запуска (после тика, не на нём). Значит к следующему тику
+// прошло чуть меньше целого числа десяток: при частоте, кратной 10, товар не успевает
+// «созреть» и проверяется только на втором тике (10 мин -> 20, 20 -> 30). Формула
+// (floor(f/10)+1)*10 - это НИЖНЯЯ граница: при долгом запуске бывает ещё на тик
+// дольше, поэтому в подписях везде «не чаще, чем раз в N мин», а расход, посчитанный
+// по этой границе, завышен, то есть остаётся на безопасной стороне.
 export function effectiveCheckPeriodMinutes(frequencyMinutes: number | null | undefined): number {
   const f = Number(frequencyMinutes)
   const freq = Number.isFinite(f) && f > 0 ? f : DEFAULT_CHECK_FREQUENCY_MINUTES
-  return Math.max(CRON_INTERVAL_MINUTES, Math.ceil(freq / CRON_INTERVAL_MINUTES) * CRON_INTERVAL_MINUTES)
+  return Math.max(CRON_INTERVAL_MINUTES, (Math.floor(freq / CRON_INTERVAL_MINUTES) + 1) * CRON_INTERVAL_MINUTES)
 }
 
 export function checksPerDay(frequencyMinutes: number | null | undefined): number {
@@ -46,7 +51,14 @@ export function dailyCostPerProduct(frequencyMinutes: number | null | undefined)
   return checksPerDay(frequencyMinutes) * CHECK_PRICE_TENGE
 }
 
-export type CostProduct = { enabled?: boolean; check_frequency_minutes?: number | null }
+export type CostProduct = { enabled?: boolean; available_for_sale?: boolean | null; check_frequency_minutes?: number | null }
+
+// Бот проверяет (и списывает 5 ₸ за) только включённые товары, которые в продаже:
+// снятые с продажи на Kaspi (available_for_sale = false) цикл и «Применить сейчас»
+// пропускают, ничего не списывая. Пустое значение у старых строк считается «в продаже».
+export function isBilledProduct(p: CostProduct): boolean {
+  return !!p.enabled && p.available_for_sale !== false
+}
 
 export type DailyCostEstimate = {
   count: number
@@ -64,7 +76,7 @@ export function estimateDailyCost(products: CostProduct[]): DailyCostEstimate {
   let minPeriod = Infinity
   let maxPeriod = 0
   for (const p of products) {
-    if (!p.enabled) continue
+    if (!isBilledProduct(p)) continue
     count++
     dailyCost += dailyCostPerProduct(p.check_frequency_minutes)
     const period = effectiveCheckPeriodMinutes(p.check_frequency_minutes)
@@ -75,8 +87,11 @@ export function estimateDailyCost(products: CostProduct[]): DailyCostEstimate {
   return { count, dailyCost, minPeriod, maxPeriod }
 }
 
+// «Не чаще, чем»: период - нижняя граница (см. effectiveCheckPeriodMinutes).
 export function periodLabel(minPeriod: number, maxPeriod: number): string {
-  return minPeriod === maxPeriod ? `около ${minPeriod} мин` : `от ${minPeriod} до ${maxPeriod} мин`
+  return minPeriod === maxPeriod
+    ? `не чаще, чем раз в ${minPeriod} мин`
+    : `не чаще, чем раз в ${minPeriod}-${maxPeriod} мин, в зависимости от товара`
 }
 
 // На сколько часов хватит баланса при данном суточном расходе. null - расхода нет.
@@ -147,6 +162,40 @@ export function applyNowSuccessText(data: any): string {
 }
 
 // ---------- Ответы сервера ----------
+
+// PATCH /api/kaspi-shop/products отвечает 400 с этим кодом, когда минимум сильно
+// выше текущей цены (или максимум сильно ниже): почти всегда опечатка. Форма
+// спрашивает продавца и повторяет запрос с confirmFloor: true.
+export const FLOOR_FAR_ERROR_CODE = 'floor_far_above_price'
+
+export function isFloorFarResponse(status: number, data: any): boolean {
+  return status === 400 && data?.code === FLOOR_FAR_ERROR_CODE
+}
+
+// Текст подтверждения. Числа берём из ответа сервера; если их нет (или они
+// не числа), возвращаем null: тогда показываем обычную ошибку сервера, а не
+// выдуманные цифры.
+export function floorFarConfirmText(data: any): string | null {
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
+  const own = num(data?.ownPrice)
+  if (own === null) return null
+  const factor = num(data?.factor) ?? 3
+  if (data?.field === 'max_price') {
+    const max = num(data?.maxPrice)
+    if (max === null) return null
+    return `Максимум ${formatTenge(max)} ниже текущей цены ${formatTenge(own)} более чем в ${factor} ${pluralRu(factor, 'раз', 'раза', 'раз')}. Цена сразу опустится до максимума. Сохранить?`
+  }
+  const floor = num(data?.floorPrice)
+  if (floor === null) return null
+  return `Минимум ${formatTenge(floor)} выше текущей цены ${formatTenge(own)} более чем в ${factor} ${pluralRu(factor, 'раз', 'раза', 'раз')}. Цена сразу поднимется до минимума. Сохранить?`
+}
+
+// «Обновить каталог»: при неполном импорте (502 с partial: true) часть товаров уже
+// записана, поэтому список на странице надо перечитать, иначе они не видны.
+export function catalogSyncShouldReload(ok: boolean, data: any): boolean {
+  if (ok) return true
+  return typeof data?.imported === 'number' && data.imported > 0
+}
 
 // Текст ошибки для человека: слово сервера, если оно есть, иначе по коду ответа.
 export function apiErrorMessage(status: number, data: any, fallback: string): string {

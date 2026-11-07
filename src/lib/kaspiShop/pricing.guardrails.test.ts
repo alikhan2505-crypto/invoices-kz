@@ -131,3 +131,44 @@ describe('computeRepriceCandidate: hard floor and sane numbers', () => {
     expect(r).toEqual({ price: 10, heldAtFloor: true, newStreak: 0 })
   })
 })
+
+// Engine2: восстановление и памп дают целые тенге, как и конкурентная ветка.
+describe('computeRepriceCandidate: whole tenge in recovery and pump', () => {
+  it('recovery step with a fractional step is a whole number (was 1000.5)', () => {
+    const r = computeRepriceCandidate({ competitorPrices: [], undercutStep: 0.5, floorPrice: 1000, ownCurrentPrice: 1000 })
+    expect(Number.isInteger(r.price)).toBe(true)
+    expect(r.price).toBe(1001)
+  })
+
+  it('recovery from a fractional own price at the floor is whole and never below the floor', () => {
+    const r = computeRepriceCandidate({ competitorPrices: [], undercutStep: 0, floorPrice: 1000.4, ownCurrentPrice: 1000.4 })
+    expect(r.price).toBeGreaterThanOrEqual(1000.4)
+  })
+
+  it('recovery is rounded BEFORE the ceiling clamp', () => {
+    const r = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100.6, floorPrice: 1000, maxPrice: 1100, ownCurrentPrice: 1000 })
+    expect(r.price).toBe(1100)
+  })
+
+  it('pump with a fractional step and fractional own price is whole', () => {
+    const r = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 0.5, floorPrice: 1000, maxPrice: 5000, ownCurrentPrice: 2000.3, noCompetitorStreak: 5,
+    })
+    expect(Number.isInteger(r.price)).toBe(true)
+    expect(r.price).toBe(2001)
+  })
+
+  it('pump never overshoots the ceiling after rounding', () => {
+    const r = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100.7, floorPrice: 1000, maxPrice: 2050, ownCurrentPrice: 2000, noCompetitorStreak: 5,
+    })
+    expect(r.price).toBe(2050)
+  })
+
+  it('whole numbers stay exactly as before (no behaviour change for integer data)', () => {
+    expect(computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 1000, ownCurrentPrice: 1000 }).price).toBe(1100)
+    expect(computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 1000, maxPrice: 5000, ownCurrentPrice: 2000, noCompetitorStreak: 5,
+    }).price).toBe(2100)
+  })
+})

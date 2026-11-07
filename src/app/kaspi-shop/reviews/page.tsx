@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,8 @@ import { baseProductName } from '@/lib/kaspiShop/salesAnalytics'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -25,11 +27,23 @@ type Review = {
 
 type ReviewStats = { avgRating: number; total: number; negative: number; fiveStar: number }
 
+// Числа самих карточек Kaspi (total_count и avg_rating, средняя взвешена по числу
+// отзывов): не то же самое, что загруженная выборка в stats (аудит K40).
+type ReviewCatalog = {
+  totalCount: number | null
+  avgRating: number | null
+  productsWithTotals: number
+  productsCount: number
+}
+
 type ReviewsResponse = {
   stats: ReviewStats
+  catalog?: ReviewCatalog
   reviews: Review[]
   lastFetchedAt: string | null
   productErrorCount: number
+  // Только когда запрос шёл с since: сколько товаров ждём и сколько уже обновил ЭТОТ запуск.
+  refresh?: { expected: number; updated: number } | null
 }
 
 const STAR_PILLS: { label: string; value: number | null }[] = [
@@ -99,9 +113,16 @@ export default function KaspiShopReviews() {
   const [dataLoading, setDataLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [accessError, setAccessError] = useState('')
+  // Номер последнего запроса отзывов: ответ на устаревший (другой фильтр звёзд) не затирает новый.
+  const reviewsReqId = useRef(0)
   const [activeStars, setActiveStars] = useState<number | null>(null)
   const [refreshNote, setRefreshNote] = useState('')
   const [groupMode, setGroupMode] = useState<'none' | 'product' | 'month'>('none')
+
+  // Страницу закрыли или ушли с неё: опрос обновления дальше не крутим.
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadReviews(activeStars) }, [activeStars, loading])
@@ -121,13 +142,16 @@ export default function KaspiShopReviews() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
   async function loadReviews(stars: number | null) {
+    const id = ++reviewsReqId.current
     setDataLoading(true)
     setLoadError('')
     try {
@@ -135,19 +159,47 @@ export default function KaspiShopReviews() {
       const qs = stars !== null ? `?stars=${stars}` : ''
       const res = await fetch(`/api/kaspi-shop/reviews${qs}`, { headers })
       const json = await res.json()
+      if (id !== reviewsReqId.current) return
       if (!res.ok) { setLoadError(json.error || 'Не удалось загрузить отзывы'); setData(null); return }
       setData(json)
     } catch {
+      if (id !== reviewsReqId.current) return
       setLoadError('Не удалось загрузить отзывы. Проверьте соединение и попробуйте ещё раз.')
       setData(null)
     } finally {
-      setDataLoading(false)
+      if (id === reviewsReqId.current) setDataLoading(false)
     }
   }
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
+
+  // Опрос прогресса ИМЕННО этого запуска: since -- серверное время запуска (его отдаёт
+  // POST), прогресс -- число товаров, у которых fetched_at не раньше since. Раньше
+  // ждали, пока «самая свежая строка по всем товарам» станет новее часов браузера, и
+  // обновление объявлялось законченным по первому же пришедшему товару (аудит K42).
+  async function pollRefresh(since: string, expectedHint: number): Promise<boolean> {
+    // ~3 с на шаг; бюджет растёт с числом товаров (раннер тратит около секунды на товар).
+    const maxAttempts = Math.min(120, Math.ceil(expectedHint * 2 / 3) + 15)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await sleep(3000)
+      if (!mounted.current) return false
+      const pollHeaders = await authHeader()
+      const qs = `?since=${encodeURIComponent(since)}${activeStars !== null ? `&stars=${activeStars}` : ''}`
+      const pollRes = await fetch(`/api/kaspi-shop/reviews${qs}`, { headers: pollHeaders }).catch(() => null)
+      const pollJson = pollRes ? await pollRes.json().catch(() => null) : null
+      if (pollRes?.ok && pollJson) {
+        setData(pollJson)
+        const r = pollJson.refresh as ReviewsResponse['refresh']
+        if (r && r.expected > 0) {
+          if (r.updated >= r.expected) { setRefreshNote(''); return true }
+          setRefreshNote(`Обновлено ${r.updated} из ${r.expected} товаров. Раннер проверяет их по очереди, это может занять несколько минут...`)
+        }
+      }
+    }
+    return false
+  }
 
   // The actual per-product fetch now runs on a GitHub Actions relay (Kaspi
   // 429s this endpoint from Vercel's IP -- confirmed live 2026-08-21), so
@@ -159,41 +211,49 @@ function sleep(ms: number) {
     setRefreshing(true)
     setLoadError('')
     setRefreshNote('')
-    const dispatchedAt = new Date().toISOString()
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/reviews', { method: 'POST', headers })
-      const json = await res.json()
-      if (!res.ok) { setLoadError(json.error || 'Не удалось обновить отзывы'); return }
-
-      setRefreshNote(`Проверяем ${json.dispatchedCount} товар(ов) на Kaspi — это может занять пару минут...`)
-
-      // Poll budget scales with how many products are being checked (~1s
-      // each on the relay side), capped so a stuck run doesn't poll forever.
-      const maxAttempts = Math.min(60, Math.ceil(json.dispatchedCount * 2 / 3) + 15)
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await sleep(3000)
-        const pollHeaders = await authHeader()
-        const qs = activeStars !== null ? `?stars=${activeStars}` : ''
-        const pollRes = await fetch(`/api/kaspi-shop/reviews${qs}`, { headers: pollHeaders })
-        const pollJson = await pollRes.json().catch(() => null)
-        if (pollRes.ok && pollJson) {
-          setData(pollJson)
-          if (pollJson.lastFetchedAt && pollJson.lastFetchedAt >= dispatchedAt) {
-            setRefreshNote('')
-            return
-          }
-        }
+      const json = await res.json().catch(() => ({}))
+      let since: string | null = null
+      if (res.status === 429 && json.alreadyRunning && json.since) {
+        // Обновление уже идёт (запущено раньше, может быть с другой вкладки): второй
+        // запуск не создаём, а просто следим за этим.
+        setRefreshNote('Обновление отзывов уже идёт. Показываем, как оно продвигается.')
+        since = json.since
+      } else if (res.status === 429) {
+        // Лимит: слишком рано для нового запуска, а прошлый уже закончился.
+        setRefreshNote(json.error || 'Новый запуск пока недоступен.')
+        await loadReviews(activeStars)
+        return
+      } else if (!res.ok) {
+        setLoadError(json.error || 'Не удалось обновить отзывы')
+        return
+      } else {
+        since = json.since || null
+        setRefreshNote(`Проверяем ${json.dispatchedCount} товар(ов) на Kaspi. Это может занять пару минут...`)
       }
-      setRefreshNote('Обновление ещё идёт на стороне Kaspi — данные обновятся сами по мере поступления, попробуйте открыть страницу заново через минуту.')
+      if (!since) {
+        setRefreshNote('Обновление запущено. Откройте страницу заново через пару минут, чтобы увидеть свежие данные.')
+        return
+      }
+
+      const finished = await pollRefresh(since, Number(json.dispatchedCount) || 0)
+      if (!finished && mounted.current) {
+        setRefreshNote('Обновление ещё идёт на стороне Kaspi. Данные подтянутся сами, откройте страницу заново через минуту-две.')
+      }
     } catch {
       setLoadError('Не удалось обновить отзывы. Проверьте соединение и попробуйте ещё раз.')
     } finally {
-      setRefreshing(false)
+      if (mounted.current) setRefreshing(false)
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   const stats = data?.stats
 
@@ -227,24 +287,31 @@ function sleep(ms: number) {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold font-mono tabular-nums flex items-center gap-1" style={{ color: 'var(--nav-text-primary)' }}>
-                <StarIcon />{(stats?.avgRating ?? 0).toFixed(1)}
+                {data?.catalog?.avgRating != null ? <><StarIcon />{data.catalog.avgRating.toFixed(1)}</> : '—'}
               </div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>средняя оценка</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>средняя оценка по карточкам товаров</div>
             </div>
-            <div>
-              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{stats?.total ?? 0}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>всего отзывов</div>
+            <div className="min-w-0">
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
+                {data?.catalog?.totalCount != null ? data.catalog.totalCount.toLocaleString('ru-KZ') : '—'}
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                отзывов на карточках{stats ? ` · загружено ${stats.total.toLocaleString('ru-KZ')}` : ''}
+              </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold font-mono tabular-nums" style={{ color: (stats?.negative ?? 0) > 0 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>{stats?.negative ?? 0}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>негативных (≤3★)</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>негативных (≤3★) среди загруженных</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{stats?.fiveStar ?? 0}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>5★ отзывов</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>5★ среди загруженных</div>
             </div>
+          </div>
+          <div className="text-[11px] mt-4 max-w-3xl" style={{ color: 'var(--nav-text-muted)' }}>
+            Оценка и число отзывов взяты с карточек товаров Kaspi: эти отзывы общие для всех продавцов карточки, а не рейтинг вашего магазина (он на странице «Качество»). В список загружается до 50 самых популярных отзывов на товар: Kaspi не отдаёт свежие первыми, поэтому новый негативный отзыв может в список не попасть.
           </div>
 
           {refreshNote && (

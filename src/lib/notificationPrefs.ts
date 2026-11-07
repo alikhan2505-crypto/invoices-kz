@@ -32,6 +32,7 @@ export type NotificationEventKey =
   // Владельцу — Kaspi Bot
   | 'kaspi_daily_digest'
   | 'kaspi_floor_price'
+  | 'kaspi_session_expired'
   // Владельцу — ИИ-агент
   | 'ai_operator_requested'
   | 'ai_review_draft'
@@ -157,6 +158,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     channels: ['telegram'], toggleable: ['telegram'],
     requiresRu: 'Тариф Про',
     sentFrom: ['src/lib/kaspiShop/checkCycle.ts'],
+  },
+  {
+    key: 'kaspi_session_expired', audience: 'owner', group: 'kaspiShop',
+    labelRu: 'Сессия кабинета Kaspi истекла',
+    descRu: 'Kaspi разлогинил кабинет: цены не меняются и заказы не загружаются, пока вы не переподключите магазин. Не чаще раза в сутки и не больше трёх раз за один обрыв; в приложении появляется ещё и уведомление.',
+    channels: ['telegram', 'bell'], toggleable: ['telegram'],
+    requiresRu: 'Тариф Про',
+    sentFrom: ['src/lib/kaspiShop/connection.ts (markSessionExpired)', 'src/lib/kaspiShop/sessionExpiredNotice.ts', 'src/app/api/cron/notifications/route.ts'],
   },
   // ---------- ИИ-агент ----------
   {

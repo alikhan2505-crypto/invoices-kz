@@ -11,6 +11,8 @@ import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -38,6 +40,7 @@ export default function KaspiShopPendingProducts() {
   usePageDocumentTitle('Нераспознанные товары')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
   const [page, setPage] = useState(1)
   const [products, setProducts] = useState<PendingProduct[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -65,15 +68,18 @@ export default function KaspiShopPendingProducts() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
   async function loadProducts(forPage: number) {
     setListLoading(true)
     setLoadError('')
+    setSessionExpired(false)
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/pending-products?page=${forPage}`, { headers })
@@ -93,7 +99,11 @@ export default function KaspiShopPendingProducts() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>

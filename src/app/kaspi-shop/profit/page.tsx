@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -8,10 +8,13 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
+import { parseMoneyInput, moneyParseMessage } from '@/lib/kaspiShop/moneyInput'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const PERIODS = [7, 30, 90]
@@ -45,6 +48,7 @@ type ProductProfit = {
   cogsTotal: number | null
   commissionCategoryLabel: string | null
   commissionRatePercent: number | null
+  commissionSource?: 'category' | 'flat' | null
   commissionAmount: number | null
   profit: number | null
 }
@@ -59,9 +63,29 @@ type ProfitSummary = {
   adSpendConfigured: boolean
   commissionRatePercent: number | null
   commissionAmount: number
+  commissionMissing?: boolean
   netProfit: number
+  isPreliminary?: boolean
   truncated: boolean
   sessionExpired: boolean
+  // Kaspi не ответил на заказы: выручка и прибыль неполные или неизвестны (аудит K35).
+  upstreamFailed?: boolean
+  periodFrom?: string
+  fetchedOrders?: number
+  newestFirst?: boolean
+}
+
+// «2026-11-01» -> «01.11.2026» (дата без часового пояса: Date тут не нужен).
+function ruDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
+// Копия записи без одного ключа (сброс ошибки ввода у конкретного товара).
+function without(rec: Record<string, string>, key: string): Record<string, string> {
+  const copy = { ...rec }
+  delete copy[key]
+  return copy
 }
 
 /** «1 товар», «2 товара», «5 товаров», «33 товара». */
@@ -82,9 +106,15 @@ export default function KaspiShopProfit() {
   const [summary, setSummary] = useState<ProfitSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [accessError, setAccessError] = useState('')
+  // Номер последнего запроса сводки: ответ на устаревший (другой период) не затирает новый.
+  const summaryReqId = useRef(0)
   const [commissionInput, setCommissionInput] = useState('')
+  const [commissionError, setCommissionError] = useState('')
   const [savingCogsFor, setSavingCogsFor] = useState<string | null>(null)
   const [cogsInputs, setCogsInputs] = useState<Record<string, string>>({})
+  // Ошибка ввода себестоимости под полем конкретного товара (аудит K34).
+  const [cogsErrors, setCogsErrors] = useState<Record<string, string>>({})
   const [savingCategoryFor, setSavingCategoryFor] = useState<string | null>(null)
   // «Расходы периода» modal: реклама + прочие (аренда, электроэнергия…),
   // one save per период-окно (founder request 2026-08-21).
@@ -92,6 +122,7 @@ export default function KaspiShopProfit() {
   const [adInput, setAdInput] = useState('')
   const [otherInput, setOtherInput] = useState('')
   const [savingExpenses, setSavingExpenses] = useState(false)
+  const [expensesError, setExpensesError] = useState('')
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadSummary(days) }, [days, loading])
@@ -111,34 +142,49 @@ export default function KaspiShopProfit() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
   async function loadSummary(forDays: number) {
+    const id = ++summaryReqId.current
     setSummaryLoading(true)
     setLoadError('')
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/profit?days=${forDays}`, { headers })
       const data = await res.json()
+      if (id !== summaryReqId.current) return
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить прибыль'); setSummary(null); return }
       setSummary(data)
       setCommissionInput(data.commissionRatePercent !== null ? String(data.commissionRatePercent) : '')
       setAdInput(data.adSpendConfigured ? String(data.adSpend) : '')
       setOtherInput(data.adSpendConfigured ? String(data.otherExpenses ?? 0) : '')
     } catch {
+      if (id !== summaryReqId.current) return
       setLoadError('Не удалось загрузить прибыль. Проверьте соединение и попробуйте ещё раз.')
       setSummary(null)
     } finally {
-      setSummaryLoading(false)
+      if (id === summaryReqId.current) setSummaryLoading(false)
     }
   }
 
   async function saveCommission() {
-    const value = commissionInput.trim() === '' ? null : Number(commissionInput)
+    // Пусто -- осознанно «сбросить ставку»; «12,5» и «12.5» -- 12,5; всё остальное
+    // ошибка и запрос не уходит (раньше Number('12,5') = NaN уходил как null и
+    // молча сбрасывал ставку: аудит K34).
+    let value: number | null = null
+    setCommissionError('')
+    if (commissionInput.trim() !== '') {
+      const parsed = parseMoneyInput(commissionInput)
+      if (!parsed.ok) { setCommissionError(moneyParseMessage('Комиссия', parsed)); return }
+      if (parsed.value > 100) { setCommissionError('Комиссия: ставка не больше 100%.'); return }
+      value = parsed.value
+    }
     setLoadError('')
     try {
       const headers = await authHeader()
@@ -155,13 +201,20 @@ export default function KaspiShopProfit() {
   }
 
   async function saveExpenses() {
+    // Пустое поле расходов -- 0, а нечисловое -- ошибка (раньше Number(x) || 0
+    // превращал опечатку в тихий ноль: аудит K34).
+    setExpensesError('')
+    const ad = adInput.trim() === '' ? { ok: true as const, value: 0 } : parseMoneyInput(adInput)
+    if (!ad.ok) { setExpensesError(moneyParseMessage('Реклама', ad)); return }
+    const other = otherInput.trim() === '' ? { ok: true as const, value: 0 } : parseMoneyInput(otherInput)
+    if (!other.ok) { setExpensesError(moneyParseMessage('Прочие расходы', other)); return }
     setSavingExpenses(true)
     setLoadError('')
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/profit/ad-spend', {
         method: 'PATCH', headers,
-        body: JSON.stringify({ days, amount: Number(adInput) || 0, otherAmount: Number(otherInput) || 0 }),
+        body: JSON.stringify({ days, amount: ad.value, otherAmount: other.value }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -180,8 +233,17 @@ export default function KaspiShopProfit() {
   // Keyed by kaspiMasterSku (works for ANY sold product, in демпинге or
   // not) -- «не везде могу поменять себестоимость» closed 2026-08-21.
   async function saveCogs(kaspiMasterSku: string) {
+    // Пусто -- осознанно «убрать себестоимость». «1250,50» и «1 250» разбираются;
+    // нечисловое -- ошибка под полем, запрос не уходит (раньше Number() давал NaN,
+    // он уходил как null и стирал сохранённую себестоимость: аудит K34).
     const raw = cogsInputs[kaspiMasterSku]
-    const value = raw === undefined || raw.trim() === '' ? null : Number(raw)
+    let value: number | null = null
+    setCogsErrors(prev => without(prev, kaspiMasterSku))
+    if (raw !== undefined && raw.trim() !== '') {
+      const parsed = parseMoneyInput(raw)
+      if (!parsed.ok) { setCogsErrors(prev => ({ ...prev, [kaspiMasterSku]: moneyParseMessage('Себестоимость', parsed) })); return }
+      value = parsed.value
+    }
     setSavingCogsFor(kaspiMasterSku)
     setLoadError('')
     try {
@@ -225,7 +287,11 @@ export default function KaspiShopProfit() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -264,11 +330,46 @@ export default function KaspiShopProfit() {
           </div>
         )}
 
+        {summary?.upstreamFailed && !summary.sessionExpired && (
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>
+              Kaspi не ответил на часть запросов к заказам, поэтому {summary.totalRevenue > 0 ? 'выручка и прибыль неполные' : 'выручка и прибыль неизвестны'}. Не считайте их итогом, попробуйте ещё раз через минуту.
+            </span>
+            <button onClick={() => loadSummary(days)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+          </div>
+        )}
+
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-            {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль{!!summary && summary.productsWithoutCogsCount > 0 ? ' (предварительно)' : ''}</span>
-          </div>
+          {(() => {
+            // «—» вместо прибыли, когда Kaspi не ответил на заказы или сессия мертва:
+            // сумма расходов с нулевой выручкой дала бы ложный минус (аудит K35).
+            const unknown = !summary || summary.sessionExpired || (!!summary.upstreamFailed && summary.totalRevenue === 0)
+            const reasons: string[] = []
+            if (summary) {
+              if (summary.productsWithoutCogsCount > 0) reasons.push('нет себестоимости у части товаров')
+              if (summary.commissionMissing) reasons.push('не указана комиссия')
+              if (summary.truncated) reasons.push('заказы загружены не все')
+              if (summary.upstreamFailed) reasons.push('Kaspi не ответил на часть запросов')
+            }
+            const preliminary = !!summary && !unknown && (summary.isPreliminary ?? reasons.length > 0)
+            return (
+              <>
+                <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1 min-w-0 [overflow-wrap:anywhere]" style={{ color: 'var(--nav-text-primary)' }}>
+                  {unknown ? <span style={{ color: 'var(--nav-text-muted)' }}>—</span> : summary!.netProfit.toLocaleString('ru-KZ')}{' '}
+                  <span className="text-base lg:text-lg font-semibold" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль до доставки и налогов{preliminary ? ' (предварительно)' : ''}</span>
+                </div>
+                {preliminary && reasons.length > 0 && (
+                  <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>Предварительно: {reasons.join('; ')}.</div>
+                )}
+                {!!summary && !unknown && (
+                  <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                    Доставка Kaspi, налоги, возвраты и отмены не вычтены.{summary.periodFrom ? ` Период с ${ruDate(summary.periodFrom)}, время Алматы.` : ''}
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
             <div>
@@ -309,10 +410,13 @@ export default function KaspiShopProfit() {
                   </div>
                   {!hasFlatRate && (
                     <div className="flex items-center gap-1.5 mt-1">
-                      <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%" inputMode="decimal" autoComplete="off"
+                      <input value={commissionInput} onChange={e => { setCommissionInput(e.target.value); setCommissionError('') }} placeholder="%" inputMode="decimal" autoComplete="off"
                         className={`w-16 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                       <button onClick={saveCommission} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                     </div>
+                  )}
+                  {!hasFlatRate && commissionError && (
+                    <div className="text-[11px] mt-1" style={{ color: 'var(--nav-critical)' }}>{commissionError}</div>
                   )}
                   {!hasFlatRate && !hasAnyCategorized && (
                     <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>укажите комиссию Kaspi</div>
@@ -328,20 +432,27 @@ export default function KaspiShopProfit() {
             </div>
           )}
           {summary?.truncated && (
-            <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
+            <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+              {summary.newestFirst
+                ? `Период длиннее, чем мы успеваем загрузить: учтены самые свежие заказы (до 200 на статус, получено ${summary.fetchedOrders ?? 200}). Более ранние заказы периода не вошли.`
+                : 'Kaspi отдаёт заказы не от новых к старым, а мы загружаем не больше 200 на статус, поэтому учтена только часть заказов периода.'}
+            </div>
           )}
         </motion.div>
 
         {summaryLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Считаем...</div>
         ) : !summary || summary.products.length === 0 ? (
-          <div className="nav-glass rounded-2xl p-8 text-center">
-            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период продаж нет.</div>
-          </div>
+          // «Продаж нет» только когда Kaspi ответил на все запросы (аудит K35).
+          loadError || summary?.upstreamFailed || summary?.sessionExpired ? null : (
+            <div className="nav-glass rounded-2xl p-8 text-center">
+              <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период продаж нет.</div>
+            </div>
+          )
         ) : (
           <>
             <div className={`text-[11px] px-1 mb-2 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-muted)' }}>
-              Прибыль по товару — выручка минус себестоимость минус комиссия (реклама не делится по товарам). Укажите категорию Kaspi, чтобы считать комиссию по реальной ставке вместо общего процента сверху.
+              Прибыль по товару — выручка минус себестоимость минус комиссия, до доставки и налогов (реклама и прочие расходы не делятся по товарам). Укажите категорию Kaspi, чтобы считать комиссию по реальной ставке вместо общего процента сверху.
             </div>
             {/* Compact cards (founder 2026-08-21: no photo background, half
                 the width): small thumb + name + cogs input, dense grid.
@@ -369,12 +480,18 @@ export default function KaspiShopProfit() {
                     <div className="flex items-center gap-1">
                       <input
                         value={cogsInputs[p.kaspiMasterSku] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
-                        onChange={e => setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))}
+                        onChange={e => {
+                          setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))
+                          setCogsErrors(prev => without(prev, p.kaspiMasterSku))
+                        }}
                         placeholder="₸" inputMode="decimal" autoComplete="off"
                         className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                       <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
                         className="flex-shrink-0 text-xs font-medium rounded-lg px-2 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                     </div>
+                    {cogsErrors[p.kaspiMasterSku] && (
+                      <span className="text-[10px] mt-1 block" style={{ color: 'var(--nav-critical)' }}>{cogsErrors[p.kaspiMasterSku]}</span>
+                    )}
                   </label>
 
                   <label className="block mt-2">
@@ -391,7 +508,7 @@ export default function KaspiShopProfit() {
 
                   <div className="pt-2 flex items-baseline justify-between gap-1">
                     <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>
-                      Прибыль{p.commissionAmount !== null && ` (−${p.commissionAmount.toLocaleString('ru-KZ')} ₸ комиссия)`}
+                      Прибыль{p.commissionAmount !== null ? ` (−${p.commissionAmount.toLocaleString('ru-KZ')} ₸ комиссия)` : ' (комиссия не указана)'}
                     </span>
                     <span className="font-mono font-bold text-xs tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
                       {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[10px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
@@ -424,14 +541,15 @@ export default function KaspiShopProfit() {
               </p>
               <label className="block mb-3">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Реклама, ₸</span>
-                <input type="number" value={adInput} onChange={e => setAdInput(e.target.value)} placeholder="0" inputMode="decimal"
+                <input type="text" value={adInput} onChange={e => { setAdInput(e.target.value); setExpensesError('') }} placeholder="0" inputMode="decimal" autoComplete="off"
                   className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               </label>
               <label className="block mb-4">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Прочие расходы, ₸ (аренда, электроэнергия, упаковка…)</span>
-                <input type="number" value={otherInput} onChange={e => setOtherInput(e.target.value)} placeholder="0" inputMode="decimal"
+                <input type="text" value={otherInput} onChange={e => { setOtherInput(e.target.value); setExpensesError('') }} placeholder="0" inputMode="decimal" autoComplete="off"
                   className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               </label>
+              {expensesError && <div className="text-[11px] mb-3" style={{ color: 'var(--nav-critical)' }}>{expensesError}</div>}
               <button onClick={saveExpenses} disabled={savingExpenses}
                 className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>

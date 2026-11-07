@@ -90,7 +90,10 @@ async function forEachConcurrent<T>(items: T[], limit: number, fn: (item: T) => 
 // Kaspi был ложным успехом (аудит K22). Все поля вызывающий (роут sync) читает явно.
 export type ImportCatalogResult = {
   imported: number
-  // Сколько товаров вернул Kaspi (для «обновлено N из M»).
+  // Сколько товаров вернул Kaspi (для «обновлено N из M»). 0 = неизвестно: если
+  // список каталога оборвался на середине, число прочитанных до обрыва НЕ общее
+  // число товаров, и «из N» читалось бы как «всё получено». Читатель пишет «из M»
+  // только при total > 0.
   total: number
   // Товаров, которые не удалось записать в нашу базу.
   skipped: number
@@ -115,7 +118,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
   try {
     const list = await listCatalogWithStatus(sessionCookies, merchantId, true)
     const offers = list.offers
-    total = offers.length
+    total = list.complete ? offers.length : 0
     if (list.sessionExpired) {
       return { imported: 0, total: 0, skipped: 0, complete: false, sessionExpired: true, pointCitiesPartial: false, error: list.error }
     }

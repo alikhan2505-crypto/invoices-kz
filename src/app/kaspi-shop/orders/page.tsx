@@ -15,6 +15,8 @@ import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -68,6 +70,7 @@ function KaspiShopOrdersInner() {
   const status = searchParams.get('status') || ORDER_STATUS_TABS[0].value
 
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [loadedCount, setLoadedCount] = useState(0)
@@ -149,9 +152,11 @@ function KaspiShopOrdersInner() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    // Сбой запроса не равен «не подключён»: показываем «Повторить», а не уводим
+    // подключённого продавца на окно подключения (аудит Kaspi 2026-11-06, K12).
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
@@ -408,7 +413,11 @@ function KaspiShopOrdersInner() {
   const bulkEnabled = BULK_SELECTABLE_STATUSES.includes(status) && !orderCodeSearch
   const listPending = ordersLoading || !listIsCurrent
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return accessError
+      ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
+      : <LoadingSpinner />
+  }
 
   return (
     <DesktopShell>
@@ -423,15 +432,15 @@ function KaspiShopOrdersInner() {
           <div className="flex items-center gap-2 flex-wrap">
             <input type="text" value={orderCodeInput} onChange={e => setOrderCodeInput(e.target.value)}
               placeholder="Поиск по номеру заказа"
-              className="nav-glass rounded-full px-3 py-1.5 text-xs font-medium outline-none w-44"
+              className="nav-glass rounded-full px-3 py-1.5 max-sm:min-h-10 text-xs font-medium outline-none w-44"
               style={{ color: 'var(--nav-text-primary)' }} />
             <select value={cityId} onChange={e => setCityId(e.target.value)}
-              className="nav-glass rounded-full px-3 py-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+              className="nav-glass rounded-full px-3 py-1.5 max-sm:min-h-10 text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>
               <option value="">Все города</option>
               {cityOptions.map(c => <option key={c.cityId} value={c.cityId}>{c.cityName}</option>)}
             </select>
             <button onClick={exportExcel} disabled={exporting}
-              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 max-sm:min-h-10 disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
               {exporting ? 'Экспорт...' : 'Выгрузить в Excel'}
             </button>
             <div className="relative flex items-center gap-0.5 nav-glass rounded-full p-[3px]">
@@ -439,7 +448,7 @@ function KaspiShopOrdersInner() {
                 const active = groupBy === value
                 return (
                   <button key={value} onClick={() => setGroupBy(g => g === value ? null : value)}
-                    className="relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    className="relative px-3 py-1.5 max-sm:min-h-10 rounded-full text-xs font-medium transition-colors"
                     style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
                     {active && (
                       <motion.span layoutId="groupByPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
@@ -456,7 +465,7 @@ function KaspiShopOrdersInner() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadOrders(status, cityId, orderCodeSearch)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => loadOrders(status, cityId, orderCodeSearch)} className="text-xs font-semibold rounded-lg px-3 py-1.5 max-sm:min-h-10 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
@@ -480,7 +489,7 @@ function KaspiShopOrdersInner() {
             const active = status === tab.value
             return (
               <button key={tab.value} onClick={() => router.push(`/kaspi-shop/orders?status=${tab.value}`)}
-                className="relative overflow-hidden flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors"
+                className="relative overflow-hidden flex-shrink-0 rounded-full px-3 py-1.5 max-sm:min-h-10 text-xs font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'transparent' : 'var(--nav-surface-glass)' }}>
                 {active && (
                   <motion.span layoutId="orderStatusPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)' }}
@@ -498,7 +507,7 @@ function KaspiShopOrdersInner() {
               const active = dateMode === value
               return (
                 <button key={value} onClick={() => changeDateMode(value)}
-                  className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                  className="rounded-full px-3 py-1.5 max-sm:min-h-10 text-xs font-semibold transition-colors"
                   style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'var(--nav-accent)' : 'var(--nav-surface-glass)' }}>
                   {label}
                 </button>
@@ -510,13 +519,13 @@ function KaspiShopOrdersInner() {
         {bulkEnabled && !listPending && visibleOrders.length > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <button onClick={selectAllVisible}
-              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 max-sm:min-h-10" style={{ color: 'var(--nav-text-primary)' }}>
               {/* Число = сколько реально выберется (видимые карточки); при неполной загрузке говорим об этом. */}
               {orders.length < total ? `Выбрать загруженные (${visibleOrders.length} из ${total})` : `Выбрать все (${visibleOrders.length})`}
             </button>
             {selectedVisibleOrders.length > 0 && (
               <button onClick={deselectAll}
-                className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
+                className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 max-sm:min-h-10" style={{ color: 'var(--nav-text-secondary)' }}>
                 Снять выбор
               </button>
             )}
@@ -527,7 +536,7 @@ function KaspiShopOrdersInner() {
           <div className="rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap mb-4" style={{ background: 'var(--nav-accent)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selectedVisibleOrders.length}</span>
             <button onClick={confirmPackingAction} disabled={confirmingPacking}
-              className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
+              className="text-xs font-medium rounded-lg px-3 py-2 max-sm:min-h-10 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
               {confirmingPacking ? 'Подтверждаем...' : 'Я упаковал, сформировать накладные'}
             </button>
           </div>
@@ -542,12 +551,12 @@ function KaspiShopOrdersInner() {
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selectedVisibleOrders.length}</span>
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => printWaybills('a4')} disabled={printing !== null}
-                className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
-                {printing === 'a4' ? 'Готовим PDF...' : 'Скачать накладные в формате А4'}
+                className="text-xs font-medium rounded-lg px-3 py-2 max-sm:min-h-10 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
+                {printing === 'a4' ? 'Готовим PDF...' : <><span className="sm:hidden">Накладные А4</span><span className="hidden sm:inline">Скачать накладные в формате А4</span></>}
               </button>
               <button onClick={() => printWaybills('a6')} disabled={printing !== null}
-                className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
-                {printing === 'a6' ? 'Готовим PDF...' : 'Скачать накладные в формате А6'}
+                className="text-xs font-medium rounded-lg px-3 py-2 max-sm:min-h-10 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
+                {printing === 'a6' ? 'Готовим PDF...' : <><span className="sm:hidden">Накладные А6</span><span className="hidden sm:inline">Скачать накладные в формате А6</span></>}
               </button>
             </div>
           </div>
@@ -600,7 +609,7 @@ function KaspiShopOrdersInner() {
                     <div className="font-mono font-bold text-xs tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
                     <button type="button" aria-label="Подробнее о заказе"
                       onClick={e => { e.stopPropagation(); router.push(`/kaspi-shop/orders/${o.code}`) }}
-                      className="flex-shrink-0 rounded-full p-1 transition-colors hover:opacity-70" style={{ color: 'var(--nav-text-muted)' }}>
+                      className="flex-shrink-0 rounded-full p-2 -m-1.5 transition-colors hover:opacity-70" style={{ color: 'var(--nav-text-muted)' }}>
                       <ChevronRightIcon />
                     </button>
                     <button type="button" aria-label="Запросить отзыв в WhatsApp"
@@ -613,7 +622,7 @@ function KaspiShopOrdersInner() {
                           text: `Здравствуйте! Спасибо за заказ «${name}» 🙏 Будем очень благодарны, если оставите отзыв на Kaspi — это помогает нам и другим покупателям.`,
                         })
                       }}
-                      className="flex-shrink-0 rounded-full p-1 transition-colors hover:opacity-70" style={{ color: 'var(--nav-success)' }}>
+                      className="flex-shrink-0 rounded-full p-2 -m-1.5 transition-colors hover:opacity-70" style={{ color: 'var(--nav-success)' }}>
                       <WhatsAppIcon />
                     </button>
                   </div>
@@ -676,7 +685,7 @@ function KaspiShopOrdersInner() {
               <div className="p-5 lg:p-6">
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <div className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Запросить отзыв</div>
-                  <button onClick={() => setReviewModal(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+                  <button onClick={() => setReviewModal(null)} aria-label="Закрыть" className="text-lg leading-none flex-shrink-0 p-2 -m-2" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
                 </div>
                 <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
                   Kaspi скрывает телефон клиента в своём API — введите номер, который видите в кабинете Kaspi. Откроется WhatsApp с готовым текстом, отправляете вы сами.
