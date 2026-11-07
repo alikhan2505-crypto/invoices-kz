@@ -90,6 +90,8 @@ export const GO_LINKS: readonly GoLink[] = [
   // Реклама рилсов серии «Клиент просит счёт, а ты…» (04.11.2026): заготовленное сообщение кнопки рекламы
   // «Хочу счёт на оплату за минуту», ответ со ссылкой на бесплатный счёт.
   link('ad-schet', '/tools/schet', 'meta', 'paid_dm', 'schet_ad', 'личные сообщения из платной рекламы: ссылка в ответе про счёт на оплату'),
+  // Реклама Kaspi Bot / демпинга (07.11.2026): трафик с объявления на лендинг kaspi.invoices.kz (как dm-bot, но источник meta / paid).
+  hostLink('ad-kaspi-bot', 'kaspi.invoices.kz', '/lp/kaspi', 'meta', 'paid', 'kaspi_bot_ad', 'платная реклама: лендинг Kaspi Bot (демпинг цен, тариф Про)'),
   link('ad-schet-btn', '/tools/schet', 'meta', 'paid_dm', 'schet_ad_btn', 'личные сообщения из платной рекламы: КНОПКА «Открыть счёт»'),
   link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
