@@ -18,9 +18,9 @@ import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 import {
-  CHECK_PRICE_TENGE, apiErrorMessage, applyNowConfirmText, applyNowSuccessText, catalogSyncShouldReload, estimateDailyCost,
-  floorFarConfirmText, formatTenge, isBilledProduct, isFloorFarResponse, lowBalanceWarning, periodLabel, pluralProducts, runwayHours, runwayLabel,
-  suggestionBlockReason, validateBulkSettings, validateProductSettings,
+  DEFAULT_CHECK_FREQUENCY_MINUTES, PRICE_CHANGE_TENGE, PRICE_MODEL_NOTE, apiErrorMessage, applyNowBlockReason, applyNowSuccessText,
+  catalogSyncShouldReload, effectiveCheckPeriodMinutes, floorFarConfirmText, formatTenge, isActiveProduct, isFloorFarResponse, lowBalanceWarning, periodLabel,
+  pluralProducts, suggestionBlockReason, summarizeSchedule, validateBulkSettings, validateProductSettings,
 } from '@/lib/kaspiShop/dempingForm'
 
 type Product = {
@@ -340,7 +340,7 @@ export default function KaspiShop() {
   const [bulkMaxPrice, setBulkMaxPrice] = useState('')
   const [bulkUndercutStep, setBulkUndercutStep] = useState('100')
   const [bulkStrategy, setBulkStrategy] = useState('undercut_leader')
-  const [bulkFrequency, setBulkFrequency] = useState('15')
+  const [bulkFrequency, setBulkFrequency] = useState(String(DEFAULT_CHECK_FREQUENCY_MINUTES))
   const [bulkSubmitting, setBulkSubmitting] = useState(false)
   const [bulkError, setBulkError] = useState('')
 
@@ -501,7 +501,7 @@ export default function KaspiShop() {
       const headers = await authHeader()
       const r = await postConnectStep('/api/kaspi-shop/connect', headers, { phone })
       if (!r.ok) {
-        const localized = connectErrorMessage(lang, r.data?.code, { step: 'phone', resumable: false })
+        const localized = connectErrorMessage(lang, r.data?.code, { step: 'phone', resumable: false, scope: r.data?.scope, retryAfterSec: r.data?.retryAfterSec })
         setConnectError(localized || r.error || 'Не удалось подключиться')
         setConnectErrorDetail(typeof r.data?.detail === 'string' ? r.data.detail : '')
         return
@@ -884,16 +884,14 @@ export default function KaspiShop() {
   // synchronously (real Kaspi fetches only work from GitHub Actions, not
   // Vercel). The route responds as soon as it has queued the run, so this
   // polls the product list a few times afterwards rather than expecting
-  // fresh numbers in the response itself. Каждая проверка стоит 5 ₸ за товар,
-  // поэтому перед запуском человек видит «N товаров × 5 ₸ = X ₸» и
-  // подтверждает; а запуск у большого списка идёт минутами, не «в течение минуты».
+  // fresh numbers in the response itself. Проверка бесплатна (5 ₸ берётся только
+  // за изменение цены ботом), поэтому подтверждения со стоимостью нет; запуск у
+  // большого списка идёт минутами, не «в течение минуты».
   async function applyNow() {
     if (applyingNow) return
-    // Считаем так же, как сервер: включённые И в продаже (снятые с продажи бот
-    // пропускает и не списывает). Иначе подтверждение и итог «N × 5 ₸» расходятся.
-    const planned = products.filter(isBilledProduct).length
-    if (planned === 0) return
-    if (!(await confirm(applyNowConfirmText(planned, balance)))) return
+    // Те же причины отказа, что показаны под кнопкой: пауза, мёртвая сессия, нет
+    // включённых товаров в продаже, баланс меньше 5 ₸.
+    if (applyNowBlockReason({ paused, sessionStatus, activeCount: products.filter(isActiveProduct).length, balance })) return
     setApplyingNow(true)
     setApplyNowMessage('')
     try {
@@ -909,7 +907,7 @@ export default function KaspiShop() {
       applyTimers.current.forEach(clearTimeout)
       applyTimers.current = [
         setTimeout(() => { load() }, 15_000),
-        // Кнопка снова доступна через минуту: двойное нажатие подряд списало бы деньги дважды.
+        // Кнопка снова доступна через минуту; повторный запуск сервер всё равно держит за лимитом раз в 10 минут.
         setTimeout(() => { load(); setApplyingNow(false) }, 60_000),
         setTimeout(() => { load() }, 150_000),
         setTimeout(() => { load(); setApplyNowMessage('') }, 300_000),
@@ -955,7 +953,7 @@ export default function KaspiShop() {
     setBulkMaxPrice('')
     setBulkUndercutStep('100')
     setBulkStrategy('undercut_leader')
-    setBulkFrequency('15')
+    setBulkFrequency(String(DEFAULT_CHECK_FREQUENCY_MINUTES))
     setBulkError('')
   }
 
@@ -1025,20 +1023,21 @@ export default function KaspiShop() {
   const untouchedFloorCount = products.filter(
     p => p.own_current_price > 0 && Math.abs(p.own_current_price - p.floor_price) < 0.01
   ).length
-  const activeCount = products.filter(p => p.enabled).length
+  // «Активных» = включённые И в продаже: снятые с продажи бот не проверяет.
+  const activeCount = products.filter(isActiveProduct).length
   // «Работает» при нуле включённых товаров вводило в заблуждение: бот ничего не делает (аудит 02.11.2026).
   const idleNoProducts = !paused && activeCount === 0
-  // Реальный расход на проверки (K15): 5 ₸ за проверку, а период на деле около
-  // 20 минут при настройке «15»: запуски идут раз в 10 минут. Считаем по
-  // включённым товарам; плашка «баланс заканчивается» строится из этой же оценки.
-  const costEstimate = estimateDailyCost(products)
-  const balanceWarning = lowBalanceWarning(balance, costEstimate, paused)
+  // Расписание проверок: сколько товаров бот реально проверяет и как часто (запуски
+  // идут раз в 10 минут, период округляется до целого числа тиков). Денег в этой
+  // оценке нет: проверка бесплатна, а число изменений цены заранее не известно.
+  const schedule = summarizeSchedule(products)
+  const balanceWarning = lowBalanceWarning(balance, schedule, paused)
+  const applyBlockReason = applyNowBlockReason({ paused, sessionStatus, activeCount, balance })
   // То же для окна «Добавить несколько»: выбранные товары будут включены с общей частотой.
   const bulkFreq = Number(bulkFrequency.replace(/[\s ]/g, '').replace(',', '.'))
-  const bulkEstimate = Number.isInteger(bulkFreq) && bulkFreq >= 5
-    ? estimateDailyCost(Array.from(bulkSelected).map(() => ({ enabled: true, check_frequency_minutes: bulkFreq })))
+  const bulkSchedule = Number.isInteger(bulkFreq) && bulkFreq >= 5
+    ? summarizeSchedule(Array.from(bulkSelected).map(() => ({ enabled: true, check_frequency_minutes: bulkFreq })))
     : null
-  const bulkRunway = bulkEstimate ? runwayHours(balance, bulkEstimate.dailyCost) : null
 
   // Which cities this product's demping actually covers: manually tracked
   // cities win; with none picked, auto mode checks the product's own point
@@ -1252,7 +1251,7 @@ export default function KaspiShop() {
         {balanceWarning && (
           <div role="alert" className="rounded-2xl p-4 lg:p-5 mb-4" style={{ border: '1px solid var(--nav-critical)' }}>
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-critical)' }}>
-              {balanceWarning.level === 'empty' ? 'Бот остановлен: нет денег на балансе' : 'Баланс заканчивается'}
+              {balanceWarning.title}
             </div>
             <p className={`text-[13px] ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
               {balanceWarning.message}{' '}
@@ -1292,11 +1291,11 @@ export default function KaspiShop() {
                   </div>
                 </div>
               </div>
-              {costEstimate.count > 0 && (
+              {schedule.count > 0 && (
                 <p data-testid="running-cost" className="text-[12px] mt-5 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
                   {paused
-                    ? `Демпинг на паузе: проверки не идут, деньги не списываются. После включения бот проверяет цены ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)}.`
-                    : `Каждая проверка цены стоит ${CHECK_PRICE_TENGE} ₸. Бот проверяет цены ${periodLabel(costEstimate.minPeriod, costEstimate.maxPeriod)} (запуски идут раз в 10 минут). Ориентировочно ${formatTenge(costEstimate.dailyCost)} в сутки на ${costEstimate.count} ${pluralProducts(costEstimate.count)}.`}
+                    ? `Демпинг на паузе: проверки не идут, деньги не списываются. После включения бот проверяет цены ${periodLabel(schedule.minPeriod, schedule.maxPeriod)}.`
+                    : `${PRICE_MODEL_NOTE} За одну проверку товара списывается не больше ${PRICE_CHANGE_TENGE} ₸, даже если цена изменилась в нескольких городах. Бот проверяет цены ${periodLabel(schedule.minPeriod, schedule.maxPeriod)}.`}
                 </p>
               )}
             </motion.div>
@@ -1347,7 +1346,7 @@ export default function KaspiShop() {
             </div>
             </div>
 
-            {companyName && activeCount === 0 && products.length > 0 && (
+            {companyName && products.length > 0 && products.every(p => !p.enabled) && (
               <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
             )}
 
@@ -1362,7 +1361,7 @@ export default function KaspiShop() {
                   className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
                   Добавить несколько
                 </button>
-                <button onClick={applyNow} disabled={applyingNow || !stats || costEstimate.count === 0}
+                <button onClick={applyNow} disabled={applyingNow || !stats || applyBlockReason !== null}
                   className="text-xs font-semibold rounded-full px-4 py-2 flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {applyingNow ? 'Проверяем...' : 'Применить сейчас'}
@@ -1371,9 +1370,9 @@ export default function KaspiShop() {
             </div>
             {applyNowMessage ? (
               <div role="status" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
-            ) : stats && !paused && costEstimate.count > 0 ? (
-              <div data-testid="apply-now-cost" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
-                {`«Применить сейчас»: ${costEstimate.count} ${pluralProducts(costEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ = ${formatTenge(costEstimate.count * CHECK_PRICE_TENGE)}, списывается при запуске.`}
+            ) : stats && applyBlockReason ? (
+              <div data-testid="apply-now-reason" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
+                {`«Применить сейчас» недоступна. ${applyBlockReason}`}
               </div>
             ) : null}
 
@@ -1425,7 +1424,7 @@ export default function KaspiShop() {
                           <div className="min-w-0">
                             <div className="text-sm font-semibold truncate" title={p.product_name} style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
                             <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-                              {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин
+                              {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка примерно раз в {effectiveCheckPeriodMinutes(p.check_frequency_minutes)} мин
                             </div>
                           </div>
                           <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
@@ -1649,7 +1648,7 @@ export default function KaspiShop() {
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
               <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Пополнить кошелёк</div>
-              <div className="text-xs mb-4" style={{ color: 'var(--nav-text-muted)' }}>Баланс: {balance.toLocaleString('ru-KZ')} ₸ · проверка цены — 5 ₸</div>
+              <div className="text-xs mb-4" style={{ color: 'var(--nav-text-muted)' }}>Баланс: {balance.toLocaleString('ru-KZ')} ₸ · {PRICE_CHANGE_TENGE} ₸ за каждое изменение цены ботом</div>
               <div className="flex gap-2 flex-wrap mb-2">
                 {[1000, 5000, 10000].map(amount => (
                   <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
@@ -1795,15 +1794,15 @@ export default function KaspiShop() {
                     <div className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                       {STRATEGY_DESCRIPTIONS[bulkStrategy] || ''} {STRATEGY_COMMON_NOTE}
                     </div>
-                    {bulkEstimate && (
+                    {bulkSchedule && (
                       <div data-testid="bulk-cost" className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                         <div className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
-                          {`Расход: ориентировочно ${formatTenge(bulkEstimate.dailyCost)} в сутки`}
+                          {PRICE_MODEL_NOTE}
                         </div>
-                        {`${bulkEstimate.count} ${pluralProducts(bulkEstimate.count)} × ${CHECK_PRICE_TENGE} ₸ за проверку. Бот проверяет цены ${periodLabel(bulkEstimate.minPeriod, bulkEstimate.maxPeriod)} (запуски идут раз в 10 минут). Деньги списываются с баланса (сейчас ${formatTenge(balance)}), когда он закончится, бот остановится.`}
-                        {bulkRunway !== null && bulkRunway < 24 && (
+                        {`${bulkSchedule.count} ${pluralProducts(bulkSchedule.count)}: бот проверяет цены ${periodLabel(bulkSchedule.minPeriod, bulkSchedule.maxPeriod)}. За каждое изменение цены деньги списываются с баланса (сейчас ${formatTenge(balance)}), при балансе меньше ${PRICE_CHANGE_TENGE} ₸ бот цены не меняет.`}
+                        {balance < PRICE_CHANGE_TENGE && (
                           <div className="font-semibold mt-1" style={{ color: 'var(--nav-critical)' }}>
-                            {`Баланса хватит ${runwayLabel(bulkRunway)}. Пополните баланс до запуска.`}
+                            {`Баланс меньше ${PRICE_CHANGE_TENGE} ₸: бот не сможет менять цены. Пополните баланс до запуска.`}
                           </div>
                         )}
                       </div>

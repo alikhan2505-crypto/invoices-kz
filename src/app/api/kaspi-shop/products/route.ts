@@ -77,7 +77,9 @@ export async function GET(req: NextRequest) {
   const now = Date.now()
   const stats = {
     totalRules: products.length,
-    activeCount: products.filter((p: any) => p.enabled).length,
+    // «Активных» -- только включённые товары в продаже: снятые с продажи бот не проверяет
+    // (null у старых строк = в продаже), и считать их работающими было бы неправдой.
+    activeCount: products.filter((p: any) => p.enabled && p.available_for_sale !== false).length,
     readyToApply: connectionPaused || !sessionActive
       ? 0
       : products.filter((p: any) => p.enabled && p.available_for_sale !== false && isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)).length,

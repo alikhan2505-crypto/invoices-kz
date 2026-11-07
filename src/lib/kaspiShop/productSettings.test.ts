@@ -121,9 +121,9 @@ describe('validateProductPatch', () => {
 
 describe('validateProductCreate', () => {
   const ok = { ownCurrentPrice: 1500, floorPrice: 1000, undercutStep: 100 }
-  it('accepts a sane body and defaults frequency 15 and stock 0', () => {
+  it('accepts a sane body and defaults frequency 60 (hourly) and stock 0', () => {
     expect(validateProductCreate(ok)).toEqual({
-      ok: true, value: { ownCurrentPrice: 1500, floorPrice: 1000, undercutStep: 100, checkFrequencyMinutes: 15, stockCount: 0 },
+      ok: true, value: { ownCurrentPrice: 1500, floorPrice: 1000, undercutStep: 100, checkFrequencyMinutes: 60, stockCount: 0 },
     })
   })
   it.each([
@@ -148,9 +148,9 @@ describe('validateBulkSettings', () => {
       ok: true, value: { floorPrice: 1000, maxPrice: 3000, undercutStep: 100, dempingStrategy: 'be_second', checkFrequencyMinutes: 20 },
     })
   })
-  it('defaults: no max, undercut_leader, 15 minutes', () => {
+  it('defaults: no max, undercut_leader, 60 minutes (hourly)', () => {
     expect(validateBulkSettings({ floorPrice: 700, undercutStep: 0 })).toEqual({
-      ok: true, value: { floorPrice: 700, maxPrice: null, undercutStep: 0, dempingStrategy: 'undercut_leader', checkFrequencyMinutes: 15 },
+      ok: true, value: { floorPrice: 700, maxPrice: null, undercutStep: 0, dempingStrategy: 'undercut_leader', checkFrequencyMinutes: 60 },
     })
   })
   it('rejects an unknown strategy instead of silently replacing it', () => {

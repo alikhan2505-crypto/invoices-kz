@@ -21,9 +21,33 @@ const supabase = createClient(
 //     details пачками по 50, города) при каждом открытии страницы заказов. Через
 //     10 минут пробуем снова, и «застрять навсегда» он не может;
 //   * старый голый массив читается как устаревший: пробуем обновить, а если Kaspi
-//     сейчас не ответил полно, отдаём его (лучше старые точки, чем пустой список).
+//     сейчас не ответил полно, отдаём его (лучше старые точки, чем пустой список);
+//   * неполный свежий скан не выбрасывается в пользу старого кэша: точки сливаются
+//     (mergePoints), иначе новая точка не появилась бы, пока Kaspi отвечает неполно;
+//   * неполный результат БЕЗ единой точки (разовый сбой Kaspi: таймаут, 429) живёт
+//     всего минуту (MERCHANT_POINTS_EMPTY_TTL_MS), а не десять: первый же сбой не
+//     должен на 10 минут оставлять пустой список городов.
 export const MERCHANT_POINTS_TTL_MS = 24 * 60 * 60 * 1000
 export const MERCHANT_POINTS_PARTIAL_TTL_MS = 10 * 60 * 1000
+export const MERCHANT_POINTS_EMPTY_TTL_MS = 60 * 1000
+
+/**
+ * Объединение двух наборов точек по storeCode. Запись с cityId предпочтительнее записи
+ * без города; если город есть у обеих, берётся свежая (вторая). Порядок: сначала старые
+ * точки, затем новые.
+ */
+export function mergePoints(cached: MerchantPoint[], fresh: MerchantPoint[]): MerchantPoint[] {
+  const byCode = new Map<string, MerchantPoint>()
+  for (const p of [...cached, ...fresh]) {
+    const prev = byCode.get(p.storeCode)
+    // Запись с городом не заменяется записью без города; в остальных случаях побеждает поздняя.
+    if (!prev || p.cityId || !prev.cityId) {
+      // Название города из кэша не теряется, если у свежей записи его нет (справочник городов не ответил).
+      byCode.set(p.storeCode, prev && p.cityId && prev.cityId === p.cityId && !p.cityName && prev.cityName ? { ...p, cityName: prev.cityName } : p)
+    }
+  }
+  return [...byCode.values()]
+}
 
 export type MerchantPointsCache = { v: 2; cachedAt: string; points: MerchantPoint[]; partial?: true }
 
@@ -33,7 +57,7 @@ export function readPointsCache(raw: unknown, now = Date.now()): { points: Merch
   if (raw && typeof raw === 'object' && Array.isArray((raw as MerchantPointsCache).points)) {
     const c = raw as MerchantPointsCache
     const partial = c.partial === true
-    const ttl = partial ? MERCHANT_POINTS_PARTIAL_TTL_MS : MERCHANT_POINTS_TTL_MS
+    const ttl = partial ? (c.points.length > 0 ? MERCHANT_POINTS_PARTIAL_TTL_MS : MERCHANT_POINTS_EMPTY_TTL_MS) : MERCHANT_POINTS_TTL_MS
     const at = Date.parse(c.cachedAt)
     return { points: c.points, fresh: Number.isFinite(at) && now - at >= 0 && now - at < ttl, partial }
   }
@@ -60,8 +84,10 @@ export async function getCachedMerchantPoints(connectionId: string, sessionCooki
     await writeCache({ v: 2, cachedAt: new Date().toISOString(), points: fresh.points })
     return fresh.points
   }
-  // Если есть старый кэш, он полнее случайного обрыва.
-  const points = cached.points.length > 0 ? cached.points : fresh.points
+  // Неполный свежий скан и старый кэш (полный, устаревший или тоже неполный) не
+  // противопоставляются, а сливаются: в старом есть то, что Kaspi сейчас не отдал, в
+  // свежем -- то, чего в старом ещё нет.
+  const points = mergePoints(cached.points, fresh.points)
   // Мёртвая сессия: после переподключения точки нужны сразу, отрицательный результат не запоминаем.
   if (!fresh.sessionExpired) {
     await writeCache({ v: 2, cachedAt: new Date().toISOString(), points, partial: true })

@@ -70,9 +70,9 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       en: ['Automatic price cuts down to your floor', 'Packing, handover, waybills — all orders at once', 'Profit per product after commissions'],
     },
     priceNote: {
-      ru: `Входит в тариф Про — ${PRO_MONTHLY}/мес. Каждая проверка цены — 5\u00A0₸ из кошелька.`,
-      kk: `Про тарифіне кіреді — ${PRO_MONTHLY}/ай. Бағаны әр тексеру — әмияннан 5\u00A0₸.`,
-      en: `Included in the Pro plan — ${PRO_MONTHLY}/mo. Each price check takes 5\u00A0₸ from your wallet.`,
+      ru: `Входит в тариф Про, ${PRO_MONTHLY}/мес. Проверки цен бесплатны: 5\u00A0₸ из кошелька берётся только за каждое изменение цены ботом.`,
+      kk: `Про тарифіне кіреді, ${PRO_MONTHLY}/ай. Бағаны тексеру тегін: әмияннан 5\u00A0₸ тек бот бағаны өзгерткен сайын алынады.`,
+      en: `Included in the Pro plan, ${PRO_MONTHLY}/mo. Price checks are free: 5\u00A0₸ is taken from your wallet only for each price change the bot makes.`,
     },
     title: {
       ru: 'Kaspi Bot — демпинг цен и заказы Kaspi | invoices.kz',

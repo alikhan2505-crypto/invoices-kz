@@ -4,6 +4,7 @@ import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listCatalogWithStatus, fetchOffersDetailsChecked, extractOfferPointInfo, totalStock, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
+import { DEFAULT_CHECK_FREQUENCY } from '@/lib/kaspiShop/productSettings'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -136,11 +137,12 @@ export async function GET(req: NextRequest) {
   let citiesIncomplete = false
   try {
     const details = await fetchOffersDetailsChecked(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
-    if (details.sessionExpired) {
-      await markSessionExpired(connection.id)
-      return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).', sessionExpired: true }, { status: 400 })
-    }
+    // Оба списка каталога выше ответили без 401/403, так что 401/403 только от details не
+    // доказывает смерть сессии (Kaspi может отвечать 403 на один путь при живой куке).
+    // Не запираем живой магазин на окне подключения: списки остаются, города помечены
+    // как неполные. Сессия помечается истёкшей только по самим спискам (выше).
     if (!details.ok) citiesIncomplete = true
+    if (details.sessionExpired) console.error('kaspi-shop removed-products: details answered 401/403 while the catalog lists were fine (cards show no cities, session NOT marked expired)')
     for (const item of details.items) {
       if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
     }
@@ -286,7 +288,7 @@ export async function POST(req: NextRequest) {
             own_current_price: offer.minPrice,
             floor_price: offer.minPrice,
             undercut_step: 100,
-            check_frequency_minutes: 15,
+            check_frequency_minutes: DEFAULT_CHECK_FREQUENCY,
             enabled: false,
             available_for_sale: true,
             kaspi_master_sku: offer.masterSku,

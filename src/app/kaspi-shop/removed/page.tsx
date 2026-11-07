@@ -157,6 +157,7 @@ export default function KaspiShopProductAvailability() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [loadNote, setLoadNote] = useState('')
   const [active, setActive] = useState<Offer[]>([])
   const [removed, setRemoved] = useState<Offer[]>([])
   // «В продаже» first (founder request) -- these are the products being
@@ -249,6 +250,9 @@ export default function KaspiShopProductAvailability() {
       } else {
         setActive(data.active || [])
         setRemoved(data.removed || [])
+        // Kaspi не отдал названия городов: карточки показывают коды точек, скажем об этом, а не молчим.
+        if (data.citiesIncomplete) setLoadNote('Названия городов не загрузились, обновите страницу.')
+        else setLoadNote('')
         if ((data.active || []).length === 0 && (data.removed || []).length > 0) setTab('removed')
       }
     } catch {
@@ -333,8 +337,16 @@ export default function KaspiShopProductAvailability() {
       return
     }
     const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.ok) {
-      const failMsg = (data.results || []).filter((r: any) => !r.ok).map((r: any) => `${r.storeCode}: ${r.message}`).join('; ')
+    const results: { storeCode: string; ok: boolean; message?: string }[] = Array.isArray(data.results) ? data.results : []
+    const failMsg = results.filter(r => !r.ok).map(r => `${r.storeCode}: ${r.message}`).join('; ')
+    // Часть точек могла сохраниться (HTTP 200, у каждой точки свой результат). Сохранённые
+    // фиксируем как новый «исходный» снимок, а упавшие оставляем изменёнными: иначе повтор
+    // заново отправил бы уже сохранённые точки и потратил бюджет изменений Kaspi.
+    const savedCodes = new Set<string>(
+      res.ok && data.ok ? plan.entries.map(e => e.storeCode) : res.ok ? results.filter(r => r.ok).map(r => r.storeCode) : [],
+    )
+    const allSaved = res.ok && !!data.ok
+    if (!allSaved && savedCodes.size === 0) {
       setStockModal(prev => prev ? { ...prev, saving: false, error: data.error || failMsg || 'Не удалось сохранить' } : prev)
       return
     }
@@ -344,20 +356,32 @@ export default function KaspiShopProductAvailability() {
     // на город, поэтому у ВСЕХ точек сохранённого города цена теперь новая городская
     // (и у не тронутых соседей тоже): иначе правка остатка соседа ушла бы со старой
     // ценой и откатила город назад.
-    const savedCityPrice = new Map(plan.entries.map(e => [e.cityId, String(e.price)]))
+    const savedEntries = plan.entries.filter(e => savedCodes.has(e.storeCode))
+    const failedCodes = new Set(plan.entries.filter(e => !savedCodes.has(e.storeCode)).map(e => e.storeCode))
+    const savedCityPrice = new Map(savedEntries.map(e => [e.cityId, String(e.price)]))
     setStockModal(prev => {
       if (!prev) return prev
-      const initial: StockModalState['initial'] = JSON.parse(JSON.stringify(sentEdits))
+      // Всё сохранено: новый снимок это то, что отправили. Частично: старый снимок, поверх него только сохранённые точки.
+      const initial: StockModalState['initial'] = allSaved
+        ? JSON.parse(JSON.stringify(sentEdits))
+        : JSON.parse(JSON.stringify(prev.initial))
+      if (!allSaved) for (const e of savedEntries) if (sentEdits[e.storeCode]) initial[e.storeCode] = { ...sentEdits[e.storeCode] }
       const edits = { ...prev.edits }
       for (const e of prev.entries) {
+        if (failedCodes.has(e.storeCode)) continue // не сохранилась: остаётся изменённой
         const cityPrice = e.cityId ? savedCityPrice.get(e.cityId) : undefined
         if (cityPrice === undefined || !initial[e.storeCode]) continue
         const untouched = edits[e.storeCode]?.price === sentEdits[e.storeCode]?.price
         initial[e.storeCode] = { ...initial[e.storeCode], price: cityPrice }
         if (untouched) edits[e.storeCode] = { ...edits[e.storeCode], price: cityPrice }
       }
-      return { ...prev, saving: false, saved: true, initial, edits }
+      if (allSaved) return { ...prev, saving: false, saved: true, initial, edits }
+      return {
+        ...prev, saving: false, saved: false, initial, edits,
+        error: `Сохранено точек: ${savedEntries.length} из ${plan.entries.length}. Не сохранились: ${failMsg || 'ответ Kaspi не получен'}. Нажмите «Сохранить изменения» ещё раз: сохранённые точки заново не уйдут.`,
+      }
     })
+    if (!allSaved) return
     // Auto-close shortly after the success notice (founder request) --
     // unless the user already started editing again (any input resets
     // `saved`), in which case the modal stays put.
@@ -763,6 +787,10 @@ export default function KaspiShopProductAvailability() {
             </button>
           </div>
         </div>
+
+        {!loadError && loadNote && (
+          <div className="nav-glass rounded-2xl p-3 mb-4 text-xs" role="status" style={{ color: 'var(--nav-text-secondary)' }}>{loadNote}</div>
+        )}
 
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">

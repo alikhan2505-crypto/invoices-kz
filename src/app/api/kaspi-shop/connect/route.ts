@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { startPhoneLogin } from '@/lib/kaspiShop/cabinetAuth'
 import { normalizeKzPhone, formatKzPhone } from '@/lib/kzPhone'
-import { claimConnectSmsSlots, releaseConnectSmsSlots } from '@/lib/kaspiShop/connectSmsLimits'
+import { connectErrorMessage } from '@/lib/kaspiShop/connectMessages'
+import { claimConnectSmsSlots, releaseConnectSmsSlots, isConnectionRefusal } from '@/lib/kaspiShop/connectSmsLimits'
 
 // Счётчики лимитов лежат в базе: нужен сервисный ключ (как в остальных маршрутах).
 const supabase = createClient(
@@ -14,6 +15,10 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// Русские тексты наших собственных отказов берутся из connectMessages (тот же
+// источник, по которому страница показывает kk/en); `code` в ответе остаётся.
+const STEP_PHONE = { step: 'phone', resumable: false } as const
 
 async function requireUser(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -43,13 +48,22 @@ export async function POST(req: NextRequest) {
   // национальных цифр). Объект/число/массив раньше уходили в вызов Kaspi как есть.
   const rawPhone = body?.phone
   if (typeof rawPhone !== 'string' || !rawPhone.trim()) {
-    return NextResponse.json({ error: 'phone обязателен', code: 'phone_required' }, { status: 400 })
+    return NextResponse.json({ error: connectErrorMessage('ru', 'phone_required', STEP_PHONE)!, code: 'phone_required' }, { status: 400 })
   }
   // Больше одиннадцати цифр это не номер: normalizeKzPhone молча обрезал бы хвост
   // («+7 777 123 45 67 89» ушёл бы как 777 123 45 67), и SMS пришла бы не тому, кого
-  // человек ввёл. Такой ввод отклоняем, а не угадываем.
-  if (rawPhone.length > 40 || rawPhone.replace(/\D/g, '').length > 11 || !normalizeKzPhone(rawPhone)) {
-    return NextResponse.json({ error: 'Введите номер телефона полностью: +7 777 123 45 67', code: 'phone_invalid' }, { status: 400 })
+  // человек ввёл. Ровно одиннадцать цифр -- это код страны + десять, и начинаться они
+  // могут только с 7 или 8: «+1 777 123 45 67» normalizeKzPhone тоже обрезал бы до
+  // чужого «+7 177 712 34 56». Такой ввод отклоняем, а не угадываем.
+  const digits = rawPhone.replace(/\D/g, '')
+  if (
+    rawPhone.length > 40 || digits.length > 11
+    || (digits.length === 11 && digits[0] !== '7' && digits[0] !== '8')
+    || !normalizeKzPhone(rawPhone)
+    // Казахстанский национальный номер начинается с 7: «1771234567» ушёл бы как «+7 177…», то есть чужому абоненту.
+    || normalizeKzPhone(rawPhone)![2] !== '7'
+  ) {
+    return NextResponse.json({ error: connectErrorMessage('ru', 'phone_invalid', STEP_PHONE)!, code: 'phone_invalid' }, { status: 400 })
   }
   // В Kaspi уходит тот же вид «+7 777 123 45 67», что и из поля ввода кабинета
   // (так вход подтверждён вживую), а не произвольный текст из запроса.
@@ -57,19 +71,19 @@ export async function POST(req: NextRequest) {
 
   // K48: каждый вызов заставляет Kaspi слать SMS постороннему человеку с общего
   // IP сервера. Слот занимается ДО обращения к Kaspi и не возвращается, если Kaspi
-  // отказал: неудачные попытки тоже считаются. Исключение: Kaspi был недоступен и
-  // до него запрос не дошёл (kaspi_unreachable) -- SMS не отправлялась, слоты возвращаются.
+  // отказал: неудачные попытки тоже считаются. Исключение: соединение с Kaspi не
+  // установилось (отказ, нет адреса: kaspi_unreachable с кодом из isConnectionRefusal) --
+  // до него запрос не дошёл, SMS не отправлялась, слоты возвращаются. На таймаут и
+  // обрыв слоты не возвращаются: Kaspi мог принять запрос и отправить SMS.
   const slotsAt = Date.now()
   const limit = await claimConnectSmsSlots(supabase, req.headers, user.id, phone, slotsAt)
   if (!limit.ok) {
     if (limit.reason === 'error') {
-      return NextResponse.json({ error: 'Не удалось проверить лимит запросов. Попробуйте через минуту.', code: 'limit_unavailable' }, { status: 503 })
+      return NextResponse.json({ error: connectErrorMessage('ru', 'limit_unavailable', STEP_PHONE)!, code: 'limit_unavailable' }, { status: 503 })
     }
-    const minutes = Math.max(1, Math.ceil(limit.retryAfterSec / 60))
-    const who = limit.scope === 'phone' ? 'на этот номер' : limit.scope === 'ip' ? 'с вашего адреса' : 'от вашего аккаунта'
     return NextResponse.json(
       {
-        error: `Слишком много SMS-запросов ${who}. Повторите примерно через ${minutes} мин.`,
+        error: connectErrorMessage('ru', 'rate_limited', { ...STEP_PHONE, scope: limit.scope, retryAfterSec: limit.retryAfterSec })!,
         code: 'rate_limited',
         scope: limit.scope,
         retryAfterSec: limit.retryAfterSec,
@@ -81,7 +95,7 @@ export async function POST(req: NextRequest) {
   const result = await startPhoneLogin(phone)
   if (result.status !== 'otp_required') {
     if (result.status === 'error') {
-      if (result.code === 'kaspi_unreachable') await releaseConnectSmsSlots(supabase, req.headers, user.id, phone, slotsAt)
+      if (result.code === 'kaspi_unreachable' && isConnectionRefusal(result.detail)) await releaseConnectSmsSlots(supabase, req.headers, user.id, phone, slotsAt)
       return NextResponse.json(
         { error: result.message, code: result.code, detail: result.detail },
         { status: result.code === 'kaspi_unreachable' ? 502 : 400 },

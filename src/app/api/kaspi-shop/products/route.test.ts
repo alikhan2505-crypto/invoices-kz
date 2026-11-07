@@ -21,7 +21,7 @@ vi.mock('@/lib/kaspiShop/checkCycle', () => ({
 }))
 
 import { db, resetDb } from '@/lib/kaspiShop/routeDb.testkit'
-import { PATCH, POST } from './route'
+import { GET, PATCH, POST } from './route'
 
 const P1 = '3f2b8c1e-9a4d-4e6f-8b1a-0c2d3e4f5a6b'
 const P_OTHER = '9a1b8c1e-9a4d-4e6f-8b1a-0c2d3e4f5a6c'
@@ -138,11 +138,11 @@ describe('PATCH /api/kaspi-shop/products', () => {
 describe('POST /api/kaspi-shop/products', () => {
   const body = { kaspiSku: 's1', productName: 'Тест', brand: 'B', storeId: 'PP1', ownCurrentPrice: 1500, floorPrice: 1000, undercutStep: 100 }
 
-  it('inserts validated numbers with the default frequency 15', async () => {
+  it('inserts validated numbers with the default frequency 60 (hourly)', async () => {
     const res = await POST(req('POST', { ...body, floorPrice: '1000' }))
     expect(res.status).toBe(200)
     const inserted = db.writes.find(w => w.table === 'kaspi_shop_tracked_products' && w.op === 'insert')!.payload!
-    expect(inserted).toMatchObject({ floor_price: 1000, own_current_price: 1500, undercut_step: 100, check_frequency_minutes: 15, stock_count: 0, user_id: 'u1' })
+    expect(inserted).toMatchObject({ floor_price: 1000, own_current_price: 1500, undercut_step: 100, check_frequency_minutes: 60, stock_count: 0, user_id: 'u1' })
   })
 
   it.each([
@@ -162,5 +162,37 @@ describe('POST /api/kaspi-shop/products', () => {
 
   it('a JSON null body is 400', async () => {
     expect((await POST(req('POST', 'null'))).status).toBe(400)
+  })
+})
+
+// «Активных» на странице «Демпинг»: только включённые товары, которые в продаже
+// (null у старых строк = в продаже). Снятый с продажи бот не проверяет, считать его
+// работающим было бы неправдой (аудит 07.11.2026).
+describe('GET /api/kaspi-shop/products: stats.activeCount', () => {
+  function get() {
+    return GET(new NextRequest('http://localhost/api/kaspi-shop/products', { headers: { authorization: 'Bearer t' } }))
+  }
+  const row = (id: string, over: Record<string, unknown>) => ({ id, user_id: 'u1', connection_id: 'c1', enabled: true, held_at_floor: false, last_checked_at: null, check_frequency_minutes: 60, ...over })
+
+  it('counts enabled products on sale only: off-sale and disabled ones are not active, null counts as on sale', async () => {
+    db.tables.kaspi_shop_connections = [{ id: 'c1', session_status: 'active' }]
+    db.tables.kaspi_shop_tracked_products = [
+      row('a', { available_for_sale: true }),
+      row('b', { available_for_sale: null }),
+      row('c', {}),
+      row('d', { available_for_sale: false }),
+      row('e', { enabled: false, available_for_sale: true }),
+    ]
+    const json = await (await get()).json()
+    expect(json.stats.totalRules).toBe(5)
+    expect(json.stats.activeCount).toBe(3)
+    // «Готовы применить» считает тех же активных, и карточки не расходятся
+    expect(json.stats.readyToApply).toBe(3)
+  })
+
+  it('all enabled products off sale: zero active', async () => {
+    db.tables.kaspi_shop_connections = [{ id: 'c1', session_status: 'active' }]
+    db.tables.kaspi_shop_tracked_products = [row('a', { available_for_sale: false }), row('b', { available_for_sale: false })]
+    expect((await (await get()).json()).stats.activeCount).toBe(0)
   })
 })

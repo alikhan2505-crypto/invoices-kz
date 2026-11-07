@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // POST /api/kaspi-shop/apply-now (аудит Kaspi 06.11.2026, K14): запуск проверки
-// раньше сброса, серверный лимит раз в 10 минут, число товаров и стоимость в ответе.
+// раньше сброса, серверный лимит раз в 10 минут, число товаров в ответе. С 07.11.2026
+// проверка бесплатна (5 ₸ только за изменение цены ботом): стоимости в ответе нет.
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test-key'
@@ -79,11 +80,14 @@ afterEach(() => {
 })
 
 describe('POST /api/kaspi-shop/apply-now', () => {
-  it('dispatches first, resets last_checked_at only afterwards, answers with count and cost (off-sale products are not counted)', async () => {
+  it('dispatches first, resets last_checked_at only afterwards, answers with the product count and NO cost (off-sale products are not counted)', async () => {
     const res = await call()
     expect(res.status).toBe(202)
     const json = await res.json()
-    expect(json).toMatchObject({ ok: true, count: 2, cost: 10, queued: 2 })
+    expect(json).toMatchObject({ ok: true, count: 2, queued: 2 })
+    // проверка бесплатна: ни стоимости, ни «хватит на N проверок» в ответе нет
+    expect(json).not.toHaveProperty('cost')
+    expect(json).not.toHaveProperty('affordable')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     // в момент запуска сброса ещё не было
     expect(lastCheckedAtAtDispatch.every(v => v === '2026-11-06T09:00:00Z')).toBe(true)
@@ -160,10 +164,21 @@ describe('POST /api/kaspi-shop/apply-now', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('a wallet below the fee: 400, nothing is queued', async () => {
+  it('a wallet below 5 tenge: 400 in the new model words, nothing is queued (the bot cannot pay for a price change)', async () => {
     h.balance = 4
-    expect((await call()).status).toBe(400)
+    const res = await call()
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toContain('Баланс меньше 5 ₸')
+    expect(json.error).toContain('бот не сможет менять цены')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a wallet of exactly 5 tenge may run; the run does not cost anything by itself', async () => {
+    h.balance = 5
+    const res = await call()
+    expect(res.status).toBe(202)
+    expect(await res.json()).not.toHaveProperty('cost')
   })
 
   it('a wallet read failure is a 500, nothing is queued', async () => {
@@ -184,10 +199,12 @@ describe('POST /api/kaspi-shop/apply-now', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('a single product run reports 1 product and 5 tenge and has its own cooldown key', async () => {
+  it('a single product run reports 1 product, no cost, and has its own cooldown key', async () => {
     const res = await call({ productId: P1 })
     expect(res.status).toBe(202)
-    expect(await res.json()).toMatchObject({ count: 1, cost: 5 })
+    const json = await res.json()
+    expect(json).toMatchObject({ count: 1 })
+    expect(json).not.toHaveProperty('cost')
     expect(products().find(p => p.id === P2)!.last_checked_at).toBe('2026-11-06T09:00:00Z')
     // the whole-store run is a different key, not blocked by the single run
     expect((await call()).status).toBe(202)

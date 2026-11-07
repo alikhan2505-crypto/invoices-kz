@@ -119,12 +119,17 @@ describe('GET removed-products', () => {
     expect(body.citiesIncomplete).toBe(true)
   })
 
-  it('истёкшая сессия на details: 400 с sessionExpired', async () => {
-    h.catalog.mockImplementation(async (_c: string, _m: string, available: boolean) => available ? complete('A') : complete())
+  it('401/403 только от details при двух ответивших списках: списки остаются, citiesIncomplete, соединение НЕ помечается истёкшим', async () => {
+    h.catalog.mockImplementation(async (_c: string, _m: string, available: boolean) => available ? complete('A') : complete('B'))
     h.details.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: true })
     const res = await get()
-    expect(res.status).toBe(400)
-    expect(h.expired).toHaveBeenCalledWith('c1')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.active).toHaveLength(1)
+    expect(body.removed).toHaveLength(1)
+    expect(body.citiesIncomplete).toBe(true)
+    expect(body.sessionExpired).toBeUndefined()
+    expect(h.expired).not.toHaveBeenCalled()
   })
 })
 

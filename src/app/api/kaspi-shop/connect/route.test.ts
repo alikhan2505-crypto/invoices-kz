@@ -70,6 +70,15 @@ describe('POST /api/kaspi-shop/connect', () => {
       expect(state.db.tables[COUNTER_TABLE] ?? []).toHaveLength(0)
     })
 
+    it.each(['+1 777 123 45 67', '17771234567', '27771234567', '+44 7771 234 567', '97771234567'])(
+      'rejects an 11-digit number whose first digit is not 7 or 8 (no silent cut into a foreign number): %j', async phone => {
+        const res = await POST(req({ phone }))
+        expect(res.status).toBe(400)
+        expect((await res.json()).code).toBe('phone_invalid')
+        expect(startPhoneLogin).not.toHaveBeenCalled()
+        expect(state.db.tables[COUNTER_TABLE] ?? []).toHaveLength(0)
+      })
+
     it.each(['+7 777 123 45 67 8', '+7 777 123 45 678 9', '8 777 123 45 67 89'])(
       'rejects a number with more than eleven digits instead of silently truncating it: %j', async phone => {
         const res = await POST(req({ phone }))
@@ -161,9 +170,9 @@ describe('POST /api/kaspi-shop/connect', () => {
       expect(startPhoneLogin).toHaveBeenCalledTimes(PHONE_HOURLY_LIMIT)
     })
 
-    it('gives the user, phone and IP slots back when Kaspi was unreachable (nothing was sent)', async () => {
+    it('gives the user, phone and IP slots back when the connection to Kaspi was refused (nothing was sent)', async () => {
       startPhoneLogin.mockResolvedValue({
-        status: 'error', code: 'kaspi_unreachable', detail: 'ECONNRESET', message: 'Kaspi не ответил. Попробуйте ещё раз через минуту.',
+        status: 'error', code: 'kaspi_unreachable', detail: 'ECONNREFUSED', message: 'Kaspi не ответил. Попробуйте ещё раз через минуту.',
       })
       // Больше попыток, чем лимит на номер: каждая заканчивается «Kaspi недоступен», слоты возвращаются.
       for (let i = 0; i < PHONE_HOURLY_LIMIT + 2; i++) {
@@ -175,6 +184,42 @@ describe('POST /api/kaspi-shop/connect', () => {
       // И после этого обычная попытка проходит.
       startPhoneLogin.mockResolvedValue({ status: 'otp_required', otpToken: 'tok' })
       expect((await POST(req({ phone: '+7 777 666 55 44' }, '10.6.0.1'))).status).toBe(200)
+    })
+
+    it.each(['ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT'])(
+      'also gives the slots back for the connect-level failure %s', async detail => {
+        startPhoneLogin.mockResolvedValue({ status: 'error', code: 'kaspi_unreachable', detail, message: 'Kaspi не ответил.' })
+        expect((await POST(req({ phone: '+7 777 888 99 00' }, '10.8.0.1'))).status).toBe(502)
+        const spent = (state.db.tables[COUNTER_TABLE] ?? []).reduce((sum: number, r: any) => sum + r.count, 0)
+        expect(spent).toBe(0)
+      })
+
+    it.each(['TIMEOUT', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE', undefined])(
+      'keeps the slots on %s: Kaspi may have accepted the request and sent the SMS', async detail => {
+        startPhoneLogin.mockResolvedValue({ status: 'error', code: 'kaspi_unreachable', ...(detail ? { detail } : {}), message: 'Kaspi не ответил.' })
+        const res = await POST(req({ phone: '+7 777 888 99 01' }, '10.8.0.2'))
+        expect(res.status).toBe(502) // пользователь по-прежнему видит «Kaspi не ответил»
+        const spent = (state.db.tables[COUNTER_TABLE] ?? []).reduce((sum: number, r: any) => sum + r.count, 0)
+        expect(spent).toBe(3) // пользователь, номер, IP
+      })
+
+    it('a slow Kaspi cannot be used to spam SMS: repeated timeouts hit the phone limit', async () => {
+      startPhoneLogin.mockResolvedValue({ status: 'error', code: 'kaspi_unreachable', detail: 'TIMEOUT', message: 'Kaspi не ответил.' })
+      for (let i = 0; i < PHONE_HOURLY_LIMIT; i++) {
+        expect((await POST(req({ phone: '+7 777 888 99 02' }, `10.9.0.${i}`))).status).toBe(502)
+      }
+      expect((await POST(req({ phone: '+7 777 888 99 02' }, '10.9.0.99'))).status).toBe(429)
+      expect(startPhoneLogin).toHaveBeenCalledTimes(PHONE_HOURLY_LIMIT)
+    })
+
+    it('our own refusals keep their codes and the Russian text from connectMessages', async () => {
+      const bad = await POST(req({ phone: '777' }))
+      expect(await bad.json()).toEqual({ error: 'Введите номер телефона полностью: +7 777 123 45 67', code: 'phone_invalid' })
+      const none = await POST(req({}))
+      expect(await none.json()).toEqual({ error: 'Введите номер телефона.', code: 'phone_required' })
+      state.db.fail.add(COUNTER_TABLE)
+      const down = await POST(req({ phone: '+7 777 123 45 67' }))
+      expect(await down.json()).toEqual({ error: 'Не удалось проверить лимит запросов. Попробуйте через минуту.', code: 'limit_unavailable' })
     })
 
     it('keeps the slots when Kaspi refused the number (the SMS may have gone out)', async () => {

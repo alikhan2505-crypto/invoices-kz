@@ -14,14 +14,15 @@
 //  - частота -- целое число минут не меньше минимума, который предлагает форма;
 //  - стратегия -- одна из четырёх известных (неизвестная молча вела себя как be_second).
 // Деньги в тенге хранятся целыми: дробное округляется.
-import { MIN_CHECK_FREQUENCY_MINUTES } from './dempingForm'
+import { MIN_CHECK_FREQUENCY_MINUTES, DEFAULT_CHECK_FREQUENCY_MINUTES } from './dempingForm'
 
 export { MIN_CHECK_FREQUENCY_MINUTES }
 
 export const DEMPING_STRATEGIES = ['undercut_leader', 'match_leader', 'stay_above_leader', 'be_second'] as const
 export type DempingStrategyValue = (typeof DEMPING_STRATEGIES)[number]
 
-export const DEFAULT_CHECK_FREQUENCY = 15
+// Новые товары проверяются раз в час (правило основателя 07.11.2026); у существующих своя частота.
+export const DEFAULT_CHECK_FREQUENCY = DEFAULT_CHECK_FREQUENCY_MINUTES
 
 // Число из тела запроса: настоящее число или строка из одного числа ("1250").
 // «1 250» и «12,5» сервер не угадывает (клиент разбирает их сам), true/null/[] не числа.

@@ -147,3 +147,21 @@ describe('importCatalogProducts: total при оборванном списке'
     expect(result).toMatchObject({ imported: 3, total: 3, complete: true })
   })
 })
+
+describe('importCatalogProducts: частота проверки новых товаров (правило основателя 07.11.2026)', () => {
+  it('a NEW product is inserted with the hourly default (60 minutes), disabled', async () => {
+    listCatalogWithStatus.mockResolvedValue(okList([offer('a')]))
+    fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: false })
+    await importCatalogProducts('conn', 'user', 'cookie', 'm')
+    expect(inserts[0].check_frequency_minutes).toBe(60)
+    expect(inserts[0].enabled).toBe(false)
+  })
+
+  it('an EXISTING product keeps its own frequency: the import does not touch it', async () => {
+    tables.tracked.push({ id: 'old', kaspi_master_sku: 'Ma', check_frequency_minutes: 15 })
+    listCatalogWithStatus.mockResolvedValue(okList([offer('a')]))
+    fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: false })
+    await importCatalogProducts('conn', 'user', 'cookie', 'm')
+    expect(updates.every(u => !('check_frequency_minutes' in u))).toBe(true)
+  })
+})

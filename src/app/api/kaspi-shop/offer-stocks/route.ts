@@ -51,8 +51,19 @@ export async function GET(req: NextRequest) {
 
   const detailsRes = await fetchOffersDetailsChecked(connection.sessionCookies, connection.merchantId, [sku])
   if (detailsRes.sessionExpired) {
-    await markSessionExpired(connection.id)
-    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь', sessionExpired: true }, { status: 400 })
+    // 401/403 только от details не доказывает, что сессия умерла (Kaspi может отвечать
+    // 403 на один путь при живой куке). Сессию помечаем истёкшей лишь если с 401/403
+    // не отвечают и сами списки каталога: иначе один капризный ответ запирал бы
+    // живой магазин на окне подключения (выпуск «polish», ревью wave2).
+    const [activeProbe, removedProbe] = await Promise.all([
+      listCatalogWithStatus(connection.sessionCookies, connection.merchantId, true),
+      listCatalogWithStatus(connection.sessionCookies, connection.merchantId, false),
+    ])
+    if (activeProbe.sessionExpired || removedProbe.sessionExpired) {
+      await markSessionExpired(connection.id)
+      return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь', sessionExpired: true }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Kaspi не отдал карточку товара (доступ к ней отклонён), хотя кабинет отвечает. Повторите через минуту.' }, { status: 502 })
   }
   const details = detailsRes.items[0] ?? null
   if (!details) {

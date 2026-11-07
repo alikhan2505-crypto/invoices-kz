@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Движок демпинга: деньги, цена и список «пора проверять» (аудит Kaspi
 // 06.11.2026, K4-K10, K19-K21, K43, K44). База и Kaspi подменены: настоящих
 // запросов нет.
+//
+// Правило основателя 07.11.2026: проверка БЕСПЛАТНА, 5 ₸ списывается только за
+// изменение цены, которое дошло до Kaspi, один раз за товар за цикл.
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test-key'
@@ -23,6 +26,7 @@ const h = vi.hoisted(() => ({
   notifyProfileCalls: 0,
   markExpiredCalls: [] as string[],
   markExpiredThrows: false,
+  lowBalanceNotified: [] as string[][],
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -116,6 +120,10 @@ vi.mock('./planGate', () => ({
   filterByOwnerAccess: (items: any[], ownerOf: (i: any) => string | null, profiles: Map<string, any>) =>
     items.filter(i => profiles.get(ownerOf(i) as string)?.ok),
 }))
+// Настоящее уведомление пишет в базу счётчик и колокольчик; здесь только журнал вызовов.
+vi.mock('./lowBalanceNotice', () => ({
+  notifyLowBalanceOwners: async (_supabase: unknown, userIds: string[]) => { h.lowBalanceNotified.push([...userIds]) },
+}))
 vi.mock('@/lib/telegramNotify', () => ({ sendTelegramNotification: async () => true }))
 vi.mock('@/lib/notificationPrefsServer', () => ({ isMissingSchemaError: () => false, loadNotifyProfile: async () => { h.notifyProfileCalls += 1; return null } }))
 
@@ -162,6 +170,7 @@ beforeEach(() => {
   h.notifyProfileCalls = 0
   h.markExpiredCalls = []
   h.markExpiredThrows = false
+  h.lowBalanceNotified = []
   seed()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -233,6 +242,33 @@ describe('getDueTrackedProducts', () => {
     expect((await getDueTrackedProducts()).map(d => d.id)).toEqual(['p1'])
   })
 
+  it('an owner below 5 tenge is told once per run; funded owners and owners failing other gates are not', async () => {
+    // u0: баланс 4 (должен получить уведомление), u1: баланс 5 (не получает), u2: баланс 0, но сессия мертва
+    // (товар отсеян раньше, бот его всё равно не проверил бы), u3: баланс 0, но товар снят с продажи.
+    seedDue([
+      { balance: 4 },
+      { balance: 5 },
+      { balance: 0, connection: { session_status: 'session_expired' } },
+      { balance: 0, product: { available_for_sale: false } },
+    ])
+    const due = await getDueTrackedProducts()
+    expect(due.map(d => d.id)).toEqual(['p1'])
+    expect(h.lowBalanceNotified).toEqual([['u0']])
+  })
+
+  it('no owner below 5 tenge: the notice code is not even called', async () => {
+    seedDue([{ balance: 100 }, { balance: 5 }])
+    await getDueTrackedProducts()
+    expect(h.lowBalanceNotified).toEqual([])
+  })
+
+  it('an owner without Kaspi Bot access (lapsed Pro) is not told about the balance', async () => {
+    seedDue([{ balance: 0 }, { balance: 100 }])
+    h.accessDenied.add('u0')
+    await getDueTrackedProducts()
+    expect(h.lowBalanceNotified).toEqual([])
+  })
+
   it('leaves out an owner without Kaspi Bot access', async () => {
     seedDue([{}, {}])
     h.accessDenied.add('u0')
@@ -245,19 +281,40 @@ describe('getDueTrackedProducts', () => {
   })
 })
 
-describe('applyPriceCheckResult: no charge without a real, completed check', () => {
-  it('charges 5 tenge (1 credit) for a completed check whose price reached Kaspi', async () => {
+describe('applyPriceCheckResult: проверка бесплатна, 5 ₸ только за изменение цены, дошедшее до Kaspi', () => {
+  it('charges 5 tenge (1 credit) once for a price change that reached Kaspi; the reason names the change', async () => {
     await applyPriceCheckResult('p1', legacyOffer(900), null)
     expect(h.debits).toHaveLength(1)
     expect(h.debits[0].credits).toBe(1)
+    expect(h.debits[0].note).toBe('Изменение цены: Тест 1000 → 800 ₸')
     expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1, own_price_before: 1000, own_price_after: 800 })
   })
 
-  it('charges for a completed check that needed no price change', async () => {
+  it('a check that finds nothing to change is FREE: no push, no debit, credit_cost 0', async () => {
     await applyPriceCheckResult('p1', legacyOffer(1100), null)
     expect(h.pushCalls).toHaveLength(0)
-    expect(h.debits).toHaveLength(1)
-    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 1 })
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
+    // но сама проверка состоялась: время проверки сдвинуто
+    expect(product().last_checked_at).toBeTruthy()
+  })
+
+  it('a competitor-less check with nothing to change is free too', async () => {
+    await applyPriceCheckResult('p1', { competitorOffers: [] }, null)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0].credit_cost).toBe(0)
+  })
+
+  it('held at the floor WITHOUT a push (already at the floor and in sync) is free', async () => {
+    seed({
+      product: { own_current_price: 500, floor_price: 500 },
+      cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 500, no_competitor_streak: 0 }],
+    })
+    await applyPriceCheckResult('p1', legacyOffer(400), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'held_at_floor', credit_cost: 0 })
+    expect(product().held_at_floor).toBe(true)
   })
 
   it('does not charge on a Kaspi fetch error (K5), logs an error row and moves last_checked_at', async () => {
@@ -324,9 +381,20 @@ describe('applyPriceCheckResult: no charge without a real, completed check', () 
     expect(checks()[0]).toMatchObject({ action: 'error', credit_cost: 0 })
   })
 
-  it('a failed debit is recorded as credit_cost 0, not as a charge that never happened', async () => {
+  it('a debit that fails AFTER a successful push: the change stays, credit_cost 0, the failure is logged', async () => {
+    h.debitThrows = true
+    await expect(applyPriceCheckResult('p1', legacyOffer(900), null)).resolves.toBeUndefined()
+    expect(h.pushCalls).toHaveLength(1)
+    expect(product().own_current_price).toBe(800)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(800)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 0, own_price_after: 800 })
+    expect((console.error as any).mock.calls.some((c: any[]) => String(c[0]).includes('price change reached Kaspi but wallet debit failed'))).toBe(true)
+  })
+
+  it('a debit failure on a free check is never even attempted', async () => {
     h.debitThrows = true
     await applyPriceCheckResult('p1', legacyOffer(1100), null)
+    expect(h.debits).toHaveLength(0)
     expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
   })
 })
@@ -407,14 +475,17 @@ describe('applyPriceCheckResult: a price is recorded only after Kaspi accepted i
     expect(h.pushCalls).toHaveLength(1)
     expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: '750000000', value: 500 }])
     expect(product().own_current_price).toBe(500)
+    // цена реально сменилась на Kaspi (1000 -> 500, пол): это изменение цены, оно платное
     expect(checks()[0]).toMatchObject({ action: 'held_at_floor', credit_cost: 1 })
+    expect(h.debits).toHaveLength(1)
   })
 
-  it('a held_at_floor price whose push failed keeps the old price', async () => {
+  it('a held_at_floor price whose push failed keeps the old price and is free', async () => {
     h.pushResult = { success: false, reason: 'other', message: 'HTTP 503' }
     await applyPriceCheckResult('p1', legacyOffer(400), null)
     expect(product().own_current_price).toBe(1000)
     expect(checks()[0].action).toBe('push_failed')
+    expect(h.debits).toHaveLength(0)
   })
 
   it('respects maxPrice end to end: a competitor above the ceiling is pushed at the ceiling', async () => {
@@ -439,13 +510,14 @@ describe('applyPriceCheckResult: legacy branch heals desynced products (engine2,
     expect(h.debits).toHaveLength(1)
   })
 
-  it('the cycle after the heal is a plain no_change: no second push, charged once more as usual', async () => {
+  it('the cycle after the heal is a plain no_change: no second push, and it is free (only the heal push was charged)', async () => {
     seed({ product: { own_current_price: 950 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 1000, no_competitor_streak: 0 }] })
     await applyPriceCheckResult('p1', legacyOffer(1050), null)
     await applyPriceCheckResult('p1', legacyOffer(1050), null)
     expect(h.pushCalls).toHaveLength(1)
     expect(checks().map(c => c.action)).toEqual(['updated', 'no_change'])
-    expect(h.debits).toHaveLength(2)
+    expect(checks().map(c => c.credit_cost)).toEqual([1, 0])
+    expect(h.debits).toHaveLength(1)
   })
 
   it('a failed heal push keeps everything, is push_failed and free; the next cycle retries and heals', async () => {
@@ -477,7 +549,25 @@ describe('applyPriceCheckResult: legacy branch heals desynced products (engine2,
   it('everything in sync and nothing to change: still no push', async () => {
     await applyPriceCheckResult('p1', legacyOffer(1100), null)
     expect(h.pushCalls).toHaveLength(0)
-    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 1 })
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
+    expect(h.debits).toHaveLength(0)
+  })
+
+  it('several cities pushed in ONE upload: exactly one charge for the product (not one per city)', async () => {
+    seed({
+      product: { own_current_price: 1000 },
+      cityRows: [
+        { tracked_product_id: 'p1', city_code: 'A', own_current_price: 1000, no_competitor_streak: 0 },
+        { tracked_product_id: 'p1', city_code: 'B', own_current_price: 1000, no_competitor_streak: 0 },
+        { tracked_product_id: 'p1', city_code: 'C', own_current_price: 1000, no_competitor_streak: 0 },
+      ],
+    })
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toHaveLength(3)
+    expect(h.debits).toHaveLength(1)
+    expect(checks()).toHaveLength(1)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
   })
 })
 
@@ -520,7 +610,7 @@ describe('applyPriceCheckResult: legacy product without city rows (engine2, item
     expect(rows.every(r => r.own_current_price === 800 && r.last_pushed_at)).toBe(true)
     expect(product().own_current_price).toBe(800)
     expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
-    expect(h.debits).toHaveLength(1)
+    expect(h.debits).toHaveLength(1) // два города, одна отправка, одно списание
   })
 
   it('push failed right after creating the rows: the created rows are removed, so nothing looks confirmed and nothing is charged', async () => {
@@ -653,6 +743,7 @@ describe('applyPriceCheckResult: per-city branch', () => {
     expect(product().own_current_price).toBe(800)
     expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
     expect(h.debits).toHaveLength(1)
+    expect(h.debits[0].note).toBe('Изменение цены: Тест 1000 → 800 ₸')
   })
 
   it('failed push: old city and product price kept, push_failed, error kept, no charge', async () => {
@@ -668,11 +759,62 @@ describe('applyPriceCheckResult: per-city branch', () => {
     expect(h.debits).toHaveLength(0)
   })
 
-  it('no price change in any city: nothing pushed, no_change, charged once', async () => {
+  it('no price change in any city: nothing pushed, no_change, FREE', async () => {
     await applyPriceCheckResult('p1', perCity(1100), null)
     expect(h.pushCalls).toHaveLength(0)
-    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 1 })
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
+    expect(h.debits).toHaveLength(0)
+  })
+
+  it('held at the floor in every city and nothing to push: free', async () => {
+    seed({
+      product: { own_current_price: 950, floor_price: 950 },
+      cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 950, no_competitor_streak: 0 }],
+    })
+    await applyPriceCheckResult('p1', perCity(900), null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'held_at_floor', credit_cost: 0 })
+    expect(h.debits).toHaveLength(0)
+  })
+
+  it('three cities change in one upload: ONE debit for the product, one history row', async () => {
+    seed({
+      product: { own_current_price: 1000 },
+      cityRows: ['A', 'B', 'C'].map(code => ({ tracked_product_id: 'p1', city_code: code, own_current_price: 1000, no_competitor_streak: 0 })),
+    })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [{ merchantId: 'X', price: 900 }], B: [{ merchantId: 'X', price: 900 }], C: [{ merchantId: 'X', price: 900 }] } }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toHaveLength(3)
     expect(h.debits).toHaveLength(1)
+    expect(h.debits[0].credits).toBe(1)
+    expect(checks()).toHaveLength(1)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
+  })
+
+  it('the lowest price did not move, but one city did and was pushed: that is an update and it is charged once', async () => {
+    seed({
+      product: { own_current_price: 1000 },
+      cityRows: [
+        { tracked_product_id: 'p1', city_code: 'A', own_current_price: 1000, no_competitor_streak: 0 },
+        { tracked_product_id: 'p1', city_code: 'B', own_current_price: 1200, no_competitor_streak: 0 },
+      ],
+    })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [{ merchantId: 'X', price: 1100 }], B: [{ merchantId: 'X', price: 1500 }] } }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: 'B', value: 1400 }])
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1 })
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('one push failed: nothing is charged and there is one failed row', async () => {
+    seed({
+      product: { own_current_price: 1000 },
+      cityRows: ['A', 'B'].map(code => ({ tracked_product_id: 'p1', city_code: code, own_current_price: 1000, no_competitor_streak: 0 })),
+    })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 500' }
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [{ merchantId: 'X', price: 900 }], B: [{ merchantId: 'X', price: 900 }] } }, null)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'push_failed', credit_cost: 0 })
   })
 
   it('fetch error: no charge, error row', async () => {
@@ -691,5 +833,32 @@ describe('applyPriceCheckResult: history row before the migration', () => {
     expect(checks()[0]).toMatchObject({ action: 'error', credit_cost: 0 })
     expect(checks()[0].error_message).toContain('HTTP 500')
     expect(product().own_current_price).toBe(1000)
+  })
+})
+
+describe('applyPriceCheckResult: per-city branch, city without a row (review 07.11)', () => {
+  it('creates the row after a successful push, so the next identical check is free', async () => {
+    seed({ cityRows: [] })
+    const offers = { perCityOffers: { A: [{ merchantId: 'X', price: 900 }] } }
+    await applyPriceCheckResult('p1', offers, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(1)
+    expect(h.tables.kaspi_shop_product_city_prices[0]).toMatchObject({ city_code: 'A', own_current_price: 800 })
+    await applyPriceCheckResult('p1', offers, null)
+    await applyPriceCheckResult('p1', offers, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+    expect(checks().map((c: any) => c.action)).toEqual(['updated', 'no_change', 'no_change'])
+  })
+
+  it('a second city without a row is created too, the first one stays untouched', async () => {
+    seed({ cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0 }] })
+    const offers = { perCityOffers: { A: [{ merchantId: 'X', price: 900 }], B: [{ merchantId: 'X', price: 900 }] } }
+    await applyPriceCheckResult('p1', offers, null)
+    await applyPriceCheckResult('p1', offers, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+    expect(h.tables.kaspi_shop_product_city_prices.map((r: any) => r.city_code).sort()).toEqual(['A', 'B'])
   })
 })

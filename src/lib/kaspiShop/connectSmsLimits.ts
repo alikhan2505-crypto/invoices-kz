@@ -79,9 +79,21 @@ export async function claimConnectSmsSlots(
   return { ok: true }
 }
 
+// Коды сетевых сбоев, при которых запрос с номером до Kaspi заведомо НЕ дошёл:
+// соединение не установилось (отказ, нет адреса, нет маршрута). Таймаут и обрыв
+// (TIMEOUT, ECONNRESET, EPIPE, ETIMEDOUT) сюда не входят: запрос мог дойти, Kaspi мог
+// отправить SMS и ответить позже, чем мы ждали, а дубль SMS хуже лишней попытки.
+const NOT_DELIVERED_CODE = /^(ECONNREFUSED|ENOTFOUND|EAI_[A-Z]+|ENETUNREACH|EHOSTUNREACH|EHOSTDOWN|UND_ERR_CONNECT_TIMEOUT)$/
+
+/** true, если `detail` (код причины из cabinetAuth) говорит об отказе соединения, а не о таймауте/обрыве. */
+export function isConnectionRefusal(detail: unknown): boolean {
+  return typeof detail === 'string' && NOT_DELIVERED_CODE.test(detail)
+}
+
 /**
  * Вернуть слоты, занятые claimConnectSmsSlots в этом вызове, когда SMS заведомо не
- * ушла: Kaspi не ответил (kaspi_unreachable), запрос до него не дошёл. Отказы Kaspi
+ * ушла: соединение с Kaspi не установилось (isConnectionRefusal), запрос до него не
+ * дошёл. На таймаут и обрыв слоты НЕ возвращаются: SMS могла уйти. Отказы Kaspi
  * (номер не принят и т. п.) слоты не возвращают: SMS мог уйти, и счёт попыткам нужен.
  * Передавайте тот же now, что и в claim: окно часа считается от него. Best-effort.
  */

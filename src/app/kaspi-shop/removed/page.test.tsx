@@ -251,4 +251,41 @@ describe('K24: «Цена и остатки» сохраняет по город
     expect(text()).toContain('PP1: валидация Kaspi: цена вне диапазона')
     expect(text()).not.toContain('Отправлено')
   })
+
+  it('частичное сохранение: упавшая точка остаётся изменённой, сохранённая заново не уходит', async () => {
+    world.postResult = { status: 200, body: { ok: false, results: [
+      { storeCode: 'PP1', ok: true },
+      { storeCode: 'PP3', ok: false, message: 'валидация Kaspi: цена вне диапазона' },
+    ] } }
+    await mount()
+    await openModal()
+    await type(pointInputs('PP1').price, '1500')
+    await type(pointInputs('PP3').price, '1400')
+    await click(byText('button', 'Сохранить изменения'))
+    expect(posts()).toHaveLength(1)
+    expect(posts()[0].body.entries.map((e: any) => e.storeCode)).toEqual(['PP1', 'PP3'])
+    expect(text()).toContain('PP3: валидация Kaspi: цена вне диапазона')
+    expect(text()).toContain('Сохранено точек: 1 из 2')
+    expect(text()).not.toContain('Отправлено')
+    // поля упавшей точки сохранили правку
+    expect(pointInputs('PP3').price.value).toBe('1400')
+    // повтор: уходит только PP3
+    world.postResult = { status: 200, body: { ok: true, results: [{ storeCode: 'PP3', ok: true }] } }
+    await click(byText('button', 'Сохранить изменения'))
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body.entries).toEqual([{ storeCode: 'PP3', cityId: 'AST', price: 1400, stockCount: 5 }])
+  })
+
+  it('частичное сохранение: окно не закрывается само, сосед сохранённого города получает новую цену города', async () => {
+    world.postResult = { status: 200, body: { ok: false, results: [
+      { storeCode: 'PP1', ok: true },
+      { storeCode: 'PP3', ok: false, message: 'сбой' },
+    ] } }
+    await mount()
+    await openModal()
+    await type(pointInputs('PP1').price, '1500')
+    await type(pointInputs('PP3').price, '1400')
+    await click(byText('button', 'Сохранить изменения'))
+    expect(pointInputs('PP2').price.value).toBe('1500')
+  })
 })

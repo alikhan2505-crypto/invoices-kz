@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeSecDb } from './secDb.testkit'
+import { COUNTER_TABLE } from '@/lib/toolQuota'
 
 const { sendTelegram, createNotification } = vi.hoisted(() => ({
   sendTelegram: vi.fn(async () => true),
@@ -102,6 +103,26 @@ describe('notifySessionExpired', () => {
     await resetSessionExpiredNotices(db.client, 'u1')
     __resetSessionNoticeCacheForTests()
     expect((await notifySessionExpired(db.client, 'u1', ['A'], { now: T0 + 4 * DAY })).status).toBe('sent')
+  })
+
+  it('a reconnect handled by ANOTHER instance does not leave this one silent: no in-memory day cache', async () => {
+    const db = setup()
+    expect((await notifySessionExpired(db.client, 'u1', ['A'], { now: T0 })).status).toBe('sent')
+    // Переподключение прошло в другом экземпляре функции: он стёр слоты в базе, а память
+    // этого экземпляра осталась прежней (тест нарочно НЕ вызывает reset кэша и reset уведомлений).
+    db.tables[COUNTER_TABLE] = (db.tables[COUNTER_TABLE] ?? []).filter((r: any) => !String(r.key).startsWith('kaspisessexp'))
+    expect((await notifySessionExpired(db.client, 'u1', ['A'], { now: T0 + 3_600_000 })).status).toBe('sent')
+    expect(sendTelegram).toHaveBeenCalledTimes(2)
+  })
+
+  it('without a reconnect the same day stays quiet, and the per-outage cap of 3 still holds with no cache at all', async () => {
+    const db = setup()
+    const statuses: string[] = []
+    for (let i = 0; i < 3; i++) statuses.push((await notifySessionExpired(db.client, 'u1', ['A'], { now: T0 + i * 3_600_000 })).status)
+    expect(statuses).toEqual(['sent', 'duplicate', 'duplicate'])
+    for (let d = 1; d <= 4; d++) statuses.push((await notifySessionExpired(db.client, 'u1', ['A'], { now: T0 + d * DAY })).status)
+    expect(statuses.slice(3)).toEqual(['sent', 'sent', 'capped', 'capped'])
+    expect(sendTelegram).toHaveBeenCalledTimes(SESSION_NOTICE_MAX_PER_EPISODE)
   })
 
   it('a reconnect also clears the day slot of today: a new outage the same day is announced again', async () => {

@@ -31,8 +31,10 @@ const GITHUB_REPO = 'invoices-kz'
 const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 
 // Не чаще одного запуска «Применить сейчас» за окно на продавца (аудит Kaspi
-// 06.11.2026, K14): каждый запуск -- реальные 5 ₸ за каждый включённый товар,
-// и раньше API можно было дёргать подряд. Счётчик -- общий windowLimits
+// 06.11.2026, K14): каждый запуск гоняет весь список товаров к Kaspi, и раньше
+// API можно было дёргать подряд. С 07.11.2026 проверка бесплатна (5 ₸ берётся
+// только за изменение цены ботом), но лимит остаётся: он бережёт Kaspi и очередь
+// GitHub, а не деньги продавца. Счётчик -- общий windowLimits
 // (строки tool_kontragent_checks со своим ключом, без новых колонок). Окна
 // фиксированные, выровненные по эпохе: на границе окна два нажатия подряд
 // пройдут, дальше -- не чаще раза в окно.
@@ -62,14 +64,15 @@ const APPLY_NOW_PREFIX = 'kaspiapply'
 // The workflow then runs getDueTrackedProducts -> real Kaspi fetch ->
 // applyPriceCheckResult for these products (and any other due products
 // platform-wide, which is correct: it's the same idempotent per-product
-// due check either way, one credit debit per product per cycle regardless
-// of what triggered the run). Because the actual work happens
+// due check either way; a wallet debit happens only for a price change that
+// reached Kaspi, one per product per cycle, regardless of what triggered the
+// run). Because the actual work happens
 // asynchronously in GitHub Actions, this route itself finishes in well
 // under a second -- no maxDuration override needed, matching
 // niches/request/route.ts (which also doesn't set one).
 //
-// Ответ: { ok, count, cost, queued } -- сколько товаров реально встанет в
-// проверку и сколько это стоит; страница показывает это продавцу.
+// Ответ: { ok, count, queued } -- сколько товаров реально встанет в проверку;
+// страница показывает это продавцу. Стоимости в ответе нет: проверка бесплатна.
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -86,8 +89,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'productId должен быть id товара' }, { status: 400 })
   }
 
-  // Мёртвая сессия: бот такие подключения не проверяет и денег не берёт --
-  // запускать нечего, честно говорим об этом.
+  // Мёртвая сессия: бот такие подключения не проверяет -- запускать нечего,
+  // честно говорим об этом.
   const { data: sessionRow, error: sessionError } = await supabase
     .from('kaspi_shop_connections')
     .select('session_status')
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
   // scope rather than a single row. Scoped by connection_id, not user_id --
   // with multi-store support a user-wide query would also reset the OTHER
   // store's products. A per-row trigger can still pass productId.
-  // Снятые с продажи (available_for_sale = false) бот не проверяет, их в счёт не берём.
+  // Снятые с продажи (available_for_sale = false) бот не проверяет, их не считаем.
   let query = supabase
     .from('kaspi_shop_tracked_products')
     .select('id, available_for_sale')
@@ -117,7 +120,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Нет активных товаров для проверки' }, { status: 400 })
   }
   const ids = targets.map((t: any) => t.id)
-  const cost = ids.length * KASPI_SHOP_CREDIT_PRICE_TENGE
 
   let balance: number
   try {
@@ -126,8 +128,10 @@ export async function POST(req: NextRequest) {
     console.error('kaspi-shop apply-now: wallet balance read failed for user', user.id, ':', err?.message)
     return NextResponse.json({ error: 'Не удалось проверить баланс, попробуйте ещё раз' }, { status: 500 })
   }
+  // Проверка бесплатна, но владельца с балансом меньше цены изменения бот из списка
+  // исключает (изменение цены ему не оплатить): запускать было бы нечего.
   if (balance < KASPI_SHOP_CREDIT_PRICE_TENGE) {
-    return NextResponse.json({ error: 'На балансе не хватает средств на проверку -- пополните баланс' }, { status: 400 })
+    return NextResponse.json({ error: `Баланс меньше ${KASPI_SHOP_CREDIT_PRICE_TENGE} ₸: бот не сможет менять цены, проверка не запущена. Пополните баланс.` }, { status: 400 })
   }
 
   const token = process.env.KASPI_SHOP_GITHUB_PAT
@@ -149,8 +153,8 @@ export async function POST(req: NextRequest) {
         { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
       )
     }
-    // Счётчик не читается: за этот запуск продавец платит деньгами, поэтому
-    // при неисправном лимите не запускаем.
+    // Счётчик не читается: без лимита запуски можно дёргать подряд, поэтому
+    // при неисправном счётчике не запускаем.
     return NextResponse.json({ error: 'Не удалось проверить лимит запуска, попробуйте через минуту' }, { status: 503 })
   }
 
@@ -189,6 +193,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: resetError.message }, { status: 500 })
   }
 
-  const affordable = Math.floor(balance / KASPI_SHOP_CREDIT_PRICE_TENGE)
-  return NextResponse.json({ ok: true, count: ids.length, cost, queued: ids.length, affordable }, { status: 202 })
+  return NextResponse.json({ ok: true, count: ids.length, queued: ids.length }, { status: 202 })
 }

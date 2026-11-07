@@ -326,6 +326,13 @@ export default function KaspiShopNiches() {
           : (data.error || 'Не удалось запустить проверку'))
         return
       }
+      // 200 с телом без checkId (прокси-страница, пустой ответ): опрашивать нечего, иначе
+      // страница крутила бы «Ищем...» до таймаута опроса.
+      if (typeof data.checkId !== 'string' || !data.checkId) {
+        setSearching(false)
+        setLoadError('Не удалось запустить проверку')
+        return
+      }
       pollResult(data.checkId)
     } catch {
       setSearching(false)

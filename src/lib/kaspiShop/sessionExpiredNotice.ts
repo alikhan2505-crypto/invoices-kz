@@ -67,12 +67,12 @@ export function formatSessionExpiredDigestLine(names: string[]): string {
   return `⚠️ Сессия кабинета Kaspi истекла${label ? ` (${label})` : ''}: цены не меняются. <a href="${RECONNECT_URL}">Переподключить</a>`
 }
 
-// Один и тот же продавец за сутки в одном экземпляре функции: не ходим в базу за
-// счётчиком на каждый 401 (страницы опрашивают Kaspi часто). Общий слот в базе
-// остаётся главным -- это только предохранитель от лишних запросов.
-const claimedToday = new Map<string, number>()
-
-export function __resetSessionNoticeCacheForTests() { claimedToday.clear() }
+// Суточный слот живёт ТОЛЬКО в базе, в памяти экземпляра функции его не кэшируем:
+// переподключение (resetSessionExpiredNotices) может пройти в другом экземпляре, и
+// тёплый экземпляр с кэшем «сегодня уже слали» молчал бы о новом обрыве в тот же день.
+// Цена -- один SELECT счётчика на вызов; markSessionExpired и так делает UPDATE.
+/** Оставлено для обратной совместимости тестов: кэша в памяти больше нет. */
+export function __resetSessionNoticeCacheForTests() {}
 
 /**
  * Сообщить продавцу о мёртвой сессии. Никогда не бросает. names -- названия
@@ -88,16 +88,14 @@ export async function notifySessionExpired(
   try {
     const now = opts?.now ?? Date.now()
     const today = dayBucket(now)
-    if (claimedToday.get(userId) === today) return { status: 'duplicate', telegram: false }
 
     // 1. Суточный слот. Не читается счётчик -- молчим: лучше пропустить
     //    сообщение, чем слать его на каждый запрос.
     const day = await claimWindowSlot(supabase, windowKey(SESSION_NOTICE_DAY_PREFIX, userId, today), 1)
     if (!day.ok) {
-      if (day.reason === 'limit') { claimedToday.set(userId, today); return { status: 'duplicate', telegram: false } }
+      if (day.reason === 'limit') return { status: 'duplicate', telegram: false }
       return { status: 'failed', telegram: false }
     }
-    claimedToday.set(userId, today)
 
     // 2. Кому: удалённый аккаунт и закончившийся Про уведомлений не получают
     //    (тот же гейт, что у сводки). Проверяем ДО счётчика обрыва, чтобы
@@ -140,7 +138,6 @@ export async function notifySessionExpired(
  */
 export async function resetSessionExpiredNotices(supabase: SupabaseClient, userId: string, now = Date.now()): Promise<void> {
   try {
-    claimedToday.delete(userId)
     for (const key of [
       windowKey(SESSION_NOTICE_EPISODE_PREFIX, userId, 'episode'),
       windowKey(SESSION_NOTICE_DAY_PREFIX, userId, dayBucket(now)),

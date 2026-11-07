@@ -2,7 +2,7 @@
 // Ниши: сбой трендов это ошибка, а не «трендов нет»; шлюзовый не-JSON ответ не превращается в «проверьте соединение».
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement } from 'react'
-import { json, mountPage, unmountPage, pageText, byText, click } from '@/lib/kaspiShop/pageTestKit'
+import { json, mountPage, unmountPage, pageText, byText, click, typeInto } from '@/lib/kaspiShop/pageTestKit'
 
 
 const router = vi.hoisted(() => ({ push: vi.fn(), back: vi.fn() }))
@@ -42,6 +42,8 @@ import NichesPage from './page'
 
 let trends: () => Response
 let trendCalls: number
+let requestAnswer: () => Response
+let resultCalls: number
 
 const okTrends = () => json(200, {
   computedAt: null, categories: [], page: 1, pageSize: 10, totalCategories: 0, categoryOptions: [], topShare: [], trendingAll: [],
@@ -50,11 +52,15 @@ const okTrends = () => json(200, {
 beforeEach(() => {
   router.push.mockReset()
   trendCalls = 0
+  resultCalls = 0
   trends = okTrends
+  requestAnswer = () => json(200, { checkId: 'chk1' })
   globalThis.fetch = vi.fn(async (input: any) => {
     const url = String(input).split('?')[0]
     if (url === '/api/kaspi-shop/wallet') return json(200, { connected: true, sessionStatus: 'active', balance: 500 })
     if (url === '/api/kaspi-shop/niches/trends') { trendCalls++; return trends() }
+    if (url === '/api/kaspi-shop/niches/request') return requestAnswer()
+    if (url === '/api/kaspi-shop/niches/result') { resultCalls++; return json(200, { status: 'pending' }) }
     return json(404, { error: `unexpected ${url}` })
   }) as any
 })
@@ -84,5 +90,34 @@ describe('Ниши: тренды', () => {
   it('нормальный ответ: ошибки нет', async () => {
     await mountPage(NichesPage)
     expect(pageText()).not.toContain('Не удалось загрузить тренды')
+  })
+})
+
+describe('Ниши: запуск проверки идеи', () => {
+  async function search() {
+    await mountPage(NichesPage)
+    await typeInto(document.body.querySelector('input[placeholder^="Например"]') as HTMLInputElement, 'термокружка')
+    await click(byText('button', 'Проверить'))
+  }
+
+  it('200 без checkId (прокси отдал не JSON): «Не удалось запустить проверку», опроса результата нет, кнопка снова доступна', async () => {
+    requestAnswer = () => new Response('<html>proxy</html>', { status: 200 })
+    await search()
+    expect(pageText()).toContain('Не удалось запустить проверку')
+    expect(pageText()).not.toContain('Ищем...')
+    expect(resultCalls).toBe(0)
+  })
+
+  it('200 с checkId не строкой тоже не запускает опрос', async () => {
+    requestAnswer = () => json(200, { checkId: 42 })
+    await search()
+    expect(pageText()).toContain('Не удалось запустить проверку')
+    expect(resultCalls).toBe(0)
+  })
+
+  it('нормальный ответ с checkId: проверка идёт, ошибки запуска нет', async () => {
+    await search()
+    expect(pageText()).toContain('Ищем...')
+    expect(pageText()).not.toContain('Не удалось запустить проверку')
   })
 })

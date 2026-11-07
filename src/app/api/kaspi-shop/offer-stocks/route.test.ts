@@ -110,10 +110,32 @@ describe('GET offer-stocks', () => {
     expect((await res.json()).error).toContain('HTTP 500')
   })
 
-  it('details: истёкшая сессия это 400 с sessionExpired', async () => {
+  it('details 401/403 И списки каталога тоже 401: сессия правда мертва, 400 с sessionExpired и отметка соединения', async () => {
     h.details.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: true, error: 'Сессия кабинета Kaspi истекла' })
+    h.catalog.mockResolvedValue({ offers: [], sessionExpired: true, complete: false, failed: true, error: 'Сессия кабинета Kaspi истекла' })
     const res = await get()
     expect(res.status).toBe(400)
+    expect((await res.json()).sessionExpired).toBe(true)
     expect(h.expired).toHaveBeenCalledWith('c1')
+  })
+
+  it('details 401/403, но оба списка каталога ответили: понятный 502, соединение НЕ помечается истёкшим', async () => {
+    h.details.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: true, error: 'Сессия кабинета Kaspi истекла' })
+    h.catalog.mockResolvedValue(complete(listOffer('A', 7)))
+    const res = await get()
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.sessionExpired).toBeUndefined()
+    expect(body.error).toContain('карточку товара')
+    expect(body.error).not.toContain('переподключитесь')
+    expect(h.expired).not.toHaveBeenCalled()
+  })
+
+  it('details 401/403 и списки упали не по 401 (сбой, обрыв): тоже 502 без отметки истёкшей сессии', async () => {
+    h.details.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: true })
+    h.catalog.mockResolvedValue(failedList('HTTP 500'))
+    const res = await get()
+    expect(res.status).toBe(502)
+    expect(h.expired).not.toHaveBeenCalled()
   })
 })

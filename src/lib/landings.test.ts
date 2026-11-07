@@ -36,3 +36,36 @@ describe('PRICING_URL', () => {
     expect(PRICING_URL).not.toContain('/upgrade')
   })
 })
+
+// Правило основателя 07.11.2026: Kaspi Bot не берёт деньги за проверки цен, 5 ₸ только за
+// каждое изменение цены ботом. Лендинг не должен обещать «5 ₸ за каждую проверку».
+describe('LANDINGS.kaspi.priceNote: модель списаний', () => {
+  const note = LANDINGS.kaspi.priceNote!
+
+  it('ru: проверки бесплатны, 5 ₸ только за изменение цены ботом, тариф Про указан', () => {
+    expect(note.ru).toContain('Проверки цен бесплатны')
+    expect(note.ru).toContain('только за каждое изменение цены ботом')
+    expect(note.ru).toMatch(/^Входит в тариф Про, /)
+    expect(note.ru).not.toContain('Каждая проверка')
+  })
+
+  it('kk: бағаны тексеру тегін, 5 ₸ тек бот бағаны өзгерткенде; термин «Про тарифі» из памятки', () => {
+    expect(note.kk).toContain('Бағаны тексеру тегін')
+    expect(note.kk).toContain('бот бағаны өзгерткен сайын')
+    expect(note.kk).toContain('Про тарифіне')
+    expect(note.kk).not.toContain('әр тексеру')
+  })
+
+  it('en: price checks are free, 5 ₸ only for each price change the bot makes', () => {
+    expect(note.en).toContain('Price checks are free')
+    expect(note.en).toContain('only for each price change the bot makes')
+    expect(note.en).not.toContain('Each price check')
+  })
+
+  it('no language promises a charge per check, and no long dash survives in the Kaspi note', () => {
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      expect(note[lang]).not.toContain('—')
+      expect(note[lang]).toMatch(/5 ₸/)
+    }
+  })
+})

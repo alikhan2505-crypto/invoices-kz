@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { listCatalogWithStatus, fetchCityNames, fetchOffersDetailsChecked, extractOfferPointInfo, totalStock } from './cabinetApi'
 import { saveConnection, loadConnectionByMerchant } from './connection'
+import { DEFAULT_CHECK_FREQUENCY_MINUTES } from './dempingForm'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -227,7 +228,8 @@ export async function importCatalogProducts(connectionId: string, userId: string
           own_current_price: offer.minPrice,
           floor_price: offer.minPrice,
           undercut_step: 100,
-          check_frequency_minutes: 15,
+          // Новые товары проверяются раз в час (правило основателя 07.11.2026).
+          check_frequency_minutes: DEFAULT_CHECK_FREQUENCY_MINUTES,
           enabled: false,
           available_for_sale: true,
           kaspi_master_sku: offer.masterSku,

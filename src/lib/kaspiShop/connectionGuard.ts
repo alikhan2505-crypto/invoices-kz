@@ -6,7 +6,8 @@
 // запроса (500, обрыв сети, протухший вход) выглядел как «не подключён» и
 // уводил подключённого продавца на окно подключения. Здесь три исхода:
 //   ready    -- магазин подключён и сессия жива, страницу можно открывать;
-//   redirect -- магазин честно не подключён или сессия Kaspi истекла: на /kaspi-shop;
+//   redirect -- магазин честно не подключён, сессия Kaspi истекла или протух вход (401):
+//               на /kaspi-shop (оттуда при необходимости на /login);
 //   error    -- сам запрос не удался: показать «Повторить», никуда не уводить.
 import { apiErrorMessage } from './dempingForm'
 
@@ -29,6 +30,12 @@ export async function checkKaspiConnection(
     return { kind: 'error', message: CONNECTION_NETWORK_ERROR }
   }
   const data = await res.json().catch(() => null)
+  // 401: протух вход в приглашённый аккаунт (не сессия Kaspi). «Повторить» тут не
+  // поможет и сырой английский «Unauthorized» человеку ни о чём не говорит: уводим на
+  // /kaspi-shop, а он, не найдя пользователя, ведёт на /login. Причина остаётся
+  // 'not_connected' (страницы, которые различают причины, не меняются), признак
+  // входа лежит в data.unauthorized.
+  if (res.status === 401) return { kind: 'redirect', reason: 'not_connected', data: { unauthorized: true } }
   if (!res.ok) return { kind: 'error', message: apiErrorMessage(res.status, data, CONNECTION_FALLBACK_ERROR) }
   // 200 без разбираемого тела тоже не доказывает, что магазин не подключён.
   if (!data || typeof data !== 'object') return { kind: 'error', message: CONNECTION_FALLBACK_ERROR }

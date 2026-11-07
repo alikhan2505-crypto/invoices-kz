@@ -7,6 +7,8 @@ import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
 import { pushOfferState } from './cabinetPricePush'
 import { fetchOfferDetails } from './cabinetApi'
 import { filterByOwnerAccess, loadOwnerPlanProfiles, ownerHasKaspiShopAccess } from './planGate'
+import { checkDueAfterMinutes } from './dempingForm'
+import { notifyLowBalanceOwners } from './lowBalanceNotice'
 
 // All of the offer's bare point codes, read from the offer details (deep
 // scan for storeId-carrying objects -- no guessed key paths). Falls back to
@@ -102,10 +104,16 @@ export type DueTrackedProduct = { id: string; kaspiSku: string; kaspiMasterSku: 
 // scoped to one user) can compute the exact same due/not-due answer instead
 // of a second, slightly different reimplementation of the elapsed-minutes
 // math that could silently drift from this one over time.
+//
+// Порог не равен check_frequency_minutes «в лоб»: запуски идут раз в 10 минут, а
+// last_checked_at пишется внутри запуска, поэтому «60 минут» по часам созревало бы
+// только на втором тике (70). checkDueAfterMinutes округляет частоту до целого числа
+// тиков и опускает порог на 9 минут (см. dempingForm.ts), чтобы 60 действительно
+// означало раз в час, а подпись на странице совпадала с этой логикой.
 export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: number, now: number = Date.now()): boolean {
   if (!lastCheckedAt) return true
   const elapsedMinutes = (now - new Date(lastCheckedAt).getTime()) / 60000
-  return elapsedMinutes >= checkFrequencyMinutes
+  return elapsedMinutes >= checkDueAfterMinutes(checkFrequencyMinutes)
 }
 
 // Сессия кабинета пригодна для работы бота. Пустой статус у старых строк
@@ -164,8 +172,9 @@ async function loadOwnerWalletBalances(userIds: (string | null | undefined)[]): 
 //    проверка раньше списывалась и крутилась по кругу);
 //  - товар снят с продажи в кабинете (available_for_sale = false) -- пропуск,
 //    иначе пуш с available:'yes' вернул бы его в продажу;
-//  - баланс владельца меньше цены проверки -- пропуск: раньше такие товары
-//    оставались due вечно и бегунок GitHub впустую ходил в Kaspi за каждым.
+//  - баланс владельца меньше 5 ₸ -- пропуск: изменение цены ему не оплатить, а
+//    раньше такие товары оставались due вечно и бегунок GitHub впустую ходил в
+//    Kaspi за каждым. Владельцу раз в сутки уходит колокольчик (lowBalanceNotice).
 // Ничего не выключается и не удаляется: пополнил кошелёк / переподключил
 // кабинет -- бот поехал дальше сам.
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
@@ -190,11 +199,21 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   // Кошелёк списывается с p.user_id (см. applyPriceCheckResult) -- по нему и смотрим.
   const walletOwnerOf = (p: any): string | null => p.user_id ?? ownerOf(p)
   const balances = await loadOwnerWalletBalances(allowed.map(walletOwnerOf))
-  return allowed
-    .filter((p: any) => {
-      const owner = walletOwnerOf(p)
-      return !!owner && (balances.get(owner) ?? 0) >= KASPI_SHOP_CREDIT_PRICE_TENGE
-    })
+  // Правило основателя 07.11.2026: проверка бесплатна, 5 ₸ берётся только за
+  // изменение цены. Владелец с балансом меньше 5 ₸ оплатить изменение не может,
+  // поэтому бот ему цены не меняет, и ходить в Kaspi за его товарами незачем:
+  // они в список не попадают. Раз в сутки такому владельцу уходит колокольчик
+  // (Telegram по настройке — дневная сводка, она уже зовёт пополнить кошелёк).
+  const lowBalanceOwners = new Set<string>()
+  const funded = allowed.filter((p: any) => {
+    const owner = walletOwnerOf(p)
+    if (!owner) return false
+    if ((balances.get(owner) ?? 0) >= KASPI_SHOP_CREDIT_PRICE_TENGE) return true
+    lowBalanceOwners.add(owner)
+    return false
+  })
+  if (lowBalanceOwners.size > 0) await notifyLowBalanceOwners(supabase, Array.from(lowBalanceOwners))
+  return funded
     .map((p: any) => {
       const conn = joinedConnection(p)
       let targetCities = resolveTargetCities(conn?.tracked_city_codes || [], p.excluded_city_codes || [])
@@ -394,14 +413,17 @@ const ALL_CITIES_EXCLUDED_MESSAGE = 'Все города товара исклю
 // once it got past the guards below -- an error row is real information the
 // seller should see in their history, not a silently dropped cycle.
 //
-// Деньги (аудит Kaspi 06.11.2026, K4/K5/K19/K20/K43/K44): 5 ₸ за проверку
-// списываются ТОЛЬКО за проверку, которая дошла до конца: Kaspi ответил
-// (нет fetchError), сессия кабинета active, товар включён, не на паузе и в
-// продаже, кошелёк покрывает проверку. Нет списания и при неудачной отправке
-// цены в Kaspi (action 'push_failed') -- продавец не платит за то, что не
-// применилось. До проверок «сессия / продажа / баланс» функция выходит, ничего
+// Деньги (правило основателя 07.11.2026, поверх аудита Kaspi 06.11.2026,
+// K4/K5/K19/K20/K43/K44): ПРОВЕРКА БЕСПЛАТНА. 5 ₸ (1 кредит) списывается только
+// когда бот реально изменил цену и новая цена ДОШЛА до Kaspi (пуш прошёл), и
+// ровно один раз за товар за цикл, сколько бы городов ни изменилось в одной
+// отправке. Бесплатно: проверка без изменений (no_change), цена упёрлась в
+// минимум без отправки (held_at_floor), ошибка Kaspi или данных, неудачная
+// отправка (push_failed), мёртвая сессия, товар снят с продажи. Владелец с
+// балансом меньше 5 ₸ изменить цену не оплатит, поэтому функция выходит, ничего
 // не записав: товар остаётся как был, а в getDueTrackedProducts такие товары
-// уже не попадают.
+// уже не попадают. Если цена УЖЕ ушла в Kaspi, а списание не прошло (гонка
+// двух товаров на последнюю пятёрку), изменение остаётся, сбой пишется в лог.
 //
 // Цена (K9/K19): own_current_price товара и action 'updated' пишутся только
 // ПОСЛЕ успешной отправки в Kaspi. Отправка не удалась (бюджет, HTTP, сессия) --
@@ -512,6 +534,9 @@ export async function applyPriceCheckResult(
   let unappliedPrice: number | null = null
   // Не пуш-ошибка, а пропуск: у товара нет городов, куда отправлять цену.
   let noCitiesSkip: string | null = null
+  // Хотя бы одна отправка цены в Kaspi в этом цикле прошла: единственное условие
+  // списания (одно на товар за цикл, не по числу городов).
+  let priceChangePushed = false
 
   // maxPrice/noCompetitorStreak are read once here and reused by both the
   // top-level computeRepriceCandidate call AND the legacy branch's inner
@@ -602,8 +627,19 @@ export async function applyPriceCheckResult(
         cityPrices: changedCityPrices,
       })
       if (pushResult.pushed) {
+        priceChangePushed = true
         const pushedAt = new Date().toISOString()
         for (const [cityCode, price] of Object.entries(changedCityPrices)) {
+          if (currentCityPrices[cityCode] === undefined) {
+            // У города нет строки (товар заведён вручную, вставка при импорте не удалась, город выбран
+            // продавцом): без строки цена не запоминалась бы, и каждый цикл мы отправляли бы её заново
+            // и брали бы 5 ₸ за изменение, которого нет (ревью 07.11).
+            const { error: createError } = await supabase
+              .from('kaspi_shop_product_city_prices')
+              .insert({ tracked_product_id: trackedProductId, city_code: cityCode, own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+            if (createError) console.error('kaspi-shop checkCycle: city row create after push failed for product', trackedProductId, 'city', cityCode, ':', createError.message)
+            continue
+          }
           await supabase
             .from('kaspi_shop_product_city_prices')
             .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
@@ -627,7 +663,9 @@ export async function applyPriceCheckResult(
       action = 'push_failed'
       unappliedPrice = desiredPrice
     } else {
-      action = anyHeldAtFloor ? 'held_at_floor' : (ownPriceAfter === ownPriceBefore ? 'no_change' : 'updated')
+      // Итоговая цена товара (минимум по городам) могла не сдвинуться, хотя в одном
+      // из городов цена ушла в Kaspi: это изменение, а не «без изменений».
+      action = anyHeldAtFloor ? 'held_at_floor' : (ownPriceAfter === ownPriceBefore && !priceChangePushed ? 'no_change' : 'updated')
     }
 
     // "Leader" city -- whichever city's result actually set the displayed
@@ -792,6 +830,7 @@ export async function applyPriceCheckResult(
 
           if (result.pushed) {
             pushedSomething = true
+            priceChangePushed = true
             const pushedAt = new Date().toISOString()
             for (const [cityCode, cityPrice] of Object.entries(legacyCityPrices)) {
               await supabase
@@ -874,16 +913,20 @@ export async function applyPriceCheckResult(
     ? `Цена ${unappliedPrice} ₸ не отправлена в Kaspi${issuesSummary ? `: ${issuesSummary}` : ''}`.slice(0, 2000)
     : (noCitiesSkip ?? issuesSummary)
 
-  // Списание: только за состоявшуюся проверку, цена которой дошла до Kaspi
-  // (или менять было нечего). Неудачная отправка и товар без городов --
-  // бесплатно.
+  // Списание: только за изменение цены, которое дошло до Kaspi (priceChangePushed),
+  // один раз за товар за цикл. Проверка без изменений, held_at_floor без отправки,
+  // ошибки, неудачная отправка и товар без городов -- бесплатно.
   let creditCost = 0
-  if (action !== 'push_failed' && !noCitiesSkip) {
+  if (priceChangePushed) {
+    const productLabel = String(product.product_name ?? '').slice(0, 120)
     try {
-      await debitKaspiShopWallet(userId, 1, `Проверка цены: ${product.product_name}`)
+      await debitKaspiShopWallet(userId, 1, `Изменение цены: ${productLabel} ${ownPriceBefore} → ${ownPriceAfter} ₸`)
       creditCost = 1
     } catch (err: any) {
-      console.error('kaspi-shop checkCycle: wallet debit failed for user', userId, 'product', trackedProductId, ':', err.message)
+      // Цена уже на Kaspi, откатить её нельзя: изменение остаётся, списание не
+      // состоялось (credit_cost 0). Обычно это гонка двух товаров одного владельца
+      // на последние 5 ₸ в одном запуске.
+      console.error('kaspi-shop checkCycle: price change reached Kaspi but wallet debit failed for user', userId, 'product', trackedProductId, ':', err.message)
     }
   }
 
