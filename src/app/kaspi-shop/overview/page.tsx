@@ -204,7 +204,7 @@ export default function KaspiShopOverview() {
                 <thead>
                   <tr style={{ color: 'var(--nav-text-muted)' }}>
                     {['Заказ', 'Товар', 'Сумма', 'Статус'].map((h, i) => (
-                      <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold uppercase ${i === 2 ? 'text-right' : 'text-left'}`} style={{ letterSpacing: '0.08em' }}>{h}</th>
+                      <th key={h} className={`px-2.5 sm:px-4 py-2.5 text-[11px] font-semibold uppercase ${i === 3 ? 'whitespace-nowrap ' : ''}${i === 2 ? 'text-right' : 'text-left'}`} style={{ letterSpacing: '0.08em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -219,12 +219,12 @@ export default function KaspiShopOverview() {
                   )}
                   {orders?.map((o) => (
                     <tr key={o.code} style={{ borderTop: '1px solid var(--nav-border)' }}>
-                      <td className="px-4 py-3 font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.code}</td>
-                      <td className="px-4 py-3" style={{ color: 'var(--nav-text-primary)' }}>
+                      <td className="px-2.5 sm:px-4 py-3 font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.code}</td>
+                      <td className="px-2.5 sm:px-4 py-3 max-w-[8rem] truncate sm:max-w-none sm:whitespace-normal" style={{ color: 'var(--nav-text-primary)' }}>
                         {o.items?.[0]?.name ?? '—'}{(o.items?.length ?? 0) > 1 ? ` и ещё ${o.items.length - 1}` : ''}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(o.totalPrice)}</td>
-                      <td className="px-4 py-3" style={{ color: 'var(--nav-text-secondary)' }}>{statusLabel(o.tab)}</td>
+                      <td className="px-2.5 sm:px-4 py-3 text-right tabular-nums whitespace-nowrap" style={{ color: 'var(--nav-text-primary)' }}>{money(o.totalPrice)}</td>
+                      <td className="px-2.5 sm:px-4 py-3 whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{statusLabel(o.tab)}</td>
                     </tr>
                   ))}
                   {orders !== null && orders.length > 0 && ordersListFailed && (

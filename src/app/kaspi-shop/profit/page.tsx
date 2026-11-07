@@ -287,6 +287,8 @@ export default function KaspiShopProfit() {
     }
   }
 
+  // Сбой Kaspi, мёртвая сессия или пустой ответ: выручка, себестоимость и комиссия неизвестны, а не нули.
+  const tilesUnknown = !summary || summary.sessionExpired || (!!summary.upstreamFailed && summary.totalRevenue === 0)
   if (loading) {
     return accessError
       ? <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); checkAccess() }} />
@@ -345,6 +347,8 @@ export default function KaspiShopProfit() {
             // «—» вместо прибыли, когда Kaspi не ответил на заказы или сессия мертва:
             // сумма расходов с нулевой выручкой дала бы ложный минус (аудит K35).
             const unknown = !summary || summary.sessionExpired || (!!summary.upstreamFailed && summary.totalRevenue === 0)
+            // Комиссия не задана: прибыль без неё сильно завышена, поэтому крупной цифры нет, пока её не укажут.
+            const needsCommission = !unknown && !!summary?.commissionMissing
             const reasons: string[] = []
             if (summary) {
               if (summary.productsWithoutCogsCount > 0) reasons.push('нет себестоимости у части товаров')
@@ -356,10 +360,15 @@ export default function KaspiShopProfit() {
             return (
               <>
                 <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1 min-w-0 [overflow-wrap:anywhere]" style={{ color: 'var(--nav-text-primary)' }}>
-                  {unknown ? <span style={{ color: 'var(--nav-text-muted)' }}>—</span> : summary!.netProfit.toLocaleString('ru-KZ')}{' '}
+                  {unknown || needsCommission ? <span style={{ color: 'var(--nav-text-muted)' }}>—</span> : summary!.netProfit.toLocaleString('ru-KZ')}{' '}
                   <span className="text-base lg:text-lg font-semibold" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль до доставки и налогов{preliminary ? ' (предварительно)' : ''}</span>
                 </div>
-                {preliminary && reasons.length > 0 && (
+                {needsCommission && (
+                  <div role="status" className="text-[13px] mt-1" style={{ color: 'var(--nav-critical)' }}>
+                    Укажите комиссию Kaspi в плитке «комиссия» ниже: без неё прибыль была бы сильно завышена.
+                  </div>
+                )}
+                {preliminary && !needsCommission && reasons.length > 0 && (
                   <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>Предварительно: {reasons.join('; ')}.</div>
                 )}
                 {!!summary && !unknown && (
@@ -373,11 +382,11 @@ export default function KaspiShopProfit() {
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
             <div>
-              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{tilesUnknown ? '—' : (summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
             </div>
             <div>
-              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalCogsKnown ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{tilesUnknown ? '—' : (summary?.totalCogsKnown ?? 0).toLocaleString('ru-KZ')}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ себестоимость</div>
             </div>
             <div>
@@ -401,7 +410,7 @@ export default function KaspiShopProfit() {
               return (
                 <div>
                   <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
-                    {(summary?.commissionAmount ?? 0).toLocaleString('ru-KZ')}
+                    {tilesUnknown ? '—' : (summary?.commissionAmount ?? 0).toLocaleString('ru-KZ')}
                   </div>
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
                     ₸ комиссия{hasFlatRate
@@ -511,7 +520,7 @@ export default function KaspiShopProfit() {
                       Прибыль{p.commissionAmount !== null ? ` (−${p.commissionAmount.toLocaleString('ru-KZ')} ₸ комиссия)` : ' (комиссия не указана)'}
                     </span>
                     <span className="font-mono font-bold text-xs tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
-                      {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[10px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
+                      {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[10px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>{p.commissionAmount === null ? 'укажите комиссию' : 'укажите себест.'}</span>}
                     </span>
                   </div>
                 </div>

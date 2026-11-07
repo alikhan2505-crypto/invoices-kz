@@ -175,8 +175,9 @@ describe('страница Прибыль: сбой Kaspi и честные по
     await mountPage(ProfitPage)
     const text = pageText()
     expect(text).toContain('прибыль до доставки и налогов')
-    expect(text).toContain('(предварительно)')
-    expect(text).toContain('не указана комиссия')
+    // Без комиссии крупной цифры прибыли нет (она была бы завышена): прочерк и просьба указать комиссию.
+    expect(text).toContain('— ₸ прибыль до доставки и налогов')
+    expect(text).toContain('Укажите комиссию Kaspi')
     expect(text).toContain('Доставка Kaspi, налоги, возвраты и отмены не вычтены')
   })
 

@@ -17,6 +17,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { useAppDialog } from '@/components/AppDialog'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -68,6 +69,9 @@ function KaspiShopOrdersInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const status = searchParams.get('status') || ORDER_STATUS_TABS[0].value
+  const { confirm, dialogElement } = useAppDialog()
+  // Ссылка со статусом или переход с Обзора: активная вкладка не должна оставаться за краем полосы (прогон воронки 07.11.2026).
+  const tabScrolledFor = useRef('')
 
   const [loading, setLoading] = useState(true)
   const [accessError, setAccessError] = useState('')
@@ -328,6 +332,8 @@ function KaspiShopOrdersInner() {
   // both the list and the sidebar-style counts is exactly what's needed.
   async function confirmPackingAction() {
     if (selectedVisibleOrders.length === 0 || confirmingPacking) return
+    // Заказы сразу уходят в «Передачу», отменить это нельзя: спрашиваем один раз.
+    if (!(await confirm(`Отправить ${selectedVisibleOrders.length} ${selectedVisibleOrders.length === 1 ? 'заказ' : 'заказов'} на передачу? Накладные сформируются, отменить это нельзя.`))) return
     setConfirmingPacking(true)
     setLoadError('')
     setNotice('')
@@ -488,7 +494,12 @@ function KaspiShopOrdersInner() {
           {ORDER_STATUS_TABS.map(tab => {
             const active = status === tab.value
             return (
-              <button key={tab.value} onClick={() => router.push(`/kaspi-shop/orders?status=${tab.value}`)}
+              <button key={tab.value}
+                ref={el => {
+                  // Один раз на статус: полоса вкладок сама прокручивается к активной, когда та появилась в разметке.
+                  if (el && active && tabScrolledFor.current !== status) { tabScrolledFor.current = status; el.scrollIntoView({ inline: 'center', block: 'nearest' }) }
+                }}
+                onClick={() => router.push(`/kaspi-shop/orders?status=${tab.value}`)}
                 className="relative overflow-hidden flex-shrink-0 rounded-full px-3 py-1.5 max-sm:min-h-10 text-xs font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'transparent' : 'var(--nav-surface-glass)' }}>
                 {active && (
@@ -533,7 +544,7 @@ function KaspiShopOrdersInner() {
         )}
 
         {bulkEnabled && status === PACKING_STATUS && selectedVisibleOrders.length > 0 && (
-          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap mb-4" style={{ background: 'var(--nav-accent)' }}>
+          <div className="sticky top-16 lg:top-4 z-30 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap mb-4" style={{ background: 'var(--nav-accent)', boxShadow: '0 10px 24px -12px rgba(10,10,15,0.45)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selectedVisibleOrders.length}</span>
             <button onClick={confirmPackingAction} disabled={confirmingPacking}
               className="text-xs font-medium rounded-lg px-3 py-2 max-sm:min-h-10 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
@@ -723,6 +734,7 @@ function KaspiShopOrdersInner() {
           </div>
         )
       })()}
+      {dialogElement}
     </main>
     </DesktopShell>
   )

@@ -14,6 +14,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer, { TWO_COL_CLS } from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { qualityLevelLabel, qualityMetricLabel, qualityStatusLabel, qualityTone, qualityToneStyle } from '@/lib/kaspiShop/qualityText'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -230,7 +231,7 @@ export default function KaspiShopQualityPage() {
           <div className="nav-glass rounded-2xl p-4 mb-4">
             <div className="text-sm font-semibold" style={{ color: 'var(--nav-critical)' }}>Есть показатели в зоне риска</div>
             {(overview.warning.signals || []).map((s, i) => (
-              <div key={i} className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{s.metric}: {s.level}</div>
+              <div key={i} className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{qualityMetricLabel(s.metric)}: {qualityLevelLabel(s.level)}</div>
             ))}
           </div>
         )}
@@ -319,8 +320,8 @@ export default function KaspiShopQualityPage() {
                     {c.metric?.notEnoughData ? 'Недостаточно данных' : `${c.metric?.violatedCount ?? 0} из ${c.metric?.totalCount ?? 0}`}
                   </span>
                   {c.performanceStatus && (
-                    <span className="text-[10px] font-semibold rounded-full px-2 py-0.5" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
-                      {c.performanceStatus}
+                    <span className="text-[10px] font-semibold rounded-full px-2 py-0.5" style={qualityToneStyle(qualityTone(c.performanceStatus))}>
+                      {qualityStatusLabel(c.performanceStatus)}
                     </span>
                   )}
                 </div>

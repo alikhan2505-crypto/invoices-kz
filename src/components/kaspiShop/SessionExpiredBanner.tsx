@@ -11,7 +11,7 @@ import Link from 'next/link'
 export default function SessionExpiredBanner() {
   return (
     <div className="bg-[#FFF4E5] rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-      <span className="text-sm text-[#B15E00]">Сессия кабинета Kaspi истекла — переподключитесь, чтобы данные снова обновлялись.</span>
+      <span className="text-sm text-[#B15E00]">Сессия Kaspi истекла. Данные не обновляются, а бот не меняет цены, пока вы не переподключитесь.</span>
       <Link href="/kaspi-shop" className="text-xs bg-[#B15E00] text-white rounded-lg px-3 py-1.5 flex-shrink-0 whitespace-nowrap">Переподключиться</Link>
     </div>
   )

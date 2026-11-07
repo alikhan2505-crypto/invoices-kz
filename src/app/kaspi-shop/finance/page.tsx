@@ -124,6 +124,12 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+  // График открывается на последних днях: сегодняшние продажи справа, а не за горизонтальной прокруткой.
+  const dayCount = byDay.length
+  useEffect(() => {
+    const el = wrapRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [dayCount, avail])
   if (byDay.length === 0) return null
 
   // Left gutter for the revenue axis labels, bottom gutter for date labels
@@ -564,8 +570,8 @@ export default function KaspiShopFinance() {
                       <tr className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--nav-text-muted)' }}>
                         <th className="text-left font-semibold px-4 py-2.5">Класс</th>
                         <th className="text-left font-semibold px-2 py-2.5">Товар</th>
-                        <th className="text-right font-semibold px-2 py-2.5">Шт</th>
                         <th className="text-right font-semibold px-2 py-2.5">Выручка</th>
+                        <th className="text-right font-semibold px-2 py-2.5">Шт</th>
                         <th className="text-right font-semibold px-2 py-2.5">Доля</th>
                         <th className="text-right font-semibold px-4 py-2.5">Накопл.</th>
                       </tr>
@@ -577,8 +583,8 @@ export default function KaspiShopFinance() {
                             <span className="text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: ABC_COLORS[row.abcClass], color: '#fff' }}>{row.abcClass}</span>
                           </td>
                           <td className="px-2 py-2.5" style={{ color: 'var(--nav-text-primary)' }}>{row.name}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: 'var(--nav-text-primary)' }}>{row.revenue.toLocaleString('ru-KZ')} ₸</td>
                           <td className="px-2 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{row.unitsSold}</td>
-                          <td className="px-2 py-2.5 text-right tabular-nums font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{row.revenue.toLocaleString('ru-KZ')} ₸</td>
                           <td className="px-2 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{(row.share * 100).toFixed(1)}%</td>
                           <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{(row.cumulativeShare * 100).toFixed(1)}%</td>
                         </tr>
