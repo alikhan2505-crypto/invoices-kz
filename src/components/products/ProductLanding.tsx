@@ -42,6 +42,10 @@ function carryOnClick(e: React.MouseEvent<HTMLAnchorElement>) {
   e.currentTarget.href = withCarriedParams(e.currentTarget.href)
 }
 
+// Кнопка лендинга Kaspi Bot: «Начать» вместо «Войти и открыть» (решение основателя 07.11.2026: новичку с рекламы
+// слово «войти» говорит, что аккаунт уже нужен). Остальные продуктовые лендинги не менялись.
+const KASPI_START: Record<Lang, string> = { ru: 'Начать', kk: 'Бастау', en: 'Get started' }
+
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
   const { lang, setLang } = useLanguage()
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
@@ -101,7 +105,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
       ) : l.access === 'invite' ? (
         <a className="lp-cta" href={applyHref}><span>{ui.apply}</span></a>
       ) : (
-        <a className="lp-cta" href={loginHref} onClick={carryOnClick}><span>{ui.enter}</span></a>
+        <a className="lp-cta" href={loginHref} onClick={carryOnClick}><span>{landing === 'kaspi' ? KASPI_START[lang] : ui.enter}</span></a>
       )}
       {/* Одна честная строка о цене (решение «1А»): тариф и расход из кошелька,
           полная таблица — по ссылке на лендинге Счетов. */}
