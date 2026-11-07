@@ -22,6 +22,26 @@ const LANGS: { key: Lang; label: string }[] = [
   { key: 'en', label: 'Eng' },
 ]
 
+// Метки рекламы (utm_*, ref) переезжают вместе с кликом на вход: страница входа на другом
+// хосте (invoices.kz), и без этого регистрация с рекламы терялась бы без источника.
+const CARRY_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'ref']
+function withCarriedParams(href: string): string {
+  try {
+    const from = new URLSearchParams(window.location.search)
+    const to = new URL(href)
+    for (const k of CARRY_PARAMS) {
+      const v = from.get(k)
+      if (v && !to.searchParams.has(k)) to.searchParams.set(k, v.slice(0, 80))
+    }
+    return to.toString()
+  } catch {
+    return href
+  }
+}
+function carryOnClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  e.currentTarget.href = withCarriedParams(e.currentTarget.href)
+}
+
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
   const { lang, setLang } = useLanguage()
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
@@ -81,7 +101,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
       ) : l.access === 'invite' ? (
         <a className="lp-cta" href={applyHref}><span>{ui.apply}</span></a>
       ) : (
-        <a className="lp-cta" href={loginHref}><span>{ui.enter}</span></a>
+        <a className="lp-cta" href={loginHref} onClick={carryOnClick}><span>{ui.enter}</span></a>
       )}
       {/* Одна честная строка о цене (решение «1А»): тариф и расход из кошелька,
           полная таблица — по ссылке на лендинге Счетов. */}
@@ -114,7 +134,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
           {canOpen ? (
             <a className="lp-back" href={l.cabinet}><span>{ui.open}</span></a>
           ) : (
-            <a className="lp-back" href={loginHref}><span>{ui.login}</span></a>
+            <a className="lp-back" href={loginHref} onClick={carryOnClick}><span>{ui.login}</span></a>
           )}
         </div>
       </div>

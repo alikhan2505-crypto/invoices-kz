@@ -45,6 +45,15 @@
 .lp-root .lp-footer-links a { opacity: 0.75; text-decoration: none; }
 .lp-root .lp-footer-links a:hover { opacity: 1; text-decoration: underline; }
 
+/* Зоны нажатия не меньше 44 px (ревью 07.11 перед рекламой: кнопки языка 22 px, «Войти» 29 px,
+   «Тарифы» 17 px, ссылки футера 18 px). Видимый размер не меняется: расширяем невидимым слоем. */
+.lp-root .lp-lang button, .lp-root .lp-top .lp-back, .lp-root .lp-price a, .lp-root .lp-mini { position: relative; }
+.lp-root .lp-lang button::before { content: ''; position: absolute; inset: -11px -2px; }
+.lp-root .lp-top .lp-back::before { content: ''; position: absolute; inset: -8px -2px; }
+.lp-root .lp-price a::before { content: ''; position: absolute; inset: -14px -6px; }
+.lp-root .lp-mini::before { content: ''; position: absolute; inset: -9px -2px; }
+@media (pointer: coarse) { .lp-root .lp-footer-links a { display: inline-flex; align-items: center; min-height: 44px; } }
+
 /* Телефон: назад, язык и вход — в одну строку, без переносов. */
 @media (max-width: 480px) {
   .lp-root .lp-top { gap: 8px; flex-wrap: nowrap; }
