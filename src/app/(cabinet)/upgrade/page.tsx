@@ -16,12 +16,55 @@ import { upgradeCreditDays } from '@/lib/plans/planActivation'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 import { useAppDialog } from '@/components/AppDialog'
 import { homeFor } from '@/lib/products'
+import { parseHandoff } from '@/lib/crossProduct'
 import { formatDateNumeric } from '@/lib/date'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import WalletAmountChooser from '@/components/WalletAmountChooser'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { notifyWalletChanged } from '@/lib/walletSignal'
+
+// Человек пришёл покупать Про ради Kaspi Bot (ссылка со стены Про: ?from=kaspiShop&back=/kaspi-shop/...).
+// Прогон воронки 07.11.2026: после оплаты его уводило в кабинет счетов, Про не была первой, а на Базовом
+// стоял «Популярный», хотя Kaspi Bot в Базовый не входит. HandoffBanner убирает from/back из адреса, но
+// держит их в sessionStorage; читаем и адрес (на случай порядка эффектов), и хранилище.
+function readKaspiBack(): string | null {
+  try {
+    const fromUrl = parseHandoff(window.location.search)
+    if (fromUrl) return fromUrl.from === 'kaspiShop' ? fromUrl.back : null
+    const raw = sessionStorage.getItem('product_handoff')
+    if (!raw) return null
+    const h = JSON.parse(raw) as { from?: string; back?: string }
+    const parsed = parseHandoff(`?from=${encodeURIComponent(h.from ?? '')}&back=${encodeURIComponent(h.back ?? '')}`)
+    return parsed && parsed.from === 'kaspiShop' ? parsed.back : null
+  } catch {
+    return null
+  }
+}
+
+const KASPI_TEXT = {
+  ru: {
+    goToKaspi: 'Подключить магазин Kaspi',
+    basicNoKaspi: 'Kaspi Bot в этот тариф не входит',
+    proForKaspi: 'Для Kaspi Bot',
+    payHere: 'Оплата в Kaspi',
+    payHint: 'Нажмите «Открыть Kaspi», оплатите и вернитесь на эту страницу: она сама увидит оплату.',
+  },
+  kk: {
+    goToKaspi: 'Kaspi дүкенін қосу',
+    basicNoKaspi: 'Kaspi Bot бұл тарифке кірмейді',
+    proForKaspi: 'Kaspi Bot үшін',
+    payHere: 'Kaspi-де төлеу',
+    payHint: '«Kaspi ашу» батырмасын басып, төлеңіз де осы бетке оралыңыз: бет төлемді өзі көреді.',
+  },
+  en: {
+    goToKaspi: 'Connect your Kaspi store',
+    basicNoKaspi: 'Kaspi Bot is not included in this plan',
+    proForKaspi: 'For Kaspi Bot',
+    payHere: 'Pay in Kaspi',
+    payHint: 'Tap “Open Kaspi”, pay and come back to this page: it will see the payment by itself.',
+  },
+} as const
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
@@ -179,9 +222,9 @@ function OrDivider({ label }: { label: string }) {
 // One price card. All three share the same 2px border so their content lines
 // up across the desktop row; Pro alone gets the accent border, the soft
 // accent wash and the top gradient bar (.nav-card-accent).
-function PlanCard({ id, tone, current, index, reduceMotion, children }: {
+function PlanCard({ id, tone, current, index, reduceMotion, className, children }: {
   id?: string; tone: 'free' | 'basic' | 'pro'; current: boolean; index: number
-  reduceMotion: boolean; children: ReactNode
+  reduceMotion: boolean; className?: string; children: ReactNode
 }) {
   const style: CSSProperties = tone === 'pro'
     ? {
@@ -198,7 +241,7 @@ function PlanCard({ id, tone, current, index, reduceMotion, children }: {
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: reduceMotion ? 0 : 0.06 + index * 0.05, duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-      className={`h-full flex flex-col rounded-2xl p-6 ${tone === 'pro' ? 'nav-card-accent' : ''}`}
+      className={`h-full flex flex-col rounded-2xl p-6 ${tone === 'pro' ? 'nav-card-accent' : ''} ${className ?? ''}`}
       style={style}>
       {children}
     </motion.div>
@@ -312,9 +355,16 @@ export default function Upgrade() {
   // actually paid. 0 for a fresh purchase (no current plan_expires_at to beat).
   const baselineExpiresRef = useRef<number>(0)
 
+  const [kaspiBack, setKaspiBack] = useState<string | null>(null)
+  // Встроенный браузер Instagram / Facebook: автопереход на pay.kaspi.kz там легко оставляет человека
+  // в тупике, поэтому вместо него явная кнопка «Открыть Kaspi».
+  const [inApp, setInApp] = useState(false)
+
   useEffect(() => {
     loadData()
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
+    setInApp(/Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent))
+    setKaspiBack(readKaspiBack())
     return () => { if (statusInterval.current) clearInterval(statusInterval.current) }
   }, [])
 
@@ -605,6 +655,16 @@ export default function Upgrade() {
     return () => clearInterval(timer)
   }, [qrExpiresAt, showModal, step, phoneRequested])
 
+  // Вернулись из приложения Kaspi: сразу спрашиваем статус, не ждём пять секунд опроса.
+  useEffect(() => {
+    if (!showModal || step !== 'pending' || !selectedPlan) return
+    const planKey = selectedPlan.plan
+    const onVisible = () => { if (document.visibilityState === 'visible') void checkPaymentStatus(planKey) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showModal, step, selectedPlan])
+
   async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod, walletAmount = 0) {
     setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod, useWallet: walletAmount > 0, walletAmount })
     setWalletPaid(0)
@@ -637,7 +697,7 @@ export default function Upgrade() {
         return
       }
 
-      if (isMobile) {
+      if (isMobile && !/Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent)) {
         window.location.href = link
       }
 
@@ -959,10 +1019,10 @@ export default function Upgrade() {
                     {t.renewShortButton}
                   </button>
                 )}
-                <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
+                <button type="button" onClick={() => router.push(kaspiBack ?? homeFor(profile?.enabled_products))}
                   className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
                   style={BTN_PRIMARY}>
-                  {t.toCabinetButton}
+                  {kaspiBack ? KASPI_TEXT[lang].goToKaspi : t.toCabinetButton}
                 </button>
               </div>
             </div>
@@ -1045,7 +1105,7 @@ export default function Upgrade() {
           {/* Plans: stacked on a phone, one equal-height row from lg up. */}
           <div className="grid gap-4 lg:grid-cols-3 lg:gap-5 items-stretch mb-6 lg:max-w-[1400px] lg:mx-auto">
             {/* Free */}
-            <PlanCard tone="free" current={shownPlan === 'free'} index={0} reduceMotion={!!reduceMotion}>
+            <PlanCard tone="free" current={shownPlan === 'free'} index={0} reduceMotion={!!reduceMotion} className={kaspiBack ? 'order-3 lg:order-none' : ''}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.freePlanName}</h3>
                 {shownPlan === 'free' && <PlanBadge solid>{t.currentBadge}</PlanBadge>}
@@ -1055,17 +1115,20 @@ export default function Upgrade() {
             </PlanCard>
 
             {/* Basic */}
-            <PlanCard id="plan-basic" tone="basic" current={shownPlan === 'basic'} index={1} reduceMotion={!!reduceMotion}>
+            <PlanCard id="plan-basic" tone="basic" current={shownPlan === 'basic'} index={1} reduceMotion={!!reduceMotion} className={kaspiBack ? 'order-2 lg:order-none' : ''}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.basicPlanName}</h3>
                 {shownPlan === 'basic'
                   ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
-                  : <PlanBadge>{t.popularBadge}</PlanBadge>}
+                  : kaspiBack ? null : <PlanBadge>{t.popularBadge}</PlanBadge>}
               </div>
               <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>
                 {PLAN_PRICES.basic[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal" style={{ color: 'var(--nav-text-muted)' }}>{priceSuffix}</span>
               </div>
               <FeatureList items={t.basicFeatures} />
+              {kaspiBack && (
+                <p className="mt-4 text-xs font-medium" style={{ color: 'var(--nav-critical)' }}>{KASPI_TEXT[lang].basicNoKaspi}</p>
+              )}
               <div className="mt-6">
                 {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />}
                 {plan === 'basic' && (
@@ -1079,12 +1142,12 @@ export default function Upgrade() {
             </PlanCard>
 
             {/* Pro */}
-            <PlanCard id="plan-pro" tone="pro" current={shownPlan === 'pro'} index={2} reduceMotion={!!reduceMotion}>
+            <PlanCard id="plan-pro" tone="pro" current={shownPlan === 'pro'} index={2} reduceMotion={!!reduceMotion} className={kaspiBack ? 'order-first lg:order-none' : ''}>
               <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.proPlanName}</h3>
                 {shownPlan === 'pro'
                   ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
-                  : <PlanBadge>{t.maxBadge}</PlanBadge>}
+                  : <PlanBadge>{kaspiBack ? KASPI_TEXT[lang].proForKaspi : t.maxBadge}</PlanBadge>}
               </div>
               <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>
                 {PLAN_PRICES.pro[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal" style={{ color: 'var(--nav-text-muted)' }}>{priceSuffix}</span>
@@ -1161,9 +1224,9 @@ export default function Upgrade() {
                 ) : isMobile ? (
                   <div className="text-center py-4">
                     <StatusTile bg="var(--nav-accent-soft)" color="var(--nav-accent)"><PhoneIcon /></StatusTile>
-                    <div className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.redirectingKaspiLabel}</div>
+                    <div className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{inApp ? KASPI_TEXT[lang].payHere : t.redirectingKaspiLabel}</div>
                     <div className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>
-                      {t.appNotOpenedHint}
+                      {inApp ? KASPI_TEXT[lang].payHint : t.appNotOpenedHint}
                     </div>
                     <a href={qrToken} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-center w-full min-h-[48px] rounded-xl py-3.5 text-sm font-semibold mb-3"
@@ -1266,11 +1329,11 @@ export default function Upgrade() {
                 </div>
                 <button type="button" onClick={() => {
                   setShowModal(false)
-                  router.push('/dashboard')
+                  router.push(kaspiBack && selectedPlan?.plan === 'pro' ? kaspiBack : '/dashboard')
                 }}
                   className={`w-full min-h-[48px] rounded-xl py-4 text-sm font-semibold ${PRESS}`}
                   style={BTN_PRIMARY}>
-                  {t.goToWorkButton}
+                  {kaspiBack && selectedPlan?.plan === 'pro' ? KASPI_TEXT[lang].goToKaspi : t.goToWorkButton}
                 </button>
               </div>
             )}

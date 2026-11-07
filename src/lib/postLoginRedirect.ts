@@ -74,3 +74,11 @@ export function postLoginRedirectFromSearch(search: string): PostLoginRedirectPa
   const next = new URLSearchParams(search).get('next')
   return isAllowedPath(next) ? next : null
 }
+
+// Письмо со ссылкой часто открывают в другом браузере (почтовое приложение на
+// телефоне), где localStorage пуст и намерение «идти в Kaspi» теряется. Поэтому
+// /login кладёт его ещё и в метаданные нового пользователя, а /auth/callback
+// читает оттуда — тем же белым списком (07.11.2026, прогон воронки Kaspi).
+export function normalizePostLoginRedirect(value: unknown): PostLoginRedirectPath | null {
+  return isAllowedPath(value) ? value : null
+}

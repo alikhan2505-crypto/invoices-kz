@@ -10,6 +10,8 @@ export interface AuthContent {
   /** Слишком частые попытки входа по Face ID / Touch ID (ответ 429). */
   passkeyTooManyError: string
   googleSignInButton: string
+  /** Встроенный браузер (Instagram, Facebook): Google такой вход не принимает, ведём на почту. */
+  inAppBrowserNotice: string
   facebookSignInButton: string
   orEmailDivider: string
   emailLabel: string
@@ -100,6 +102,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     passkeyLoginButton: 'Войти по Face ID / Touch ID',
     passkeyTooManyError: 'Слишком много попыток входа. Подождите минуту и попробуйте снова.',
     googleSignInButton: 'Войти через Google',
+    inAppBrowserNotice: 'В браузере Instagram вход через Google не работает. Введите почту ниже: мы пришлём ссылку и код.',
     facebookSignInButton: 'Войти через Facebook',
     orEmailDivider: 'или через email',
     emailLabel: 'Email',
@@ -184,6 +187,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     passkeyLoginButton: 'Face ID / Touch ID арқылы кіру',
     passkeyTooManyError: 'Кіру әрекеттері тым көп. Бір минут күтіп, қайталап көріңіз.',
     googleSignInButton: 'Google арқылы кіру',
+    inAppBrowserNotice: 'Instagram браузерінде Google арқылы кіру жұмыс істемейді. Төменге поштаңызды енгізіңіз: біз сілтеме мен код жібереміз.',
     facebookSignInButton: 'Facebook арқылы кіру',
     orEmailDivider: 'немесе email арқылы',
     emailLabel: 'Email',
@@ -269,6 +273,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     passkeyLoginButton: 'Sign in with Face ID / Touch ID',
     passkeyTooManyError: 'Too many sign-in attempts. Wait a minute and try again.',
     googleSignInButton: 'Sign in with Google',
+    inAppBrowserNotice: 'Google sign-in does not work inside the Instagram browser. Enter your email below: we will send a link and a code.',
     facebookSignInButton: 'Sign in with Facebook',
     orEmailDivider: 'or with email',
     emailLabel: 'Email',

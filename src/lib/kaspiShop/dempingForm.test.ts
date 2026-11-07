@@ -144,6 +144,20 @@ describe('floor_far_above_price: подтверждение', () => {
     expect(t).not.toContain('сразу')
   })
 
+  it('минимум сильно ниже цены (потерянный ноль): процент и вопрос про ноль', () => {
+    const t = floorFarConfirmText({ code: 'floor_far_above_price', field: 'floor_price', direction: 'below', floorPrice: 7000, ownPrice: 78990, factor: 3 })!
+    expect(t).toContain('это 9% от текущей цены')
+    expect(t).toContain('бот может опустить цену до')
+    expect(t).toContain('Не пропущен ли ноль?')
+  })
+
+  it('минимум чуть выше цены: бот поднимет цену, без слов «более чем в»', () => {
+    const t = floorFarConfirmText({ code: 'floor_far_above_price', field: 'floor_price', direction: 'above', floorPrice: 2100, ownPrice: 2000, factor: 3 })!
+    expect(t).toContain('выше текущей цены')
+    expect(t).toContain('бот поднимет цену до минимума')
+    expect(t).not.toContain('более чем')
+  })
+
   it('максимум ниже цены: вопрос про максимум', () => {
     const t = floorFarConfirmText({ code: 'floor_far_above_price', field: 'max_price', maxPrice: 600, ownPrice: 2000, factor: 3 })!
     expect(t).toContain('Максимум 600 ₸ ниже текущей цены')

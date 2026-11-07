@@ -167,6 +167,13 @@ export function floorFarConfirmText(data: any): string | null {
   }
   const floor = num(data?.floorPrice)
   if (floor === null) return null
+  if (data?.direction === 'below') {
+    const share = Math.round((floor / own) * 100)
+    return `Минимум ${formatTenge(floor)} — это ${share}% от текущей цены ${formatTenge(own)}. Если товар включён, бот может опустить цену до ${formatTenge(floor)}, и вы продадите дешевле, чем хотели. Не пропущен ли ноль? Сохранить?`
+  }
+  if (data?.direction === 'above' && floor <= own * factor) {
+    return `Минимум ${formatTenge(floor)} выше текущей цены ${formatTenge(own)}. Если товар включён, бот поднимет цену до минимума, за это изменение спишется ${PRICE_CHANGE_TENGE} ₸. Сохранить?`
+  }
   return `Минимум ${formatTenge(floor)} выше текущей цены ${formatTenge(own)} более чем в ${factor} ${pluralRu(factor, 'раз', 'раза', 'раз')}. Бот сделает это при следующей проверке, если товар включён: цена поднимется до минимума, за это изменение спишется ${PRICE_CHANGE_TENGE} ₸. Сохранить?`
 }
 
@@ -179,9 +186,10 @@ export function catalogSyncShouldReload(ok: boolean, data: any): boolean {
 
 // Текст ошибки для человека: слово сервера, если оно есть, иначе по коду ответа.
 export function apiErrorMessage(status: number, data: any, fallback: string): string {
+  // 401 первым: сервер присылает сырое английское «Unauthorized», а повтор тут не поможет (прогон воронки 07.11.2026).
+  if (status === 401) return 'Вход устарел. Обновите страницу и войдите заново.'
   const fromServer = typeof data?.error === 'string' && data.error.trim() ? data.error.trim() : ''
   if (fromServer) return fromServer
-  if (status === 401) return 'Вход устарел. Обновите страницу и войдите заново.'
   if (status === 403) return 'Нет доступа к этому действию.'
   if (status >= 500) return 'Сервер временно не отвечает. Попробуйте ещё раз через минуту.'
   return fallback

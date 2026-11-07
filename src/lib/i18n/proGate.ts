@@ -9,6 +9,9 @@ export type ProGateDict = {
   lapsedTitle: string
   lapsedText: string
   lapsedCta: string
+  // Что человек получает и что будет дальше (07.11.2026, прогон воронки Kaspi: на стене не было ни цены,
+  // ни слова про кошелёк и следующий шаг). Цену подставляет вызывающий из PLAN_PRICES.
+  facts: (price: string) => string[]
 }
 
 export const kaspiProGateDict: Record<Lang, ProGateDict> = {
@@ -19,6 +22,11 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Продлите Про, чтобы Kaspi Bot снова работал',
     lapsedText: 'Пока тариф не продлён, Kaspi Bot не меняет цены в вашем магазине, а разделы закрыты. После продления доступ вернётся.',
     lapsedCta: 'Продлить Про',
+    facts: (price) => [
+      `Тариф Про: ${price} в месяц. В него входит весь кабинет магазина Kaspi.`,
+      'Проверки цен бесплатны. 5 ₸ из кошелька берётся только за каждое изменение цены ботом.',
+      'После оплаты подключите магазин по SMS от Kaspi: пароль от кабинета мы не видим.',
+    ],
   },
   kk: {
     title: 'Про тарифінде қолжетімді',
@@ -27,6 +35,11 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Kaspi Bot қайта жұмыс істеуі үшін Про тарифін ұзартыңыз',
     lapsedText: 'Тариф ұзартылмайынша, Kaspi Bot дүкеніңіздегі бағаларды өзгертпейді, ал бөлімдер жабық болады. Ұзартқаннан кейін қолжетімділік қайтады.',
     lapsedCta: 'Проны ұзарту',
+    facts: (price) => [
+      `Про тарифі: айына ${price}. Kaspi дүкенінің бүкіл кабинеті кіреді.`,
+      'Баға тексеру тегін. Әмияннан 5 ₸ тек бот бағаны әр өзгерткенде алынады.',
+      'Төлегеннен кейін дүкенді Kaspi SMS-і арқылы қосасыз: кабинет құпиясөзін біз көрмейміз.',
+    ],
   },
   en: {
     title: 'Available on the Pro plan',
@@ -35,6 +48,11 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Renew Pro to get Kaspi Bot working again',
     lapsedText: 'Until the plan is renewed, Kaspi Bot does not change the prices in your store and the sections are closed. Access returns once you renew.',
     lapsedCta: 'Renew Pro',
+    facts: (price) => [
+      `Pro plan: ${price} per month. It includes the whole Kaspi store cabinet.`,
+      'Price checks are free. 5 ₸ is taken from the wallet only for each price change made by the bot.',
+      'After paying, connect your store with an SMS code from Kaspi: we never see your cabinet password.',
+    ],
   },
 }
 

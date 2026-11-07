@@ -70,8 +70,11 @@ describe('newcomer gets the dashboard tour first (15.10.2026)', () => {
   const none = { hasPendingUpgrade: false, postLoginRedirect: null }
   it('tour not done -> /dashboard, whatever the persona or product landing', () => {
     expect(choosePostLoginDestination(none, ['kaspiShop'], false)).toBe('/dashboard')
-    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/kaspi-shop/overview' }, null, false)).toBe('/dashboard')
     expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/ai-agent/overview' }, ['aiAgent'], false)).toBe('/dashboard')
+  })
+  it('но человек, пришедший с рекламы в Kaspi-раздел, попадает в Kaspi, а не в тур по счетам (07.11.2026)', () => {
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/kaspi-shop/overview' }, null, false)).toBe('/kaspi-shop/overview')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/kaspi-shop' }, null, false)).toBe('/kaspi-shop')
   })
   it('an explicit wish to pay still wins over the tour', () => {
     expect(choosePostLoginDestination({ hasPendingUpgrade: true, postLoginRedirect: null }, null, false)).toBe('/upgrade')

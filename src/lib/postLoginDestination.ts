@@ -28,9 +28,16 @@ export interface PostLoginIntents {
 // (Kaspi Bot without Pro bounced newcomers to /upgrade, past the tour). An
 // explicit wish to pay still wins: a pending upgrade or next=/upgrade.
 // tourDone undefined (unknown) changes nothing.
+// Исключение (07.11.2026, перед рекламой Kaspi Bot): человек пришёл с рекламы
+// именно в Kaspi-раздел (next=/kaspi-shop...) — ему нужен он, а не тур по счетам,
+// иначе новичок с рекламы после входа видит мастер реквизитов счетов. Тур по
+// счетам он увидит позже, когда сам откроет кабинет счетов (tour_completed_at
+// остаётся пустым).
+const KASPI_INTENTS: readonly string[] = ['/kaspi-shop', '/kaspi-shop/overview']
 export function choosePostLoginDestination(intents: PostLoginIntents, enabledProducts: unknown, tourDone?: boolean): string {
   if (intents.hasPendingUpgrade) return '/upgrade'
   if (intents.postLoginRedirect === '/upgrade') return '/upgrade'
+  if (intents.postLoginRedirect && KASPI_INTENTS.includes(intents.postLoginRedirect)) return intents.postLoginRedirect
   if (tourDone === false) return '/dashboard'
   if (intents.postLoginRedirect) return intents.postLoginRedirect
   return homeFor(enabledProducts)

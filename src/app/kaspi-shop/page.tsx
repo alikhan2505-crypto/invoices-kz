@@ -22,6 +22,7 @@ import {
   catalogSyncShouldReload, effectiveCheckPeriodMinutes, floorFarConfirmText, formatTenge, isActiveProduct, isFloorFarResponse, lowBalanceWarning, periodLabel,
   pluralProducts, suggestionBlockReason, summarizeSchedule, validateBulkSettings, validateProductSettings,
 } from '@/lib/kaspiShop/dempingForm'
+import { FLOOR_LOW_SHARE } from '@/lib/kaspiShop/productSettings'
 
 type Product = {
   id: string
@@ -169,7 +170,7 @@ function TrashIcon() {
 // else in this UI that gets summarized as three numbers in a row -- here
 // it's drawn as an actual position on a track, because "am I winning right
 // now" is the one question a seller opens this page to answer.
-function PriceLadder({ own, competitor, floor, maxPrice }: { own: number; competitor: number | null; floor: number; maxPrice: number | null }) {
+function PriceLadder({ own, competitor, floor, maxPrice, enabled }: { own: number; competitor: number | null; floor: number; maxPrice: number | null; enabled: boolean }) {
   const gaugeTop = Math.max(own, competitor ?? own, floor, maxPrice ?? 0) * 1.15
   const span = Math.max(gaugeTop - floor, 1)
   const pct = (v: number) => Math.min(100, Math.max(0, ((v - floor) / span) * 100))
@@ -208,7 +209,10 @@ function PriceLadder({ own, competitor, floor, maxPrice }: { own: number; compet
       </div>
       <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
         <span>Пол {floor.toLocaleString('ru-KZ')} ₸</span>
-        {atFloor && <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Упёрлись в минимум</span>}
+        {atFloor && (enabled
+          ? <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Упёрлись в минимум</span>
+          // Товар ещё не включён: минимум просто равен цене с момента импорта. Это не тревога, а «не настроено».
+          : <span>Минимум не задан</span>)}
         {competitor !== null && <span>Конкурент {competitor.toLocaleString('ru-KZ')} ₸</span>}
         {maxPrice !== null && <span>Потолок {maxPrice.toLocaleString('ru-KZ')} ₸</span>}
       </div>
@@ -236,7 +240,9 @@ async function postConnectStep(url: string, headers: HeadersInit, body: unknown)
   try {
     const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120_000) })
     const data = await res.json().catch(() => ({}))
-    return { ok: res.ok, status: res.status, data, error: res.ok ? undefined : data.error }
+    // 401 приходит с английским «Unauthorized»: человеку нужна понятная фраза и путь (обновить страницу).
+    const error = res.ok ? undefined : res.status === 401 ? 'Вход устарел. Обновите страницу и войдите заново.' : data.error
+    return { ok: res.ok, status: res.status, data, error }
   } catch (err: any) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'
     return {
@@ -296,6 +302,8 @@ export default function KaspiShop() {
   const [phone, setPhone] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState('')
+  // После подключения: что-то загрузилось не целиком (иначе первый экран молча показывает неполный список).
+  const [connectNotice, setConnectNotice] = useState('')
   const [otpToken, setOtpToken] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
   // Kaspi уже принял одноразовый код из SMS, но дальнейший шаг не удался
@@ -348,6 +356,8 @@ export default function KaspiShop() {
   const [suggestError, setSuggestError] = useState('')
   const [suggestion, setSuggestion] = useState<{ id: string; floorPrice: number; undercutStep: number; reasoning: string } | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
+  // «Включить демпинг для этого товара после сохранения»: по умолчанию да для товара на паузе.
+  const [enableOnSave, setEnableOnSave] = useState(true)
   const [settingsError, setSettingsError] = useState('')
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
   const [editValues, setEditValues] = useState<Record<string, EditValues>>({})
@@ -552,6 +562,7 @@ export default function KaspiShop() {
       const nextResume = fresh || (resuming && !terminal ? resumeToken : null)
       setResumeToken(nextResume)
       if (resuming && !nextResume) setOtpCode('') // потраченный код не подставляем
+      if (r.data?.code === 'otp_rejected') setOtpCode('') // неверный код стираем: человек вводит новый
       const localized = connectErrorMessage(lang, r.data?.code, { step: 'otp', resumable: !!nextResume })
       // Сохранённый токен + ответ без нашего кода (401/403/5xx/не-JSON): сырой
       // «Unauthorized» не показываем -- человеку нужно одно: нажать «Повторить».
@@ -574,6 +585,7 @@ export default function KaspiShop() {
     setConnected(true)
     setAddingStore(false)
     setAddingNew(false)
+    if (data.importComplete === false) setConnectNotice(`Магазин подключён, но товары загрузились не полностью${typeof data.importedProducts === 'number' ? ` (загружено ${data.importedProducts})` : ''}. Нажмите «Обновить каталог»: остальные подтянутся.`)
     window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     load()
   }
@@ -588,6 +600,7 @@ export default function KaspiShop() {
     if (!r.ok) { setConnectError(r.error || 'Не удалось подключить магазин'); return }
     setSessionToken(null)
     setMerchantChoices(null)
+    if (r.data?.importComplete === false) setConnectNotice(`Магазин подключён, но товары загрузились не полностью${typeof r.data.importedProducts === 'number' ? ` (загружено ${r.data.importedProducts})` : ''}. Нажмите «Обновить каталог»: остальные подтянутся.`)
     setConnected(true)
     setAddingStore(false)
     setAddingNew(false)
@@ -744,6 +757,10 @@ export default function KaspiShop() {
   // не читался вовсе, и карточка врала о состоянии правила.
   async function toggleProduct(id: string, enabled: boolean) {
     if (togglingIds.has(id)) return
+    // Включаем товар, у которого минимум равен цене: снижать некуда, бот будет «работать» вхолостую.
+    const target = products.find(p => p.id === id)
+    if (!enabled && target && target.own_current_price > 0 && target.floor_price >= target.own_current_price - 0.01 &&
+      !(await confirm('Минимальная цена у этого товара равна текущей цене, поэтому бот не сможет её снижать. Включить всё равно? Задать минимум можно в настройках товара.'))) return
     setTogglingIds(prev => new Set(prev).add(id))
     const revert = () => setProducts(prev => prev.map(p => (p.id === id ? { ...p, enabled } : p)))
     setProducts(prev => prev.map(p => (p.id === id ? { ...p, enabled: !enabled } : p)))
@@ -795,6 +812,9 @@ export default function KaspiShop() {
     // Пустой минимум больше не уходит как 0, запятая и пробелы понимаются.
     const checked = validateProductSettings(v)
     if (!checked.ok) { setSettingsError(checked.error); return }
+    const current = products.find(p => p.id === id)
+    // Включаем вместе с сохранением, только если минимум реально ниже цены (иначе бот ничего не снизит).
+    const enableNow = !!current && !current.enabled && enableOnSave && current.own_current_price > 0 && checked.floor < current.own_current_price
     setSavingSettings(true)
     setSettingsError('')
     try {
@@ -810,6 +830,7 @@ export default function KaspiShop() {
             demping_strategy: v.strategy,
             excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
             excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
+            ...(enableNow ? { enabled: true } : {}),
             ...(confirmFloor ? { confirmFloor: true } : {}),
           }),
         })
@@ -834,6 +855,13 @@ export default function KaspiShop() {
         return
       }
       setExpandedId(null)
+      // Подтверждение словами: сохранено ли и включён ли товар (раньше окно просто закрывалось).
+      const periodMin = effectiveCheckPeriodMinutes(current?.check_frequency_minutes ?? DEFAULT_CHECK_FREQUENCY_MINUTES)
+      setApplyNowMessage(enableNow
+        ? `Сохранено. Бот включён для «${current?.product_name ?? 'товара'}»: он проверяет цену ${periodLabel(periodMin, periodMin)}.`
+        : current && !current.enabled
+          ? 'Сохранено. Товар пока на паузе: чтобы бот начал работать, нажмите «Включить» на карточке.'
+          : 'Сохранено.')
       await load({ refreshEdit: id })
     } catch {
       setSettingsError('Нет связи с сервером. Настройки не сохранены, попробуйте ещё раз.')
@@ -966,6 +994,18 @@ export default function KaspiShop() {
     })
   }
 
+  // «Выбрать все найденные»: до 100 за раз, остальные можно взять следующим заходом.
+  function selectAllFound() {
+    setBulkSelected(prev => {
+      const next = new Set(prev)
+      for (const p of bulkFiltered) {
+        if (next.size >= MAX_BULK_ITEMS) break
+        next.add(p.id)
+      }
+      return next
+    })
+  }
+
   // Searches the products already loaded on this page (GET
   // /api/kaspi-shop/products already returns every one of the seller's
   // tracked rows, which -- per finalizeConnection.ts -- already mirrors
@@ -983,6 +1023,9 @@ export default function KaspiShop() {
     // Запятая и пробелы понимаются, пустой минимум не уходит как 0.
     const checked = validateBulkSettings({ floorPrice: bulkFloorPrice, maxPrice: bulkMaxPrice, undercutStep: bulkUndercutStep, frequency: bulkFrequency })
     if (!checked.ok) { setBulkError(checked.error); return }
+    // Минимум меньше половины цены у части выбранных: чаще всего потерян ноль (как и в окне одного товара).
+    const lowShare = products.filter(p => bulkSelected.has(p.id) && p.own_current_price > 0 && checked.floor < p.own_current_price * FLOOR_LOW_SHARE).length
+    if (lowShare > 0 && !(await confirm(`У ${lowShare} ${lowShare === 1 ? 'товара' : 'товаров'} из выбранных минимум ${formatTenge(checked.floor)} меньше половины текущей цены. Бот сможет опустить цену до него. Не пропущен ли ноль? Применить?`))) return
     setBulkSubmitting(true)
     setBulkError('')
     try {
@@ -1001,6 +1044,18 @@ export default function KaspiShop() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setBulkError(apiErrorMessage(res.status, data, 'Не удалось применить настройки')); return }
       setBulkOpen(false)
+      // Итог словами: сколько включено и какие товары пропущены (у них цена ниже общего минимума).
+      const updated = typeof data?.updated === 'number' ? data.updated : null
+      const skippedList: { name?: string | null }[] = Array.isArray(data?.skipped) ? data.skipped : []
+      if (updated !== null) {
+        const names = skippedList.slice(0, 3).map(x => x.name || 'без названия').join(', ')
+        setApplyNowMessage(
+          `Включено ${updated} ${pluralProducts(updated)}.` +
+          (skippedList.length > 0
+            ? ` Пропущено ${skippedList.length}: у них цена ниже или выше заданных границ (${names}${skippedList.length > 3 ? ' и др.' : ''}). Задайте им минимум отдельно.`
+            : ''),
+        )
+      }
       load()
     } catch {
       setBulkError('Нет связи с сервером. Настройки не применены, попробуйте ещё раз.')
@@ -1012,7 +1067,7 @@ export default function KaspiShop() {
   if (loading) return <LoadingSpinner />
 
   const winningCount = products.filter(p => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length
-  const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
+  const atFloorCount = products.filter(p => p.enabled && p.own_current_price <= p.floor_price + 0.01).length
   // Products whose floor is still exactly the price they were imported at.
   // finalizeConnection seeds floor_price = own_current_price, which is a safe
   // default — no bot should start cutting prices the moment a shop connects —
@@ -1023,6 +1078,9 @@ export default function KaspiShop() {
   const untouchedFloorCount = products.filter(
     p => p.own_current_price > 0 && Math.abs(p.own_current_price - p.floor_price) < 0.01
   ).length
+  // Только что подключённый магазин: все товары на паузе. Вместо красных счётчиков показываем спокойный
+  // список «что сделать» (прогон воронки 07.11.2026: новичок видел «всё красное» сразу после подключения).
+  const freshStore = products.length > 0 && products.every(p => !p.enabled)
   // «Активных» = включённые И в продаже: снятые с продажи бот не проверяет.
   const activeCount = products.filter(isActiveProduct).length
   // «Работает» при нуле включённых товаров вводило в заблуждение: бот ничего не делает (аудит 02.11.2026).
@@ -1038,6 +1096,29 @@ export default function KaspiShop() {
   const bulkSchedule = Number.isInteger(bulkFreq) && bulkFreq >= 5
     ? summarizeSchedule(Array.from(bulkSelected).map(() => ({ enabled: true, check_frequency_minutes: bulkFreq })))
     : null
+
+  // Состояние бота. Когда включённых товаров нет, это не кнопка паузы, а обычная метка.
+  const statusPill = idleNoProducts ? (
+    <span className="text-xs font-semibold rounded-full px-3 py-2 inline-flex items-center"
+      style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)', border: '1px solid var(--nav-border)' }}>
+      Пока не запущен
+    </span>
+  ) : (
+    <button onClick={togglePause}
+      className="text-xs font-bold rounded-full px-3 min-h-[44px] flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
+      style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
+      {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />}
+      {paused ? 'На паузе. Возобновить' : 'Работает'}
+    </button>
+  )
+  const headerControls = (
+    <>
+      {statusPill}
+      <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 min-h-[44px] transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
+        Отключить
+      </button>
+    </>
+  )
 
   // Which cities this product's demping actually covers: manually tracked
   // cities win; with none picked, auto mode checks the product's own point
@@ -1065,7 +1146,9 @@ export default function KaspiShop() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={retryLoad} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            {loadError.startsWith('Вход устарел')
+              ? <a href="/login?next=/kaspi-shop/overview" className="text-xs font-semibold rounded-lg px-3 py-2.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Войти заново</a>
+              : <button onClick={retryLoad} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>}
           </div>
         )}
 
@@ -1160,33 +1243,42 @@ export default function KaspiShop() {
                   ))}
                 </div>
               ) : !otpToken ? (
-                <div className="flex flex-col gap-2">
-                  <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatKzPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" />
-                  <button onClick={startConnect} disabled={connecting}
+                <form className="flex flex-col gap-2" onSubmit={e => { e.preventDefault(); void startConnect() }}>
+                  <p className="text-[13px] leading-relaxed mb-1" style={{ color: 'var(--nav-text-secondary)' }}>
+                    Введите номер, на который оформлен кабинет <b>Kaspi Магазин</b> (не личное приложение Kaspi.kz). Kaspi пришлёт на него SMS с кодом. Пароль от кабинета мы не видим.
+                  </p>
+                  <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} aria-label="Телефон кабинета Kaspi Магазин"
+                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatKzPhone(e.target.value))} type="tel" inputMode="tel" autoComplete="tel" enterKeyHint="go" />
+                  <button type="submit" disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                    {connecting ? 'Отправляем код...' : 'Продолжить'}
+                    {connecting ? 'Отправляем код...' : 'Получить SMS-код'}
                   </button>
-                </div>
+                </form>
               ) : (
-                <div className="flex flex-col gap-2">
+                <form className="flex flex-col gap-2" onSubmit={e => { e.preventDefault(); void completeConnect() }}>
                   <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
-                  <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6}
-                    disabled={!!resumeToken || connecting} />
-                  <button onClick={completeConnect} disabled={connecting}
+                  <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} aria-label="Код из SMS"
+                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6} enterKeyHint="go"
+                    autoFocus disabled={!!resumeToken || connecting} />
+                  <button type="submit" disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {connecting ? 'Проверяем...' : resumeToken ? connectUiText(lang).retry : 'Подтвердить'}
                   </button>
-                  {connectError && (
+                  {connecting && (
+                    <p role="status" className="text-xs text-center" style={{ color: 'var(--nav-text-muted)' }}>
+                      Подключаем магазин и загружаем ваши товары. Это может занять до минуты, не закрывайте страницу.
+                    </p>
+                  )}
+                  {/* Опечатка в номере или пропавшее SMS не должны быть тупиком: выход виден сразу, не после ошибки. */}
+                  <div className="flex flex-wrap items-center justify-center gap-x-4">
                     <button type="button" disabled={connecting}
                       onClick={() => { setOtpToken(null); setResumeToken(null); setOtpCode(''); setConnectError(''); setConnectErrorDetail('') }}
                       className="min-h-[44px] rounded-xl text-sm font-medium underline-offset-2 hover:underline disabled:opacity-50"
                       style={{ color: 'var(--nav-text-secondary)' }}>
-                      {connectUiText(lang).newCode}
+                      {connectError ? connectUiText(lang).newCode : 'Изменить номер или отправить код ещё раз'}
                     </button>
-                  )}
-                </div>
+                  </div>
+                </form>
               )}
               {/* Истёкшая сессия активного магазина, но есть другой: можно открыть его,
                   не переподключая этот (K46). */}
@@ -1224,22 +1316,15 @@ export default function KaspiShop() {
             <PageHeader
               title="Демпинг"
               subtitle={companyName || 'Магазин подключён'}
-              right={(
-                <>
-                  <button onClick={togglePause}
-                    className="text-xs font-bold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
-                    style={idleNoProducts
-                      ? { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)', border: '1px solid var(--nav-border)' }
-                      : { background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
-                    {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />}
-                    {paused ? 'На паузе' : idleNoProducts ? 'Нет активных товаров' : 'Работает'}
-                  </button>
-                  <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 py-2 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
-                    Отключить
-                  </button>
-                </>
-              )}
+              stackRightOnMobile
+              right={headerControls}
             />
+            {connectNotice && (
+              <div role="status" className="rounded-2xl p-4 mb-4 flex items-start justify-between gap-3 text-[13px]" style={{ border: '1px solid var(--nav-critical)', color: 'var(--nav-text-primary)' }}>
+                <span>{connectNotice}</span>
+                <button type="button" aria-label="Закрыть" onClick={() => setConnectNotice('')} className="min-w-[44px] min-h-[44px] -m-3 text-lg leading-none" style={{ color: 'var(--nav-text-muted)' }}>×</button>
+              </div>
+            )}
             {/* Top row (2026-08-21 founder layout request: "скомпанованнее"):
                 hero on the left (2/3), city picker beside it on the right --
                 the stats row below stays full-width as the second line. */}
@@ -1259,7 +1344,34 @@ export default function KaspiShop() {
             </p>
           </div>
         )}
-        {untouchedFloorCount > 0 && (
+        {freshStore && (
+          <div data-testid="first-run-checklist" className="rounded-2xl p-4 lg:p-5 mb-4" style={{ background: 'var(--nav-accent-soft)', border: '1px solid var(--nav-border)' }}>
+            <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+              Магазин подключён: загружено товаров {products.length}. Осталось включить бота
+            </div>
+            <ol className={`text-[13px] space-y-1.5 mb-4 list-decimal pl-5 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
+              <li><b>Задайте минимальную цену</b>: ниже неё бот цену не опустит. Сейчас у товаров минимум равен цене, и снижать некуда.</li>
+              <li><b>Включите товары</b>: массовое окно задаёт минимум и сразу включает выбранные.</li>
+              <li>
+                <b>Проверьте баланс</b>: на нём {Number.isFinite(Number(balance)) ? Number(balance).toLocaleString('ru-KZ') : balance} ₸. Проверки цен бесплатны, 5 ₸ берётся только за каждое изменение цены ботом.
+              </li>
+            </ol>
+            <div className="flex flex-wrap gap-2 items-center">
+              <button onClick={openBulkAdd}
+                className="min-h-[44px] rounded-xl px-4 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                Задать минимум и включить
+              </button>
+              <button onClick={() => setWalletOpen(true)}
+                className="nav-glass min-h-[44px] rounded-xl px-4 text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                Пополнить баланс
+              </button>
+              <a href="/kaspi-shop/margin" className="text-[13px] underline underline-offset-2 min-h-[44px] inline-flex items-center" style={{ color: 'var(--nav-accent)' }}>
+                Как посчитать минимум
+              </a>
+            </div>
+          </div>
+        )}
+        {!freshStore && untouchedFloorCount > 0 && (
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-critical)' }}>
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
               {untouchedFloorCount === products.length
@@ -1275,6 +1387,7 @@ export default function KaspiShop() {
           </div>
         )}
 
+              {!freshStore && (
               <div className="grid grid-cols-3 gap-3 lg:gap-6">
                 <div>
                   <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{winningCount}</div>
@@ -1291,6 +1404,12 @@ export default function KaspiShop() {
                   </div>
                 </div>
               </div>
+              )}
+              {schedule.count === 0 && !freshStore && (
+                <p data-testid="price-model-note" className="text-[12px] mt-5 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+                  {PRICE_MODEL_NOTE}
+                </p>
+              )}
               {schedule.count > 0 && (
                 <p data-testid="running-cost" className="text-[12px] mt-5 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
                   {paused
@@ -1405,6 +1524,7 @@ export default function KaspiShop() {
                           the card inline to full width. */}
                       <div role="button" tabIndex={0} onClick={() => {
                         setExpandedId(p.id)
+                        setEnableOnSave(!p.enabled)
                         // Форма всегда открывается с сохранёнными значениями: правки,
                         // которые не сохранили в прошлый раз, не должны выдавать себя за сохранённые.
                         setEditValues(prev => ({ ...prev, [p.id]: editFromProduct(p) }))
@@ -1427,10 +1547,14 @@ export default function KaspiShop() {
                               {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка примерно раз в {effectiveCheckPeriodMinutes(p.check_frequency_minutes)} мин
                             </div>
                           </div>
-                          <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
-                            className="text-[11px] px-2 py-1 rounded-full cursor-pointer font-semibold flex-shrink-0"
-                            style={{ background: p.enabled ? 'var(--nav-success-solid)' : 'var(--nav-text-muted)', color: p.enabled ? 'var(--nav-success-ink)' : '#fff' }}>
-                            {p.enabled ? 'Активно' : 'Пауза'}
+                          <span role="button" tabIndex={0} aria-label={p.enabled ? 'Поставить товар на паузу' : 'Включить демпинг для товара'}
+                            onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleProduct(p.id, p.enabled) } }}
+                            className="flex-shrink-0 -my-3 -mr-2 px-2 min-h-[44px] inline-flex items-center cursor-pointer">
+                            <span className="text-[11px] px-2.5 py-1.5 rounded-full font-semibold"
+                              style={{ background: p.enabled ? 'var(--nav-success-solid)' : 'var(--nav-accent-soft)', color: p.enabled ? 'var(--nav-success-ink)' : 'var(--nav-accent)', border: p.enabled ? 'none' : '1px solid var(--nav-accent)' }}>
+                              {p.enabled ? 'Активно' : 'Включить'}
+                            </span>
                           </span>
                         </div>
                         <div className="flex items-end justify-between gap-3 mb-2">
@@ -1445,7 +1569,7 @@ export default function KaspiShop() {
                             </div>
                           </div>
                         </div>
-                        <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} maxPrice={p.max_price} />
+                        <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} maxPrice={p.max_price} enabled={p.enabled} />
                         <div className="flex items-center justify-between gap-2 flex-wrap mt-2.5">
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                             <span title="Города, по которым демпингуется этот товар">{productRegionLabel(p)}</span>
@@ -1508,22 +1632,31 @@ export default function KaspiShop() {
                           </div>
                           <button onClick={() => setExpandedId(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
                         </div>
+                              <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+                                Сейчас на Kaspi: <b className="tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</b>
+                                {p.last_competitor_price !== null && <> · у лидера: <b className="tabular-nums">{p.last_competitor_price.toLocaleString('ru-KZ')} ₸</b></>}
+                              </div>
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
-                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }} title="Бот никогда не опустит цену ниже этого значения. Если конкурент ушёл ниже — бот остановится на минимуме и пришлёт уведомление, а когда конкурент вернётся выше, сам поднимет цену обратно.">Минимальная цена ⓘ</span>
+                                  <span className="text-[11px] mb-1 block min-h-[28px] leading-tight" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
-                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
+                                  <span className="text-[11px] mb-1 block min-h-[28px] leading-tight" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} inputMode="decimal" />
                                 </label>
                                 <label className="block">
-                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
+                                  <span className="text-[11px] mb-1 block min-h-[28px] leading-tight" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="text" autoComplete="off" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} inputMode="decimal" />
                                 </label>
+                              </div>
+                              <div className="text-[11px] mb-3 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+                                <b>Минимум</b>: ниже этой цены бот цену не опустит. Введите свою закупку + комиссию Kaspi + доставку + прибыль, которую не хотите терять
+                                (<a href="/kaspi-shop/margin" style={{ color: 'var(--nav-accent)' }}>посчитать в калькуляторе</a>).{' '}
+                                <b>Максимум</b> необязателен: выше этой цены бот не поднимет. <b>Шаг</b>: на сколько тенге ниже конкурента ставить цену.
                               </div>
                               {/* Остатки живут по складам/городам (founder,
                                   2026-08-21) -- в «Управлении товарами», в
@@ -1595,6 +1728,12 @@ export default function KaspiShop() {
                               {settingsError && (
                                 <div className="text-xs mb-2" role="alert" style={{ color: 'var(--nav-critical)' }}>{settingsError}</div>
                               )}
+                              {!p.enabled && (
+                                <label className="flex items-center gap-2 mb-3 text-xs min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                                  <input type="checkbox" checked={enableOnSave} onChange={e => setEnableOnSave(e.target.checked)} className="w-4 h-4" />
+                                  Включить демпинг для этого товара после сохранения
+                                </label>
+                              )}
                               <div className="flex gap-2">
                                 <button onClick={() => suggestPricing(p)} disabled={suggestingFor === p.id || !!suggestBlock}
                                   className="flex-1 text-xs nav-glass rounded-lg px-3 py-2 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
@@ -1602,7 +1741,7 @@ export default function KaspiShop() {
                                 </button>
                                 <button onClick={() => saveProductSettings(p.id)} disabled={savingSettings}
                                   className="flex-1 text-xs rounded-lg px-3 py-2 font-medium disabled:opacity-60" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                                  {savingSettings ? 'Сохраняем...' : 'Сохранить'}
+                                  {savingSettings ? 'Сохраняем...' : !p.enabled && enableOnSave ? 'Сохранить и включить' : 'Сохранить'}
                                 </button>
                               </div>
                               {suggestBlock && (
@@ -1723,8 +1862,16 @@ export default function KaspiShop() {
 
               {bulkStep === 'select' ? (
                 <>
-                  <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                    Выбрано: {bulkSelected.size} / {MAX_BULK_ITEMS}
+                  <div className="text-[11px] mb-3 flex items-center justify-between gap-2" style={{ color: 'var(--nav-text-muted)' }}>
+                    <span>
+                      Выбрано: {bulkSelected.size} / {MAX_BULK_ITEMS}
+                      {bulkSelected.size >= MAX_BULK_ITEMS && ' · максимум за один раз, остальные возьмите следующим заходом'}
+                    </span>
+                    {bulkFiltered.length > 0 && (
+                      <button type="button" onClick={selectAllFound} className="font-semibold underline underline-offset-2 min-h-[44px] flex-shrink-0" style={{ color: 'var(--nav-accent)' }}>
+                        Выбрать все найденные
+                      </button>
+                    )}
                   </div>
                   <input value={bulkSearch} onChange={e => setBulkSearch(e.target.value)} placeholder="Найти по названию или SKU…"
                     className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
@@ -1759,7 +1906,7 @@ export default function KaspiShop() {
                 </>
               ) : (
                 <>
-                  <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>Применится ко всем {bulkSelected.size} выбранным товарам.</div>
+                  <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>Применится ко всем {bulkSelected.size} выбранным товарам. Они сразу включатся: бот начнёт проверять цены.</div>
                   {bulkError && <div className="text-xs mb-3" role="alert" style={{ color: 'var(--nav-critical)' }}>{bulkError}</div>}
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     <label className="block">
@@ -1815,7 +1962,7 @@ export default function KaspiShop() {
                     </button>
                     <button onClick={submitBulkAdd} disabled={bulkSubmitting || !bulkFloorPrice || !bulkUndercutStep}
                       className="flex-[2] text-sm rounded-lg px-3 py-2.5 font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                      {bulkSubmitting ? 'Применяем...' : `Применить к ${bulkSelected.size} товарам`}
+                      {bulkSubmitting ? 'Применяем...' : `Применить и включить (${bulkSelected.size})`}
                     </button>
                   </div>
                 </>

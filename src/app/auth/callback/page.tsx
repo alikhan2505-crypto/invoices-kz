@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { choosePostLoginDestination, readPostLoginIntents } from '@/lib/postLoginDestination'
+import { normalizePostLoginRedirect } from '@/lib/postLoginRedirect'
 import { selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
 import { logToolEvent, readFirstTouch } from '@/lib/tools-i18n/toolEvents'
 import { readSignupSource } from '@/lib/visits/client'
@@ -101,6 +102,14 @@ export default function AuthCallback() {
         // entries -- older than 30 minutes -- are dropped there (see
         // src/lib/storedIntent.ts).
         const intents = readPostLoginIntents()
+        // Письмо открыли в другом браузере: намерение лежит в метаданных нового
+        // аккаунта (кладёт /login). Только для нового аккаунта, чтобы старая
+        // метка не уводила при каждом следующем входе.
+        const isFreshAccount = !profile || (!profile.trial_expires_at && !profile.promo_granted_at && !profile.referred_by)
+        if (!intents.postLoginRedirect && isFreshAccount) {
+          const metaNext = normalizePostLoginRedirect(session.user.user_metadata?.post_login_next)
+          if (metaNext) intents.postLoginRedirect = metaNext
+        }
 
         // Start-page answer ("what do you do?") given before signing in: it
         // connects the matching products, but only for an account that has not

@@ -24,7 +24,7 @@ export async function finalizeConnection(
   merchantId: string,
   companyName: string,
   opts: { runInBackground?: (task: () => Promise<unknown>) => void } = {},
-): Promise<{ importedProducts: number | null }> {
+): Promise<{ importedProducts: number | null; importComplete: boolean | null }> {
   await saveConnection({ userId, sessionCookies, merchantId, companyName })
   // Not loadConnection(userId): a 2nd+ store saves as inactive (see
   // saveConnection), so "the active one" would resolve to a DIFFERENT,
@@ -42,13 +42,14 @@ export async function finalizeConnection(
         await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
         await seedCityNames(connection.id, sessionCookies, merchantId)
       })
-      return { importedProducts: null }
+      return { importedProducts: null, importComplete: null }
     }
   }
 
   const result = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
   await seedCityNames(connection.id, sessionCookies, merchantId)
-  return { importedProducts: result.imported }
+  // importComplete=false: каталог прочитан не целиком (обрыв, сессия, часть товаров не записалась): странице есть что сказать.
+  return { importedProducts: result.imported, importComplete: result.complete }
 }
 
 async function seedCityNames(connectionId: string, sessionCookies: string, merchantId: string) {

@@ -144,6 +144,6 @@ async function finishConnect(userId: string, sessionCookies: string, isReconnect
     })
   }
 
-  const { importedProducts } = await finalizeConnection(userId, sessionCookies, named[0].id, named[0].name, { runInBackground: after })
-  return NextResponse.json({ status: 'connected', companyName: named[0].name, importedProducts })
+  const { importedProducts, importComplete } = await finalizeConnection(userId, sessionCookies, named[0].id, named[0].name, { runInBackground: after })
+  return NextResponse.json({ status: 'connected', companyName: named[0].name, importedProducts, importComplete: importComplete ?? null })
 }

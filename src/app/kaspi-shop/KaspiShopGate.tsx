@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 import { kaspiProGateDict } from '@/lib/i18n/proGate'
 import { kaspiShopGateState, type ProGateState } from '@/lib/proGate'
+import { PLAN_PRICES } from '@/lib/plans/pricing'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 
@@ -68,6 +69,13 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
             text={lapsed ? t.lapsedText : t.text}
             cta={lapsed ? t.lapsedCta : t.cta}
             href={crossHref('invoices', '/upgrade', 'kaspiShop', back)}
+            extra={lapsed ? undefined : (
+              <ul className="mt-5 space-y-2 text-left text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
+                {t.facts(`${PLAN_PRICES.pro.monthly.toLocaleString('ru-KZ')} ₸`).map(line => (
+                  <li key={line} className="flex gap-2"><span aria-hidden style={{ color: 'var(--nav-accent)' }}>•</span><span>{line}</span></li>
+                ))}
+              </ul>
+            )}
           />
           </div>
         </PageContainer>

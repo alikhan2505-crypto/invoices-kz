@@ -48,13 +48,24 @@ describe('connectErrorMessage: коды нашего маршрута локал
   it('прежние коды работают как раньше, чужой код даёт null (страница покажет текст сервера)', () => {
     expect(connectErrorMessage('ru', 'kaspi_unreachable', ctx)).toContain('Kaspi не ответил')
     expect(connectErrorMessage('en', 'session_not_issued', { step: 'otp', resumable: true })).toContain('Retry')
-    expect(connectErrorMessage('ru', 'phone_rejected', ctx)).toBeNull()
+    expect(connectErrorMessage('ru', 'something_new', ctx)).toBeNull()
     expect(connectErrorMessage('kk', undefined, ctx)).toBeNull()
+  })
+
+  it('ответы Kaspi на номер и код: человеческая фраза на трёх языках, без «HTTP»', () => {
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      for (const code of ['otp_rejected', 'phone_rejected', 'invalid_token', 'code_required']) {
+        const t = connectErrorMessage(lang, code, ctx)!
+        expect(t).toBeTruthy()
+        expect(t).not.toMatch(/HTTP/)
+      }
+    }
+    expect(connectErrorMessage('ru', 'otp_rejected', ctx)).toContain('запросите новый код')
   })
 
   it('в новых текстах нет длинных тире', () => {
     for (const lang of ['ru', 'kk', 'en'] as const) {
-      for (const code of ['phone_required', 'phone_invalid', 'limit_unavailable', 'rate_limited']) {
+      for (const code of ['phone_required', 'phone_invalid', 'limit_unavailable', 'rate_limited', 'otp_rejected', 'phone_rejected', 'invalid_token', 'code_required']) {
         const t = connectErrorMessage(lang, code, { ...ctx, scope: 'ip', retryAfterSec: 120 })!
         expect(t).not.toMatch(/[—–]/)
       }

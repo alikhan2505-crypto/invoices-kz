@@ -50,10 +50,12 @@ export type PageHeaderProps = {
   titleClassName?: string
   className?: string
   animate?: boolean
+  // Кнопки справа на телефоне уходят отдельной строкой под заголовок (иначе заголовок рвётся по слогам).
+  stackRightOnMobile?: boolean
 }
 
 export default function PageHeader({
-  title, subtitle, backHref, onBack, right, as = 'h1', titleId, titleClassName, className, animate = true,
+  title, subtitle, backHref, onBack, right, as = 'h1', titleId, titleClassName, className, animate = true, stackRightOnMobile = false,
 }: PageHeaderProps) {
   const { lang } = useLanguage()
   const reduceMotion = !!useReducedMotion()
@@ -77,7 +79,7 @@ export default function PageHeader({
   return (
     <motion.div
       data-page-header=""
-      className={`flex items-start gap-3 mb-5 min-h-11 ${className ?? ''}`}
+      className={`flex items-start gap-3 mb-5 min-h-11 ${stackRightOnMobile ? 'flex-wrap sm:flex-nowrap' : ''} ${className ?? ''}`}
       initial={animate && !reduceMotion ? { opacity: 0, y: 14 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: animate && !reduceMotion ? 0.35 : 0, ease: EASE }}
@@ -97,7 +99,7 @@ export default function PageHeader({
           )}
         </div>
       </div>
-      {right && <div className="ml-auto flex items-center gap-2 flex-shrink-0 min-h-11">{right}</div>}
+      {right && <div className={`flex items-center gap-2 min-h-11 ${stackRightOnMobile ? 'basis-full flex-wrap sm:basis-auto sm:flex-nowrap sm:ml-auto sm:flex-shrink-0' : 'ml-auto flex-shrink-0'}`}>{right}</div>}
     </motion.div>
   )
 }

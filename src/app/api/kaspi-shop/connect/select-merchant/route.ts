@@ -53,6 +53,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Не удалось получить данные выбранного магазина' }, { status: 400 })
   }
 
-  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, merchantId, merchant.name, { runInBackground: after })
-  return NextResponse.json({ status: 'connected', companyName: merchant.name, importedProducts })
+  const { importedProducts, importComplete } = await finalizeConnection(user.id, sessionCookies, merchantId, merchant.name, { runInBackground: after })
+  return NextResponse.json({ status: 'connected', companyName: merchant.name, importedProducts, importComplete: importComplete ?? null })
 }

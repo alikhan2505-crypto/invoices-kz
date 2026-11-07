@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { handoffProductName, handoffReturnHref, parseHandoff, type Handoff } from '@/lib/crossProduct'
 
@@ -36,9 +36,25 @@ export default function HandoffBanner() {
   const { lang } = useLanguage()
   const [handoff, setHandoff] = useState<Handoff | null>(null)
 
+  const barRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     setHandoff(load())
   }, [])
+
+  // Плашка закреплена внизу экрана и раньше закрывала кнопку покупки Про в конце страницы
+  // (прогон воронки Kaspi 07.11.2026, blocker). Теперь странице добавляется нижний отступ ровно
+  // по высоте плашки: любой конец страницы можно прокрутить выше неё.
+  useEffect(() => {
+    const el = barRef.current
+    if (!handoff || !el) return
+    const prev = document.body.style.paddingBottom
+    const apply = () => { document.body.style.paddingBottom = `${Math.ceil(el.getBoundingClientRect().height) + 32}px` }
+    apply()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null
+    ro?.observe(el)
+    return () => { ro?.disconnect(); document.body.style.paddingBottom = prev }
+  }, [handoff])
 
   if (!handoff) return null
   const t = TEXT[lang]
@@ -51,18 +67,19 @@ export default function HandoffBanner() {
 
   return (
     <div
+      ref={barRef}
       role="status"
       className="nav-glass"
       style={{
-        position: 'fixed', left: '50%', transform: 'translateX(-50%)', zIndex: 60,
+        position: 'fixed', left: 16, right: 16, marginInline: 'auto', width: 'fit-content', zIndex: 60,
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
-        maxWidth: 'calc(100vw - 32px)', padding: '10px 16px', borderRadius: 16, fontSize: 13,
+        display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'center',
+        maxWidth: 'calc(100vw - 32px)', padding: '4px 4px 4px 16px', borderRadius: 16, fontSize: 13,
       }}
     >
       <span style={{ color: 'var(--nav-text-secondary)' }}>{t.from(name)}</span>
-      <a href={handoffReturnHref(handoff, window.location.hostname)} style={{ color: 'var(--nav-accent)', fontWeight: 600 }}>{t.back(name)}</a>
-      <button type="button" onClick={dismiss} aria-label={t.close} style={{ color: 'var(--nav-text-muted)', fontSize: 18, lineHeight: 1 }}>×</button>
+      <a href={handoffReturnHref(handoff, window.location.hostname)} style={{ color: 'var(--nav-accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 8px' }}>{t.back(name)}</a>
+      <button type="button" onClick={dismiss} aria-label={t.close} style={{ color: 'var(--nav-text-muted)', fontSize: 20, lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
     </div>
   )
 }

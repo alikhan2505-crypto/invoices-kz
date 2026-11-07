@@ -65,6 +65,9 @@ export default function Login() {
   const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
+  // Встроенный браузер Instagram / Facebook: Google отвечает 403 disallowed_useragent, Face ID там ненадёжен.
+  // Определяем после монтирования, чтобы разметка сервера и клиента совпала.
+  const [inApp, setInApp] = useState(false)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   // True until we know there is no valid session. An already-signed-in
   // visitor (founder's admin, 15.10.2026: «Попробовать бесплатно» on a free
@@ -113,7 +116,9 @@ export default function Login() {
     if (next) setPostLoginRedirect(next)
     const pending = pendingUpgradeFromSearch(window.location.search)
     if (pending) setPendingUpgrade(pending.plan, pending.period)
-    setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
+    const inAppBrowser = /Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent)
+    setInApp(inAppBrowser)
+    setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential && !inAppBrowser)
 
     // Runs AFTER ?next= / ?plan=&period= above were stored, exactly as for a
     // fresh sign-in, so a signed-in visitor arriving from a product landing
@@ -244,6 +249,9 @@ export default function Login() {
     // браузере (из встроенного браузера Instagram в почтовое приложение), где localStorage пуст.
     const pendingBin = peekPendingBinWatch()
     if (pendingBin) otpData.pending_bin_watch = pendingBin
+    // Куда вести после входа (с рекламы Kaspi): письмо могут открыть в другом браузере.
+    const nextPath = postLoginRedirectFromSearch(window.location.search)
+    if (nextPath) otpData.post_login_next = nextPath
     const { error } = await supabase.auth.signInWithOtp({
       email: address,
       options: {
@@ -362,7 +370,12 @@ export default function Login() {
                 {passkeyLoading ? t.sendingButton : t.passkeyLoginButton}
               </button>
             )}
-            <button onClick={signInWithGoogle} className={`${socialButton} mb-3`} style={socialStyle}>
+            {inApp && (
+              <p className="text-xs rounded-lg px-3 py-2 mb-3 leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }}>
+                {t.inAppBrowserNotice}
+              </p>
+            )}
+            {!inApp && <button onClick={signInWithGoogle} className={`${socialButton} mb-3`} style={socialStyle}>
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                 <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 32.8 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.1-2.7-.4-4z"/>
                 <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 18.9 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
@@ -370,7 +383,7 @@ export default function Login() {
                 <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.2 5.2C40.9 35.4 44 30.1 44 24c0-1.3-.1-2.7-.4-4z"/>
               </svg>
               {t.googleSignInButton}
-            </button>
+            </button>}
             {FACEBOOK_LOGIN_ENABLED && <button onClick={signInWithFacebook} className={`${socialButton} mb-3`} style={socialStyle}>
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#1877F2" d="M24 12c0-6.6-5.4-12-12-12S0 5.4 0 12c0 6 4.4 11 10.1 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.3l-.5 3.5h-2.8v8.4C19.6 23 24 18 24 12z"/>

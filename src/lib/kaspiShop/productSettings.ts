@@ -91,10 +91,16 @@ export type StoredProductSettings = { floor_price?: unknown; max_price?: unknown
 // цену в Kaspi. Порог -- во сколько раз пол выше цены (или цена выше максимума).
 // Продавец может подтвердить осознанно: тело PATCH с confirmFloor: true.
 export const FLOOR_FAR_FACTOR = 3
+// Пол ниже этой доли цены тоже почти всегда опечатка (7000 вместо 70 000): бот честно
+// уронил бы цену до него (прогон воронки Kaspi 07.11.2026). Пол выше цены (даже ненамного)
+// поднимает цену при следующей проверке, поэтому тоже просит подтверждения.
+export const FLOOR_LOW_SHARE = 0.5
 export const FLOOR_FAR_ERROR_CODE = 'floor_far_above_price'
 
 export type FloorFarDetails = {
   field: 'floor_price' | 'max_price'
+  // above: пол выше цены (бот поднимет цену); below: пол сильно ниже цены (бот может уронить цену до него).
+  direction?: 'above' | 'below'
   floorPrice: number | null
   maxPrice: number | null
   ownPrice: number
@@ -177,20 +183,30 @@ export function validateProductPatch(updates: Record<string, unknown>, stored: S
     const floorNew = 'floor_price' in patch && patch.floor_price !== storedFloorRounded ? (patch.floor_price as number) : null
     const maxNew = 'max_price' in patch && patch.max_price !== storedMaxRounded ? (patch.max_price as number | null) : null
     const base = { floorPrice: effectiveFloor, maxPrice: 'max_price' in patch ? (patch.max_price as number | null) : (storedMaxRaw ?? null), ownPrice, factor: FLOOR_FAR_FACTOR }
-    if (floorNew !== null && floorNew > ownPrice * FLOOR_FAR_FACTOR) {
-      return {
-        ok: false,
-        code: FLOOR_FAR_ERROR_CODE,
-        error: `Минимальная цена ${floorNew} ₸ больше текущей цены товара ${ownPrice} ₸ более чем в ${FLOOR_FAR_FACTOR} раза. Проверьте, нет ли опечатки.`,
-        details: { field: 'floor_price', ...base },
-      }
-    }
     if (maxNew !== null && ownPrice > maxNew * FLOOR_FAR_FACTOR) {
       return {
         ok: false,
         code: FLOOR_FAR_ERROR_CODE,
         error: `Максимальная цена ${maxNew} ₸ меньше текущей цены товара ${ownPrice} ₸ более чем в ${FLOOR_FAR_FACTOR} раза. Проверьте, нет ли опечатки.`,
         details: { field: 'max_price', ...base },
+      }
+    }
+    if (floorNew !== null && floorNew > ownPrice) {
+      return {
+        ok: false,
+        code: FLOOR_FAR_ERROR_CODE,
+        error: floorNew > ownPrice * FLOOR_FAR_FACTOR
+          ? `Минимальная цена ${floorNew} ₸ больше текущей цены товара ${ownPrice} ₸ более чем в ${FLOOR_FAR_FACTOR} раза. Проверьте, нет ли опечатки.`
+          : `Минимальная цена ${floorNew} ₸ выше текущей цены товара ${ownPrice} ₸: бот поднимет цену до минимума. Проверьте, нет ли опечатки.`,
+        details: { field: 'floor_price', direction: 'above', ...base },
+      }
+    }
+    if (floorNew !== null && floorNew < ownPrice * FLOOR_LOW_SHARE) {
+      return {
+        ok: false,
+        code: FLOOR_FAR_ERROR_CODE,
+        error: `Минимальная цена ${floorNew} ₸ меньше половины текущей цены товара ${ownPrice} ₸: бот сможет опустить цену до неё. Проверьте, нет ли опечатки.`,
+        details: { field: 'floor_price', direction: 'below', ...base },
       }
     }
   }

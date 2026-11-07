@@ -197,6 +197,9 @@ export default function KaspiShopMargin() {
   )
   const targetNum = Number(targetMarginPercent) || 0
   const verdict = computeVerdict(result.marginPercent, targetNum)
+  // Нет цены Kaspi или комиссии: вердикт был бы выдумкой (комиссия 0 % даёт «Брать 48,6 %», а с настоящей 12,5 % выходит 36 %).
+  // Показываем спокойную заглушку и просим ввести недостающее (прогон воронки 07.11.2026).
+  const incomplete = baseInputs.kaspiPrice <= 0 || !(baseInputs.commissionRatePercent > 0)
 
   // Sensitivity: same cost structure, a lower simulated Kaspi price -- shows
   // how margin erodes if a Демпинг repricer race pushes this product's price
@@ -210,7 +213,7 @@ export default function KaspiShopMargin() {
   )
   const whatIfVerdict = computeVerdict(whatIfResult.marginPercent, targetNum)
 
-  const canSave = productName.trim() !== '' && baseInputs.kaspiPrice > 0
+  const canSave = productName.trim() !== '' && !incomplete
 
   async function saveEvaluation() {
     if (!canSave) return
@@ -371,7 +374,13 @@ export default function KaspiShopMargin() {
 
             {/* Result panel */}
             <div className="flex flex-col">
-              <div className="nav-glass rounded-2xl p-5 mb-3" style={{ borderColor: verdict === 'take' ? 'var(--nav-success)' : 'var(--nav-critical)' }}>
+              <div className="nav-glass rounded-2xl p-5 mb-3" style={{ borderColor: incomplete ? 'var(--nav-border)' : verdict === 'take' ? 'var(--nav-success)' : 'var(--nav-critical)' }}>
+                {incomplete ? (
+                  <div data-testid="margin-incomplete" className="mb-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                    <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Введите цену Kaspi и выберите категорию</div>
+                    Без цены и комиссии Kaspi вердикт был бы неверным: комиссия сильно меняет маржу. Остальные поля можно заполнять в любом порядке.
+                  </div>
+                ) : (
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-2xl font-black tracking-tight px-4 py-1.5 rounded-full"
                     style={{ background: verdict === 'take' ? 'var(--nav-success-solid)' : 'var(--nav-critical)', color: verdict === 'take' ? 'var(--nav-success-ink)' : '#fff' }}>
@@ -384,6 +393,7 @@ export default function KaspiShopMargin() {
                     <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>маржа</div>
                   </div>
                 </div>
+                )}
 
                 <div className="space-y-1.5 text-sm mb-3">
                   <div className="flex items-center justify-between">
@@ -419,6 +429,7 @@ export default function KaspiShopMargin() {
                   as the price falls; this is the exact point where it hits
                   zero, which is also the lowest a Демпинг floor should ever
                   be set. */}
+              {!incomplete && (
               <div className="nav-glass rounded-2xl p-4 mb-3">
                 <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Границы цены</div>
                 {floors.breakEven === null ? (
@@ -445,6 +456,7 @@ export default function KaspiShopMargin() {
                   </>
                 )}
               </div>
+              )}
 
               {/* Target margin */}
               <div className="nav-glass rounded-2xl p-4 mb-3">

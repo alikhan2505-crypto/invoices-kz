@@ -217,8 +217,28 @@ describe('validateProductPatch: floor far from the current price', () => {
     expect(r).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'floor_price', floorPrice: 6001, ownPrice: 2000, factor: 3 } })
   })
 
-  it('exactly 3x is allowed', () => {
-    expect(validateProductPatch({ floor_price: 6000, max_price: null }, withOwn).ok).toBe(true)
+  it('floor above the price (even within 3x) asks for confirmation: the bot would raise the price', () => {
+    const r = validateProductPatch({ floor_price: 6000, max_price: null }, withOwn)
+    expect(r).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'floor_price', direction: 'above', floorPrice: 6000, ownPrice: 2000 } })
+    expect(validateProductPatch({ floor_price: 2100, max_price: null }, withOwn)).toMatchObject({ ok: false, details: { direction: 'above' } })
+  })
+
+  it('floor below half of the price asks for confirmation: a lost zero (7000 instead of 70000)', () => {
+    const own = { floor_price: 78990, max_price: null, own_current_price: 78990 }
+    expect(validateProductPatch({ floor_price: 7000 }, own)).toMatchObject({ ok: false, code: 'floor_far_above_price', details: { field: 'floor_price', direction: 'below', floorPrice: 7000, ownPrice: 78990 } })
+    expect(validateProductPatch({ floor_price: 39000 }, own)).toMatchObject({ ok: false, details: { direction: 'below' } })
+  })
+
+  it('a floor between half the price and the price needs no confirmation; neither does an unchanged floor', () => {
+    const own = { floor_price: 78990, max_price: null, own_current_price: 78990 }
+    expect(validateProductPatch({ floor_price: 70000 }, own).ok).toBe(true)
+    expect(validateProductPatch({ floor_price: 39495 }, own).ok).toBe(true)
+    expect(validateProductPatch({ floor_price: 78990, undercut_step: 10 }, own).ok).toBe(true)
+  })
+
+  it('confirmFloor: true lets a low floor through too', () => {
+    const own = { floor_price: 78990, max_price: null, own_current_price: 78990 }
+    expect(validateProductPatch({ floor_price: 7000, confirmFloor: true }, own).ok).toBe(true)
   })
 
   it('floor 50000 for a 5000 item is refused (the typo case)', () => {

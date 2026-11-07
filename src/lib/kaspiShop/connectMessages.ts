@@ -31,6 +31,11 @@ type Texts = {
   phoneRequired: string
   phoneInvalid: string
   limitUnavailable: string
+  // Ответы Kaspi на номер и код: человеческая фраза вместо «HTTP 400» (прогон воронки 07.11.2026).
+  otpRejected: string
+  phoneRejected: string
+  invalidToken: string
+  codeRequired: string
   // «Слишком много SMS-запросов на этот номер»: по одной фразе на каждый лимит.
   rateLimited: { user: string; phone: string; ip: string }
   // Хвост про ожидание: с минутами и без них (если сервер не передал retryAfterSec).
@@ -50,6 +55,10 @@ const TEXTS: Record<Lang, Texts> = {
     phoneRequired: 'Введите номер телефона.',
     phoneInvalid: 'Введите номер телефона полностью: +7 777 123 45 67',
     limitUnavailable: 'Не удалось проверить лимит запросов. Попробуйте через минуту.',
+    otpRejected: 'Код не подошёл или устарел. Проверьте SMS или запросите новый код.',
+    phoneRejected: 'Kaspi не принял этот номер. Введите номер, на который оформлен кабинет Kaspi Магазин.',
+    invalidToken: 'Время на ввод кода вышло. Запросите новый код.',
+    codeRequired: 'Введите код из SMS.',
     rateLimited: {
       user: 'Слишком много SMS-запросов от вашего аккаунта.',
       phone: 'Слишком много SMS-запросов на этот номер.',
@@ -69,6 +78,10 @@ const TEXTS: Record<Lang, Texts> = {
     phoneRequired: 'Телефон нөмірін енгізіңіз.',
     phoneInvalid: 'Телефон нөмірін толық енгізіңіз: +7 777 123 45 67',
     limitUnavailable: 'Сұрау лимитін тексеру мүмкін болмады. Бір минуттан кейін қайта көріңіз.',
+    otpRejected: 'Код сәйкес келмеді немесе ескірді. SMS-ті тексеріңіз немесе жаңа код сұраңыз.',
+    phoneRejected: 'Kaspi бұл нөмірді қабылдамады. Kaspi Магазин кабинеті тіркелген нөмірді енгізіңіз.',
+    invalidToken: 'Кодты енгізу уақыты өтті. Жаңа код сұраңыз.',
+    codeRequired: 'SMS-тегі кодты енгізіңіз.',
     rateLimited: {
       user: 'Сіздің аккаунтыңыздан SMS тым көп сұралды.',
       phone: 'Бұл нөмірге SMS тым көп сұралды.',
@@ -88,6 +101,10 @@ const TEXTS: Record<Lang, Texts> = {
     phoneRequired: 'Enter your phone number.',
     phoneInvalid: 'Enter the full phone number: +7 777 123 45 67',
     limitUnavailable: 'Could not check the request limit. Please try again in a minute.',
+    otpRejected: 'The code did not match or has expired. Check the SMS or request a new code.',
+    phoneRejected: 'Kaspi did not accept this number. Enter the number your Kaspi Merchant cabinet is registered to.',
+    invalidToken: 'The time to enter the code ran out. Request a new code.',
+    codeRequired: 'Enter the code from the SMS.',
     rateLimited: {
       user: 'Too many SMS requests from your account.',
       phone: 'Too many SMS requests for this number.',
@@ -121,6 +138,10 @@ export function connectErrorMessage(
   if (code === 'phone_required') return t.phoneRequired
   if (code === 'phone_invalid') return t.phoneInvalid
   if (code === 'limit_unavailable') return t.limitUnavailable
+  if (code === 'otp_rejected') return t.otpRejected
+  if (code === 'phone_rejected') return t.phoneRejected
+  if (code === 'invalid_token') return t.invalidToken
+  if (code === 'code_required') return t.codeRequired
   if (code === 'rate_limited') {
     const who = ctx.scope === 'phone' ? t.rateLimited.phone : ctx.scope === 'ip' ? t.rateLimited.ip : t.rateLimited.user
     const sec = ctx.retryAfterSec
