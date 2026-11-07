@@ -15,6 +15,10 @@ function isPublicPage(pathname: string): boolean {
     pathname === '/data-deletion' ||
     pathname === '/cashier-api' ||
     pathname === '/invoices-landing' ||
+    // Превью новой главной со своей шапкой: плашка закрыла бы переключатель
+    // языка и «Войти» у вошедших, а её ленивый чанк (supabase, framer-motion)
+    // тянулся бы и гостям.
+    pathname === '/home-preview' ||
     pathname.startsWith('/lp/') ||
     pathname.startsWith('/view/') ||
     pathname.startsWith('/contract-view/') ||

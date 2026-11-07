@@ -4,7 +4,7 @@ import { isUtilityBarHiddenPath } from './utilityBarPaths'
 describe('isUtilityBarHiddenPath', () => {
   it('hides the bar on public and marketing pages', () => {
     const hidden = [
-      '/', '/login', '/privacy', '/terms', '/data-deletion', '/cashier-api', '/invoices-landing',
+      '/', '/login', '/privacy', '/terms', '/data-deletion', '/cashier-api', '/invoices-landing', '/home-preview',
       '/lp/kaspi', '/view/abc', '/contract-view/abc', '/verify/abc', '/promo/CODE', '/shop/store',
       '/tools', '/tools/schet', '/tools/kk/schet', '/tools/en/margin',
       '/guides', '/guides/komissiya-kaspi', '/guides/kk/komissiya-kaspi',
@@ -29,7 +29,7 @@ describe('isUtilityBarHiddenPath', () => {
 
   it('does not match look-alike prefixes', () => {
     // exact-or-prefix-with-slash, never a bare startsWith
-    for (const p of ['/toolsbox', '/guidesx', '/products/x', '/planner', '/privacy-policy', '/login/x', '/lp', '/shop']) {
+    for (const p of ['/home-preview/x', '/home-previews', '/toolsbox', '/guidesx', '/products/x', '/planner', '/privacy-policy', '/login/x', '/lp', '/shop']) {
       expect(isUtilityBarHiddenPath(p), p).toBe(false)
     }
   })

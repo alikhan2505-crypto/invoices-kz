@@ -1,0 +1,526 @@
+/* Превью новой главной (/home-preview). Префикс hp-. Отдельный css-файл, как
+   hub-extras.css: новый чанк, залипать на edge-кэше нечему.
+
+   Как устроено. База этого файла: вёрстка СТОЛБИКОМ (без JS, при
+   prefers-reduced-motion, на низком окне). Поверх неё в @media (...) с
+   html.hp-js включается сцена: секция .hp-story высотой 540svh, внутри
+   липкая сцена .hp-stage на весь экран.
+
+   Ход анимации. Драйвер (useScrub.ts + scrubFrame.ts) считает прогресс
+   каждого окна в JS и пишет число (--t, --in/--out, --pbe, --tilt, --dim)
+   ТОЛЬКО на тот элемент, который его читает, и только если оно изменилось.
+   Эти переменные зарегистрированы ниже через @property с inherits: false:
+   запись не наследуется потомками, пересчёт стилей на кадр касается
+   нескольких элементов, а не ~190. Формулы transform/opacity остаются в CSS.
+   В статичном режиме (без JS, reduced-motion, низкое окно) те же переменные
+   считаются из --p = 0.74 один раз (окна --a/--k лежат в разметке):
+   --t = clamp(0, (p - a) * k, 1). Анимируются только transform и opacity;
+   контент глав и слов лежит в разметке всегда. */
+
+@property --t { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --e { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --in { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --out { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --pbe { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --tilt { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --dim { syntax: '<number>'; inherits: false; initial-value: 0; }
+
+@font-face {
+  font-family: 'IKZ Kazakh Display';
+  src: url('/fonts/kazakh-display/ikz-kazakh-display-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0492-0493, U+049A-049B, U+04A2-04A3, U+04AE-04B1, U+04BA-04BB, U+04D8-04D9, U+04E8-04E9;
+}
+
+.hp-root {
+  --hp-bg: var(--nav-bg);
+  --hp-ink: var(--nav-text-primary);
+  --hp-ink2: var(--nav-text-secondary);
+  --hp-mute: var(--nav-text-muted);
+  --hp-line: var(--nav-border);
+  --hp-paper: var(--nav-surface-chrome);
+  --hp-accent: var(--nav-accent);
+  --hp-money: var(--nav-success);
+  --hp-display: 'IKZ Kazakh Display', var(--font-unbounded), 'Arial Black', Arial, sans-serif;
+  --hp-body: var(--font-onest), Arial, Helvetica, sans-serif;
+  --hp-hand: var(--font-caveat), cursive;
+  --vh: 1vh;
+  position: relative;
+  min-height: 100vh;
+  background: var(--hp-bg);
+  color: var(--hp-ink);
+  font-family: var(--hp-body);
+  -webkit-text-size-adjust: 100%;
+}
+@supports (height: 100svh) { .hp-root { --vh: 1svh; } }
+.hp-root *, .hp-root *::before, .hp-root *::after { box-sizing: border-box; }
+/* Тёмная тема сайта красит каждый div/p/span/h1 в --text-primary (0,1,1):
+   этот сброс (0,2,0) стоит ПЕРВЫМ в файле, правила ниже того же веса его
+   перебивают порядком. Любой элемент с текстом здесь имеет класс hp-*. */
+.hp-root [class^="hp-"], .hp-root [class*=" hp-"] { color: inherit; }
+.hp-root a { text-decoration: none; }
+/* Глобальные button:active / a[href]:active (globals.css) масштабируют на 0.95
+   и добавляют transition на transform/opacity: для ссылок-плиток и кнопок
+   здесь свои значения. */
+.hp-root a[href], .hp-root button { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.hp-root a[href]:active, .hp-root button:active { transform: scale(0.97); opacity: 1; }
+
+.hp-root .hp-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* ----------------------------------------------------------------- шапка */
+.hp-root .hp-top {
+  position: fixed; inset: 0 0 auto 0; z-index: 30; height: 56px;
+  display: flex; align-items: center; gap: 8px; padding: 0 clamp(14px, 4vw, 40px);
+  background: var(--hp-bg);
+  background: color-mix(in srgb, var(--hp-bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.hp-root .hp-logo { display: inline-flex; align-items: center; min-height: 44px; color: var(--hp-ink); }
+.hp-root .hp-spacer { flex: 1; }
+.hp-root .hp-lang { position: relative; display: flex; gap: 2px; border: 1.5px solid var(--hp-line); border-radius: 9999px; padding: 2px; }
+.hp-root .hp-lang button {
+  position: relative; border: 0; background: transparent; border-radius: 9999px; padding: 0 9px; height: 32px;
+  font: 600 12.5px/1 var(--hp-body); color: var(--hp-ink2); cursor: pointer; touch-action: manipulation;
+}
+.hp-root .hp-lang button::before { content: ''; position: absolute; inset: -6px -1px; }
+.hp-root .hp-lang button[data-on="true"] { background: var(--hp-ink); color: var(--hp-bg); }
+.hp-root .hp-iconbtn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border: 0; border-radius: 9999px; background: transparent; color: var(--hp-ink2); cursor: pointer; touch-action: manipulation;
+}
+.hp-root .hp-iconbtn::before { content: ''; position: absolute; inset: -4px; }
+.hp-root .hp-iconbtn:hover { background: var(--nav-surface-glass); color: var(--hp-ink); }
+.hp-root .hp-iconbtn svg { width: 20px; height: 20px; }
+.hp-root .hp-login {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 9999px;
+  border: 1.5px solid var(--hp-ink); color: var(--hp-ink); font: 600 13px/1 var(--hp-body); white-space: nowrap;
+}
+.hp-root .hp-login { position: relative; }
+.hp-root .hp-login::before { content: ''; position: absolute; inset: -5.5px -3px; } /* зона нажатия 44px: кнопка 36px, рамка 1.5px съедает 3px от поля отсчёта inset */
+.hp-root .hp-login:hover { background: var(--hp-ink); color: var(--hp-bg); }
+.hp-root .hp-theme-top { display: none; }
+@media (min-width: 560px) {
+  .hp-root .hp-theme-top { display: inline-flex; }
+  .hp-root .hp-theme-foot { display: none; }
+  .hp-root .hp-lang button { padding: 0 11px; font-size: 13px; }
+}
+
+/* ------------------------------------------------- сцена: база (столбиком) */
+.hp-root .hp-story { position: relative; padding-top: 56px; }
+.hp-root .hp-stage {
+  position: relative; overflow: hidden;
+  --p: 0.74; /* в столбике счёт показан в готовом виде: штамп стоит, камера не отъезжала */
+  padding: 24px 20px 40px;
+}
+.hp-root .hp-inner { position: relative; display: flex; flex-direction: column; gap: 28px; max-width: 760px; margin-inline: auto; }
+.hp-root .hp-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.hp-root .hp-dots { display: none; }
+.hp-root .hp-blob { position: absolute; border-radius: 50%; }
+.hp-root .hp-b1 { width: 70vmax; height: 70vmax; left: -28vmax; top: -22vmax; background: radial-gradient(closest-side, var(--nav-accent-soft), transparent 72%); }
+.hp-root .hp-b2 { width: 60vmax; height: 60vmax; right: -26vmax; top: 6vmax; background: radial-gradient(closest-side, var(--nav-success-soft), transparent 72%); }
+.hp-root .hp-b3 { width: 50vmax; height: 50vmax; left: 8vmax; bottom: -24vmax; background: radial-gradient(closest-side, rgba(255, 107, 87, 0.16), transparent 72%); }
+.hp-root .hp-inner { z-index: 1; }
+
+/* копирайт */
+.hp-root .hp-kick { display: none; }
+.hp-root .hp-copy { display: flex; flex-direction: column; gap: 14px; }
+.hp-root .hp-h { font: 700 clamp(34px, 9.6vw, 56px)/1.04 var(--hp-display); letter-spacing: -0.03em; text-wrap: balance; }
+.hp-root .hp-hmain { display: block; }
+.hp-root .hp-ha { display: block; }
+.hp-root .hp-hw { display: block; }
+.hp-root .hp-wk { display: none; }
+.hp-root .hp-wk[data-i="0"] { display: block; }
+.hp-root .hp-hend { display: none !important; }
+.hp-root .hp-wd { color: var(--hp-accent); white-space: nowrap; }
+.hp-root .hp-subs { display: block; }
+.hp-root .hp-p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--hp-ink2); max-width: 54ch; }
+.hp-root .hp-note { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--hp-mute); max-width: 54ch; }
+.hp-root .hp-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 16px; }
+.hp-root .hp-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 9999px;
+  background: var(--hp-ink); color: var(--hp-bg); border: 2px solid var(--hp-ink); font: 600 15px/1 var(--hp-body); white-space: nowrap; touch-action: manipulation;
+}
+.hp-root .hp-btn:hover { background: transparent; color: var(--hp-ink); }
+.hp-root .hp-link {
+  display: inline-flex; align-items: center; min-height: 44px; font: 600 14px/1.2 var(--hp-body); color: var(--hp-ink);
+  text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; text-decoration-color: var(--hp-line);
+}
+.hp-root .hp-link:hover { text-decoration-color: var(--hp-ink); }
+.hp-root .hp-hint, .hp-root .hp-rail, .hp-root .hp-anchor { display: none; }
+
+/* объект: карточка счёта */
+.hp-root .hp-obj { display: contents; }
+.hp-root .hp-cardwrap { order: 1; display: flex; justify-content: center; }
+.hp-root .hp-card {
+  position: relative; width: min(100%, 380px); container-type: inline-size;
+}
+.hp-root .hp-ring { display: none; }
+.hp-root .hp-paper {
+  position: relative; display: flex; flex-direction: column; overflow: hidden; width: 100%; aspect-ratio: 1 / 1.02;
+  background: var(--hp-paper); border: 1px solid var(--hp-line); border-radius: 7cqw; box-shadow: var(--nav-card-glow);
+  font-size: 3.6cqw; color: var(--hp-ink);
+}
+.hp-root .hp-chrome { display: flex; align-items: center; gap: 1.8cqw; padding: 3cqw 5cqw; border-bottom: 1px solid var(--hp-line); font-size: 3cqw; }
+.hp-root .hp-dot { display: block; width: 2.6cqw; height: 2.6cqw; border-radius: 50%; opacity: 0.8; }
+.hp-root .hp-d1 { background: var(--nav-magenta); } .hp-root .hp-d2 { background: var(--nav-accent); } .hp-root .hp-d3 { background: var(--nav-teal); }
+.hp-root .hp-url { margin-left: 1.4cqw; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hp-mute); }
+.hp-root .hp-sample { flex: none; padding: 0.8cqw 2.4cqw; border-radius: 9999px; background: var(--nav-accent-soft); color: var(--hp-accent); font-weight: 600; font-size: 2.7cqw; }
+.hp-root .hp-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 5cqw 5.5cqw 5.5cqw; min-height: 0; }
+.hp-root .hp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 3cqw; }
+.hp-root .hp-who { min-width: 0; }
+.hp-root .hp-num { font-size: 3.1cqw; color: var(--hp-mute); }
+.hp-root .hp-client { margin-top: 0.8cqw; }
+.hp-root .hp-clientname { display: block; font-size: 4.7cqw; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-root .hp-chips { display: grid; flex: none; font-size: 2.9cqw; font-weight: 700; }
+.hp-root .hp-chip { grid-area: 1 / 1; white-space: nowrap; padding: 1.2cqw 2.8cqw; border-radius: 2.2cqw; text-align: center; align-self: start; }
+.hp-root .hp-c0 { background: var(--nav-surface-glass); color: var(--hp-ink2); }
+.hp-root .hp-c1 { background: var(--nav-magenta-soft); color: var(--nav-magenta); }
+.hp-root .hp-c2 { background: var(--nav-success-soft); color: var(--hp-money); }
+.hp-root .hp-rows { display: grid; gap: 3cqw; }
+.hp-root .hp-row { position: relative; min-height: 5.2cqw; }
+.hp-root .hp-skel { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; }
+.hp-root .hp-skel i { display: block; height: 2.2cqw; border-radius: 9999px; background: var(--hp-line); }
+.hp-root .hp-skel i:first-child { width: 55%; }
+.hp-root .hp-skel i:nth-child(2) { width: 18%; }
+.hp-root .hp-client .hp-skel i { width: 46%; height: 2.8cqw; }
+.hp-root .hp-rowc { display: flex; justify-content: space-between; gap: 3cqw; color: var(--hp-ink2); }
+.hp-root .hp-rowc > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-root .hp-money { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--hp-ink); }
+.hp-root .hp-totalrow { display: flex; align-items: baseline; justify-content: space-between; border-top: 1px solid var(--hp-line); padding-top: 3.6cqw; }
+.hp-root .hp-tl { color: var(--hp-ink2); }
+.hp-root .hp-total { font-size: 6.4cqw; font-weight: 700; line-height: 1.2; color: var(--hp-money); font-variant-numeric: tabular-nums; white-space: nowrap; transform-origin: 100% 50%; }
+.hp-root .hp-pay { position: relative; height: 24cqw; }
+.hp-root .hp-payin { display: flex; align-items: center; gap: 4cqw; height: 100%; }
+.hp-root .hp-qr, .hp-root .hp-paytxt { --dim: clamp(0, calc((var(--p) - 0.62) * 14.3), 1); }
+.hp-root .hp-qr { position: relative; display: block; flex: none; width: 22cqw; height: 22cqw; border-radius: 3cqw; overflow: hidden; opacity: calc(1 - 0.68 * var(--dim)); }
+.hp-root .hp-qrsvg { display: block; width: 100%; height: 100%; }
+.hp-root .hp-scan { position: absolute; left: 6%; right: 6%; top: 0; display: none; height: 0.9cqw; border-radius: 9999px; background: var(--hp-money); box-shadow: 0 0 2.4cqw 0.4cqw var(--hp-money); }
+.hp-root .hp-paytxt { display: grid; gap: 1.2cqw; min-width: 0; opacity: calc(1 - var(--dim)); }
+.hp-root .hp-payq { font-weight: 600; color: var(--hp-ink); }
+.hp-root .hp-payk { font-size: 3cqw; color: var(--hp-mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hp-root .hp-stamp {
+  position: absolute; right: 0; top: 50%; display: flex; flex-direction: column; align-items: center; padding: 1.6cqw 3.6cqw;
+  border: 0.8cqw solid var(--hp-money); border-radius: 3cqw; color: var(--hp-money); background: var(--hp-paper);
+  pointer-events: none;
+}
+.hp-root .hp-stampw { font-size: 4.6cqw; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.2; }
+.hp-root .hp-stampk { font-size: 2.8cqw; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* окна: --t от 0 до 1 внутри [a, b] прогресса, --e то же с торможением.
+   В сцене --t перебивает inline-значение от драйвера. Окно стоит на самом
+   элементе, который его читает: --t/--e не наследуются. */
+.hp-root .hp-t {
+  --t: clamp(0, calc((var(--p) - var(--a)) * var(--k)), 1);
+  --e: calc(1 - (1 - var(--t)) * (1 - var(--t)));
+}
+.hp-root .hp-fill { position: relative; }
+.hp-root .hp-fill > .hp-skel { opacity: calc(1 - var(--e)); }
+.hp-root .hp-fill > .hp-fillc { opacity: var(--e); transform: translate3d(calc((1 - var(--e)) * -2.4cqw), 0, 0); }
+.hp-root .hp-total { opacity: var(--e); transform: translate3d(0, calc((1 - var(--e)) * 1.6cqw), 0) scale(calc(0.9 + 0.1 * var(--e))); }
+.hp-root .hp-payin { opacity: var(--e); transform: translate3d(0, calc((1 - var(--e)) * 3cqw), 0); }
+/* штамп: прихлопывает, большой и прозрачный -> на место (кубическое торможение) */
+.hp-root .hp-stamp {
+  --s: calc(1 - (1 - var(--t)) * (1 - var(--t)) * (1 - var(--t)));
+  opacity: clamp(0, calc(var(--t) * 3), 1);
+  transform: translate3d(0, -50%, 0) rotate(calc(-16deg + 7deg * var(--s))) scale(calc(1 + 0.9 * (1 - var(--s))));
+}
+/* смена текста: появление/исчезновение в окнах --a/--k и --a2/--k2 */
+.hp-root .hp-sw, .hp-root .hp-wk {
+  --in: clamp(0, calc((var(--p) - var(--a)) * var(--k)), 1);
+  --out: clamp(0, calc((var(--p) - var(--a2)) * var(--k2)), 1);
+}
+.hp-root .hp-sw {
+  opacity: calc(var(--in) * (1 - var(--out)));
+  transform: translate3d(0, calc((1 - var(--in)) * 0.35em - var(--out) * 0.35em), 0);
+}
+
+/* главы столбиком */
+.hp-root .hp-chapters { order: 2; list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.hp-root .hp-chap { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--hp-line); border-radius: 16px; background: var(--nav-surface-glass); }
+.hp-root .hp-chapn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--hp-ink); color: var(--hp-bg); font: 700 14px/1 var(--hp-display); }
+.hp-root .hp-chapt { margin: 0 0 4px; font: 700 16px/1.25 var(--hp-display); letter-spacing: -0.01em; }
+.hp-root .hp-chapp { margin: 0; font-size: 15px; line-height: 1.5; color: var(--hp-ink2); }
+.hp-root .hp-chapnote { margin-top: 6px; font-size: 13px; color: var(--hp-mute); }
+
+/* плитки продуктов */
+.hp-root .hp-tiles { order: 3; list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: 100%; max-width: 520px; margin-inline: auto; }
+.hp-root .hp-tile { position: relative; border-radius: 28px; background: var(--bg-t); color: var(--ink-t); overflow: hidden; }
+.hp-root .hp-tilea { display: flex; align-items: center; gap: 12px; padding: 12px 14px; color: var(--ink-t); min-height: 78px; }
+.hp-root .hp-tico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--ink-t); color: var(--bg-t); }
+.hp-root .hp-tico svg { width: 21px; height: 21px; }
+.hp-root .hp-ttxt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.hp-root .hp-tn { font: 700 15px/1.1 var(--hp-display); letter-spacing: -0.02em; }
+.hp-root .hp-tp { font-size: 12.5px; line-height: 1.3; opacity: 0.86; }
+.hp-root .hp-ttag {
+  flex: none; max-width: 76px; padding: 4px 8px; border: 1.5px solid var(--ink-t); border-radius: 12px; text-align: center;
+  font: 600 10.5px/1.15 var(--hp-body);
+}
+
+/* ------------------------------------------------------------------ финал */
+.hp-root .hp-final { position: relative; z-index: 1; padding: clamp(56px, 9vw, 112px) clamp(20px, 4vw, 40px); }
+.hp-root .hp-fwrap { max-width: 920px; margin-inline: auto; display: grid; gap: 14px; justify-items: start; }
+.hp-root .hp-fh { margin: 0; font: 700 clamp(28px, 6vw, 52px)/1.06 var(--hp-display); letter-spacing: -0.03em; text-wrap: balance; }
+.hp-root .hp-fp { margin: 0; font-size: clamp(16px, 2vw, 19px); line-height: 1.5; color: var(--hp-ink2); max-width: 54ch; }
+.hp-root .hp-fcta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 6px; }
+.hp-root .hp-btn-lg { min-height: 56px; padding: 0 30px; font-size: 17px; }
+.hp-root .hp-fnote { font-size: 14px; color: var(--hp-mute); }
+.hp-root .hp-tools { margin-top: clamp(36px, 6vw, 64px); display: grid; gap: 6px; width: 100%; }
+.hp-root .hp-toolst { margin: 0; font: 700 clamp(20px, 3vw, 28px)/1.15 var(--hp-display); letter-spacing: -0.02em; }
+.hp-root .hp-toolsp { margin: 0 0 10px; font-size: 15px; color: var(--hp-ink2); }
+.hp-root .hp-chipsrow { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.hp-root .hp-toolchip {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 9999px;
+  border: 1.5px solid var(--hp-line); background: var(--nav-surface-glass); color: var(--hp-ink); font: 600 14px/1.2 var(--hp-body);
+}
+.hp-root .hp-toolchip:hover { border-color: var(--hp-ink); }
+.hp-root .hp-toolall { background: var(--hp-ink); border-color: var(--hp-ink); color: var(--hp-bg); }
+.hp-root .hp-footer {
+  position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px;
+  padding: 18px clamp(20px, 4vw, 40px) 28px; border-top: 1px solid var(--hp-line); font-size: 13px; color: var(--hp-mute);
+}
+.hp-root .hp-flinks { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.hp-root .hp-flinks a { color: var(--hp-ink2); min-height: 44px; display: inline-flex; align-items: center; }
+.hp-root .hp-flinks a:hover { color: var(--hp-ink); text-decoration: underline; }
+
+/* ======================================================================
+   СЦЕНА С ПРОКРУТКОЙ. Включается, когда работает JS (html.hp-js ставит
+   скрипт в page.tsx или сам компонент), движение разрешено и окно не ниже
+   620px по высоте: ниже на 320x568 текст, карточка и три плитки не помещаются
+   в один экран, там читаемый столбик надёжнее.
+   Условие то же, что SCRUB_MQ в timeline.ts.
+   ====================================================================== */
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) {
+  html.hp-js .hp-story { height: 540vh; height: 540svh; padding-top: 0; }
+  html.hp-js .hp-stage {
+    position: sticky; top: 0; height: 100vh; height: 100svh; padding: 0; --p: 0;
+    --top: 56px; --copy-h: 252px; --rail-h: 52px;
+    --zone-h: calc(100 * var(--vh) - var(--top) - var(--copy-h) - var(--rail-h));
+    /* Последний аргумент min: в главе 5 карточка (x0.46) и три плитки (до 276px
+       у kk, замер) делят зону под текстом без наложения. */
+    --card-w: max(150px, min(88vw, 340px, calc(var(--zone-h) * 0.9), calc((var(--zone-h) - 284px) * 2.1)));
+    --card-h: calc(var(--card-w) * 1.02);
+    --sf: 0.46;
+    --dy: calc((var(--zone-h) - var(--card-h) * var(--sf)) / 2);
+  }
+  html.hp-js .hp-inner {
+    height: 100%; max-width: none; gap: 0; padding: var(--top) 20px 0; display: flex; flex-direction: column; margin: 0;
+  }
+  /* задний план: сетка точек отъезжает вместе с камерой, пятна плывут */
+  html.hp-js .hp-dots {
+    display: block; position: absolute; left: -30%; right: -30%; top: -30%; bottom: -30%;
+    background-image: radial-gradient(circle, var(--hp-line) 1.4px, transparent 1.8px); background-size: 30px 30px;
+    -webkit-mask-image: radial-gradient(closest-side, #000 25%, transparent 78%); mask-image: radial-gradient(closest-side, #000 25%, transparent 78%);
+    opacity: 0.8; transform: scale(calc(1.32 - 0.5 * var(--pbe, 0)));
+  }
+  html.hp-js .hp-b1 { transform: translate3d(calc(var(--p) * 14vmax), calc(var(--p) * 10vmax), 0); }
+  html.hp-js .hp-b2 { transform: translate3d(calc(var(--p) * -12vmax), calc(var(--p) * 16vmax), 0); }
+  html.hp-js .hp-b3 { transform: translate3d(calc(var(--p) * 10vmax), calc(var(--p) * -20vmax), 0); }
+
+  /* текст */
+  html.hp-js .hp-copy { flex: none; height: var(--copy-h); gap: 0; position: relative; padding-top: 14px; }
+  /* Блоки колонки текста не сжимаются: высота --copy-h подобрана под самый
+     длинный текст (scrub.test.ts сверяет), иначе flex-shrink съедал
+     подпись-счётчик (.hp-kick с overflow: hidden) до 0px. */
+  html.hp-js .hp-kick, html.hp-js .hp-h, html.hp-js .hp-subs { flex: none; }
+  html.hp-js .hp-kick { display: grid; height: 16px; margin-bottom: 10px; font: 600 12px/16px var(--hp-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--hp-mute); white-space: nowrap; overflow: hidden; }
+  html.hp-js .hp-wk { display: block; grid-area: 1 / 1; will-change: auto; }
+  html.hp-js .hp-wk[data-i] {
+    opacity: calc(var(--in) * (1 - var(--out)));
+    transform: translate3d(0, calc((1 - var(--in)) * 0.4em - var(--out) * 0.4em), 0);
+  }
+  html.hp-js .hp-h { display: grid; font-size: clamp(32px, 9.2vw, 44px); }
+  html.hp-js .hp-hmain, html.hp-js .hp-hend { grid-area: 1 / 1; }
+  html.hp-js .hp-hend { display: block !important; font-size: 0.7em; line-height: 1.1; align-self: start; padding-top: 0.1em; }
+  html.hp-js .hp-hend > span { display: block; }
+  html.hp-js .hp-hw { display: grid; }
+  /* minmax(0, 1fr): ряд кнопок с длинной подписью не растягивает колонку шире экрана (320px, ru) */
+  html.hp-js .hp-subs { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 10px; }
+  html.hp-js .hp-s { pointer-events: none; }
+  html.hp-js .hp-stage[data-ch="0"] .hp-s[data-i="0"] { pointer-events: auto; }
+  html.hp-js .hp-stage:not([data-ch="0"]) .hp-s[data-i="0"] { visibility: hidden; }
+  html.hp-js .hp-p { font-size: 15px; line-height: 1.45; }
+  html.hp-js .hp-cta { margin-top: 12px; gap: 6px 12px; flex-wrap: nowrap; }
+  html.hp-js .hp-btn { padding: 0 16px; min-height: 46px; font-size: 14px; }
+  html.hp-js .hp-link { font-size: 13px; min-width: 0; line-height: 1.2; }
+
+  /* объект */
+  html.hp-js .hp-obj {
+    display: grid; place-items: center; position: relative; flex: none; height: var(--zone-h);
+    perspective: 1100px; perspective-origin: 50% 40%;
+  }
+  html.hp-js .hp-cardwrap { grid-area: 1 / 1; }
+  html.hp-js .hp-card {
+    width: var(--card-w);
+    transform:
+      translate3d(0, calc(var(--pbe, 0) * var(--dy) * -1), 0)
+      scale(calc(1 - var(--pbe, 0) * (1 - var(--sf))))
+      rotateX(calc((1 - var(--tilt, 0)) * 9deg))
+      rotateY(calc((1 - var(--tilt, 0)) * -11deg));
+    transform-origin: 50% 50%;
+  }
+  html.hp-js .hp-ring {
+    display: block; position: absolute; inset: -3%; border-radius: 9cqw; border: 0.8cqw solid var(--hp-money); pointer-events: none;
+    opacity: calc(var(--t) * (1 - var(--t)) * 3.2);
+    transform: scale(calc(0.94 + 0.16 * var(--t)));
+  }
+  html.hp-js .hp-scan { display: block; opacity: calc(var(--t) * (1 - var(--t)) * 4); transform: translate3d(0, calc(var(--t) * 20cqw), 0); }
+  html.hp-js .hp-tiles {
+    grid-area: 1 / 1; align-self: end; max-width: min(460px, calc(100vw - 40px)); margin: 0; gap: 8px; pointer-events: none;
+  }
+  html.hp-js .hp-stage[data-ch="5"] .hp-tiles { pointer-events: auto; }
+  /* Невидимые плитки остаются в дереве доступности (opacity и
+     pointer-events, не visibility: hidden); из порядка Tab их убирает
+     драйвер (tabindex=-1), пока не включена глава 5. */
+  html.hp-js .hp-tile {
+    opacity: var(--e);
+    transform: translate3d(0, calc((1 - var(--e)) * 28px), 0) scale(calc(0.92 + 0.08 * var(--e)));
+  }
+  html.hp-js .hp-chapters {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+
+  /* полоска глав */
+  html.hp-js .hp-rail { display: block; flex: none; margin-top: auto; height: var(--rail-h); padding-bottom: 8px; }
+  html.hp-js .hp-rail ol { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; height: 100%; }
+  html.hp-js .hp-rail li { flex: 1; min-width: 0; }
+  html.hp-js .hp-root .hp-seg, html.hp-js .hp-seg { display: flex; flex-direction: column; justify-content: center; gap: 8px; height: 100%; padding: 0; touch-action: manipulation; }
+  html.hp-js .hp-segbar { display: block; position: relative; height: 4px; border-radius: 9999px; background: var(--hp-line); overflow: hidden; }
+  html.hp-js .hp-segbar > i { position: absolute; inset: 0; background: var(--hp-ink); transform-origin: 0 50%; transform: scaleX(var(--t)); }
+  /* Подпись сегмента на узком экране скрыта; имя ссылки даёт её aria-label. */
+  html.hp-js .hp-seglabel { display: none; font: 600 12.5px/1.2 var(--hp-body); color: var(--hp-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html.hp-js .hp-stage[data-ch="1"] li:nth-child(1) .hp-seglabel,
+  html.hp-js .hp-stage[data-ch="2"] li:nth-child(2) .hp-seglabel,
+  html.hp-js .hp-stage[data-ch="3"] li:nth-child(3) .hp-seglabel,
+  html.hp-js .hp-stage[data-ch="4"] li:nth-child(4) .hp-seglabel,
+  html.hp-js .hp-stage[data-ch="5"] li:nth-child(5) .hp-seglabel { color: var(--hp-ink); }
+  html.hp-js .hp-hint {
+    display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 6px; position: absolute; left: 0; right: 0; bottom: calc(var(--rail-h) + 4px);
+    pointer-events: none; font: 600 22px/1 var(--hp-hand); color: var(--hp-ink2);
+    opacity: clamp(0, calc(1 - var(--p) * 45), 1);
+  }
+  html.hp-js .hp-hint span { transform: rotate(-3deg); }
+  html.hp-js .hp-hint svg { width: 22px; height: 22px; animation: hp-nudge 1.6s ease-in-out infinite; }
+  html.hp-js .hp-anchor { display: block; position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; top: calc(var(--f) * 440vh); top: calc(var(--f) * 440svh); }
+
+}
+@keyframes hp-nudge { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(4px); } }
+
+/* Невысокие телефоны (до 720px по высоте): карточка отъезжает мельче,
+   плитки плотнее, чтобы всё помещалось под текстом. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (max-height: 740px) {
+  /* карточка оставляет место под подсказку «листайте вниз» (2 x 26px) */
+  html.hp-js .hp-stage { --sf: 0.34; --card-w: max(150px, min(88vw, 340px, calc((var(--zone-h) - 52px) / 1.02))); }
+  html.hp-js .hp-tilea { min-height: 54px; padding: 8px 12px; gap: 10px; }
+  html.hp-js .hp-ttag { max-width: 84px; padding: 3px 6px; font-size: 10px; }
+  html.hp-js .hp-tico { width: 32px; height: 32px; }
+  html.hp-js .hp-tp { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+}
+
+/* Телефоны средней высоты (741..840px): плитки компактные (одна строка
+   описания), иначе три плитки (до 276px у kk) не оставляют места карточке
+   в главе 5 и они налезают друг на друга (замер 390x800, 360x780, 375x812). */
+@media (prefers-reduced-motion: no-preference) and (min-height: 741px) and (max-height: 840px) and (max-width: 899px) {
+  html.hp-js .hp-stage { --card-w: max(150px, min(88vw, 340px, calc(var(--zone-h) * 0.9), calc((var(--zone-h) - 192px) * 2.1))); }
+  html.hp-js .hp-tilea { min-height: 54px; padding: 8px 12px; gap: 10px; }
+  html.hp-js .hp-ttag { max-width: 84px; padding: 3px 6px; font-size: 10px; }
+  html.hp-js .hp-tico { width: 32px; height: 32px; }
+  html.hp-js .hp-tp { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+}
+
+/* ------------------------------------------------------------- десктоп */
+@media (min-width: 900px) {
+  .hp-stage { padding-top: 40px; }
+  .hp-inner { max-width: 1240px; }
+  .hp-h { font-size: clamp(40px, 4.4vw, 60px); }
+  .hp-p { font-size: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (min-width: 900px) {
+  html.hp-js .hp-stage {
+    --top: 72px; --rail-h: 72px; --sf: 0.5;
+    --zone-h: calc(100 * var(--vh) - var(--top) - var(--rail-h) - 12px);
+    --card-w: min(520px, calc(var(--zone-h) * 0.96), 44vw);
+  }
+  html.hp-js .hp-inner {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: clamp(24px, 4vw, 72px);
+    max-width: 1240px; margin-inline: auto; padding: var(--top) clamp(24px, 4vw, 40px) 0; width: 100%;
+  }
+  html.hp-js .hp-copy { grid-column: 1; grid-row: 1; height: auto; align-self: center; padding-top: 0; max-width: 560px; }
+  html.hp-js .hp-obj { grid-column: 2; grid-row: 1; height: var(--zone-h); align-self: center; }
+  html.hp-js .hp-rail { grid-column: 1 / -1; grid-row: 2; height: var(--rail-h); padding-bottom: 20px; margin-top: 0; }
+  html.hp-js .hp-h { font-size: clamp(38px, 4.2vw, 58px); }
+  html.hp-js .hp-kick { margin-bottom: 14px; }
+  html.hp-js .hp-subs { margin-top: 18px; }
+  html.hp-js .hp-p { font-size: 18px; line-height: 1.5; }
+  html.hp-js .hp-note { font-size: 14px; }
+  html.hp-js .hp-cta { margin-top: 20px; gap: 8px 18px; }
+  html.hp-js .hp-btn { min-height: 52px; padding: 0 26px; font-size: 16px; }
+  html.hp-js .hp-link { font-size: 15px; }
+  html.hp-js .hp-seg { gap: 10px; }
+  html.hp-js .hp-seglabel { display: block; }
+  html.hp-js .hp-hint { left: 0; right: auto; width: 50%; bottom: calc(var(--rail-h) + 16px); align-items: flex-start; padding-left: clamp(24px, 4vw, 40px); }
+  html.hp-js .hp-tiles { max-width: 500px; }
+  html.hp-js .hp-tilea { min-height: 76px; padding: 14px 18px; gap: 14px; }
+  html.hp-js .hp-tn { font-size: 17px; }
+  html.hp-js .hp-tp { font-size: 13.5px; }
+  html.hp-js .hp-ttag { font-size: 11.5px; max-width: 92px; }
+}
+@media (min-width: 900px) and (max-height: 760px) and (min-height: 620px) and (prefers-reduced-motion: no-preference) {
+  html.hp-js .hp-tilea { min-height: 62px; padding: 10px 16px; }
+  html.hp-js .hp-tp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
+/* Большие мониторы: сцена шире и крупнее, чтобы не тонула в полях. */
+@media (min-width: 1500px) {
+  .hp-root .hp-inner { max-width: 1560px; }
+  .hp-root .hp-top { padding-inline: max(40px, calc((100vw - 1560px) / 2 + 40px)); }
+}
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (min-width: 1500px) {
+  html.hp-js .hp-inner { max-width: 1560px; }
+  html.hp-js .hp-stage { --card-w: min(600px, calc(var(--zone-h) * 0.96), 44vw); }
+  html.hp-js .hp-h { font-size: clamp(56px, 3.8vw, 76px); }
+  html.hp-js .hp-copy { max-width: 700px; }
+  html.hp-js .hp-p { font-size: 21px; }
+  html.hp-js .hp-note { font-size: 15px; }
+  html.hp-js .hp-tiles { max-width: 580px; }
+  html.hp-js .hp-tn { font-size: 19px; }
+  html.hp-js .hp-tp { font-size: 15px; }
+  html.hp-js .hp-ttag { font-size: 12.5px; max-width: 104px; }
+}
+@media (max-width: 430px) {
+  .hp-root .hp-top { gap: 6px; padding: 0 12px; }
+  .hp-root .hp-lang button { padding: 0 7px; font-size: 12px; }
+  .hp-root .hp-login { padding: 0 11px; font-size: 12.5px; }
+}
+/* Высота колонки текста (--copy-h) = самый длинный текст сцены (интро с
+   кнопками) + запас 6-10px, измерено на 320..768px по ширине (при подключённых
+   шрифтах сайта). У kk и en интро длиннее, поэтому ступени по языку; ru с
+   запасом на любой ширине до 430px. Проверяет copy-fit в скрипте QA и
+   ступени в scrub.test.ts. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (min-width: 431px) {
+  html.hp-js .hp-stage { --copy-h: 262px; }
+  html.hp-js .hp-root[data-lang="kk"] .hp-stage, html.hp-js .hp-root[data-lang="en"] .hp-stage { --copy-h: 286px; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (max-width: 430px) {
+  html.hp-js .hp-stage { --copy-h: 272px; }
+  html.hp-js .hp-root[data-lang="kk"] .hp-stage, html.hp-js .hp-root[data-lang="en"] .hp-stage { --copy-h: 290px; }
+  html.hp-js .hp-btn { padding: 0 14px; font-size: 13.5px; }
+  html.hp-js .hp-link { font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (min-width: 360px) and (max-width: 430px) {
+  html.hp-js .hp-root[data-lang="kk"] .hp-stage, html.hp-js .hp-root[data-lang="en"] .hp-stage { --copy-h: 276px; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) and (min-width: 390px) and (max-width: 430px) {
+  html.hp-js .hp-root[data-lang="kk"] .hp-stage, html.hp-js .hp-root[data-lang="en"] .hp-stage { --copy-h: 286px; }
+}
+@media (max-width: 359px) {
+  .hp-root .hp-tn { font-size: 13px; }
+  .hp-root .hp-top { gap: 4px; padding: 0 10px; }
+  .hp-root .hp-logo svg { height: 11px; width: auto; }
+  .hp-root .hp-lang button { padding: 0 5px; }
+  .hp-root .hp-login { padding: 0 9px; }
+}
+@media (max-width: 380px) {
+  .hp-root .hp-h { font-size: 32px; }
+  .hp-root .hp-btn { padding: 0 16px; font-size: 14px; }
+  .hp-root .hp-link { font-size: 13px; }
+}
+@media print { .hp-root .hp-top { position: static; } }
