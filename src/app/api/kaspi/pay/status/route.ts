@@ -42,11 +42,20 @@ export async function GET(req: NextRequest) {
   if (!reqRow) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   let status = reqRow.status
+  // stage — подробнее, чем status, для страницы оплаты клиента API (Qutty kun):
+  // waiting — QR никто не трогал; scanning — покупатель открыл QR в Kaspi и
+  // подтверждает; failed — покупатель отменил или оплата не прошла, этот QR
+  // мёртв, нужен новый. status при этом остаётся прежним (pending/paid/expired):
+  // поле добавлено, старые интеграции его просто не читают.
+  let stage: 'waiting' | 'scanning' | 'failed' | 'paid' | 'expired' =
+    status === 'paid' ? 'paid' : status === 'pending' ? 'waiting' : 'expired'
   if (status === 'pending') {
     try {
       const outcome = await checkAndSettleKaspiPayment(reqRow)
-      if (outcome === 'paid') status = 'paid'
-      else if (outcome === 'expired') status = 'expired'
+      if (outcome === 'paid') status = stage = 'paid'
+      else if (outcome === 'expired') status = stage = 'expired'
+      else if (outcome === 'scanning') stage = 'scanning'
+      else if (outcome === 'failed') stage = 'failed'
     } catch (e: any) {
       // Fail open with the last-known DB status — the caller can just poll
       // again; the daily cron is the backstop if they never do.
@@ -59,6 +68,7 @@ export async function GET(req: NextRequest) {
     order_id: reqRow.order_id,
     amount: reqRow.amount,
     status,
+    stage,
     paid: status === 'paid',
   })
 }

@@ -56,6 +56,7 @@
           "order_id": { "type": "string", "example": "order_12345" },
           "amount": { "type": "number", "example": 10000 },
           "status": { "type": "string", "enum": ["pending", "paid", "expired"], "description": "pending — ожидает оплаты, paid — оплачен, expired — QR истёк без оплаты", "example": "paid" },
+          "stage": { "type": "string", "enum": ["waiting", "scanning", "failed", "paid", "expired"], "description": "Подробное состояние: waiting — QR ещё никто не открыл; scanning — покупатель открыл QR в Kaspi и подтверждает оплату (не заменяйте QR); failed — покупатель отменил или оплата не прошла, этот QR больше не сработает, создайте новый; paid — оплачен; expired — QR истёк", "example": "scanning" },
           "paid": { "type": "boolean", "example": true }
         }
       },

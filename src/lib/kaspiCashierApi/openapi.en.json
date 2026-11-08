@@ -56,6 +56,7 @@
           "order_id": { "type": "string", "example": "order_12345" },
           "amount": { "type": "number", "example": 10000 },
           "status": { "type": "string", "enum": ["pending", "paid", "expired"], "description": "pending — awaiting payment, paid — paid, expired — the QR code expired unpaid", "example": "paid" },
+          "stage": { "type": "string", "enum": ["waiting", "scanning", "failed", "paid", "expired"], "description": "Detailed state: waiting — nobody has opened the QR yet; scanning — the buyer opened the QR in Kaspi and is confirming (do not replace the QR); failed — the buyer cancelled or the payment failed, this QR will not work again, create a new one; paid — paid; expired — the QR expired", "example": "scanning" },
           "paid": { "type": "boolean", "example": true }
         }
       },
