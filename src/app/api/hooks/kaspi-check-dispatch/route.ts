@@ -28,12 +28,12 @@ const DISPATCH_WINDOW_MS = 5 * 60_000
 // KASPI_SHOP_GITHUB_PAT уже используется кнопкой «Применить сейчас»). Сам Kaspi опрашивает
 // по-прежнему раннер GitHub: с IP Vercel Kaspi отвечает отказом.
 //
-// Защита: если в окружении задан KASPI_CHECK_DISPATCH_SECRET, нужен заголовок
-// x-internal-secret с тем же значением; без него, как у welcome-instant, вызов открыт, но
-// безвреден: запуск только когда есть что проверять, не чаще раза в 5 минут (слот в базе) и
-// не чаще раза в минуту на инстанс. Ответ только счётчики.
+// Защита: общий секрет pg_cron-вызовов HOOKS_PG_NET_SECRET (как у welcome-instant): задание
+// в базе берёт его из Vault (hooks_pg_net_secret) и шлёт в заголовке x-internal-secret.
+// Сверх этого запуск только когда есть что проверять, не чаще раза в 5 минут (слот в базе)
+// и не чаще раза в минуту на инстанс. Ответ только счётчики.
 export async function POST(req: NextRequest) {
-  if (!hookSecretOk(req.headers, process.env.KASPI_CHECK_DISPATCH_SECRET)) {
+  if (!hookSecretOk(req.headers)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (throttled('kaspi-check-dispatch', 60_000)) return NextResponse.json({ ok: true, throttled: true })

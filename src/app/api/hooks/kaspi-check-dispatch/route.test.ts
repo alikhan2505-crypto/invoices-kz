@@ -45,7 +45,7 @@ function call(headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   resetThrottle()
-  delete process.env.KASPI_CHECK_DISPATCH_SECRET
+  delete process.env.HOOKS_PG_NET_SECRET
   process.env.KASPI_SHOP_GITHUB_PAT = 'gh-token'
   h.due = [{ id: 'p1' }]
   h.dueError = null
@@ -123,7 +123,7 @@ describe('POST /api/hooks/kaspi-check-dispatch', () => {
   })
 
   it('with a secret configured the header is required', async () => {
-    process.env.KASPI_CHECK_DISPATCH_SECRET = 's3cret'
+    process.env.HOOKS_PG_NET_SECRET = 's3cret'
     expect((await call()).status).toBe(401)
     expect((await call({ 'x-internal-secret': 'wrong' })).status).toBe(401)
     expect((await call({ 'x-internal-secret': 's3cret' })).status).toBe(200)

@@ -5,11 +5,8 @@
 -- маршрут сам смотрит, есть ли что проверять, и только тогда запускает workflow
 -- (workflow_dispatch, токен KASPI_SHOP_GITHUB_PAT). Расписание GitHub остаётся запасным.
 --
--- СЕКРЕТ необязателен и пока не используется: заголовка x-internal-secret задание не шлёт.
--- Если в Vercel задать KASPI_CHECK_DISPATCH_SECRET, маршрут начнёт требовать этот заголовок;
--- тогда добавить его в задание, читая значение из Vault, как в ig_dm_reminders_cron.sql.
--- Без переменной вызов открыт, но безвреден: запуск только когда есть что проверять и не
--- чаще раза в 5 минут (слот в базе).
+-- СЕКРЕТ: тот же, что у welcome-instant (Vault: hooks_pg_net_secret, в Vercel
+-- HOOKS_PG_NET_SECRET). Значение в миграции не хранится, команда читает его из Vault.
 --
 -- Применять ПОСЛЕ деплоя кода (до него маршрут отвечает 404). Идемпотентно.
 create extension if not exists pg_cron with schema pg_catalog;
@@ -22,7 +19,13 @@ select cron.schedule(
   '*/10 * * * *',
   $$ select net.http_post(
        url := 'https://invoices.kz/api/hooks/kaspi-check-dispatch',
-       headers := jsonb_build_object('Content-Type', 'application/json'),
+       headers := jsonb_build_object(
+         'Content-Type', 'application/json',
+         'x-internal-secret', coalesce(
+           (select decrypted_secret from vault.decrypted_secrets where name = 'hooks_pg_net_secret' limit 1),
+           ''
+         )
+       ),
        body := '{}'::jsonb,
        timeout_milliseconds := 30000
      ); $$
