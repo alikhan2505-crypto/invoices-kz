@@ -356,6 +356,31 @@ export type ApplyOffers =
   | { perCityOffers: Record<string, CompetitorOffer[]> }
   | { competitorOffers: CompetitorOffer[] }
 
+// Живая цена НАШЕГО предложения на Kaspi: в публичном списке предложений рядом с
+// конкурентами есть и наше (по merchantId). Продавец мог поменять цену руками в кабинете
+// Kaspi, а в нашей базе осталась старая: бот сравнивал целевую цену с базой, решал «без
+// изменений» и не отправлял цену (тест на магазине основателя 08.11.2026: в Kaspi 750,
+// в базе 613, цель 613, цена так и осталась 750). Нет нашего предложения в списке
+// (снято с продажи, город не отдан) -- null, и работаем по базе, как раньше.
+function liveOwnPrice(offers: CompetitorOffer[] | null | undefined, merchantId: unknown): number | null {
+  const mine = String(merchantId ?? '')
+  if (!mine) return null
+  const prices = (offers || [])
+    .filter(o => String(o.merchantId) === mine && Number.isFinite(Number(o.price)) && Number(o.price) > 0)
+    .map(o => Number(o.price))
+  return prices.length > 0 ? Math.min(...prices) : null
+}
+
+// Kaspi применяет загруженную цену не сразу («обычно в течение часа»). Пока с отправки в
+// город прошло меньше этого времени, публичный список может показывать старую цену, и
+// живой цене верить нельзя: иначе та же цена уйдёт и будет оплачена повторно.
+const LIVE_PRICE_TRUST_AFTER_PUSH_MS = 60 * 60_000
+function pushedRecently(lastPushedAt: unknown, now: number = Date.now()): boolean {
+  if (!lastPushedAt) return false
+  const t = Date.parse(String(lastPushedAt))
+  return Number.isFinite(t) && now - t < LIVE_PRICE_TRUST_AFTER_PUSH_MS
+}
+
 // Вызов пуша, который не бросает: любое исключение внутри (сеть, разбор
 // ответа Kaspi) -- это обычный «не отправлено», а не падение всего цикла.
 async function safePush(params: Parameters<typeof pushProductPrices>[0]): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
@@ -487,7 +512,8 @@ export async function applyPriceCheckResult(
     return
   }
 
-  const ownPriceBefore = Number(product.own_current_price)
+  // let: при расхождении с живой ценой Kaspi (см. liveOwnPrice) «цена до» берётся с Kaspi.
+  let ownPriceBefore = Number(product.own_current_price)
 
   // Проверка не состоялась: Kaspi не ответил, ответ пуст или у товара битая
   // настройка (пол не положительное число -- такой товар ничего не должен
@@ -568,16 +594,62 @@ export async function applyPriceCheckResult(
     const excludedMerchants: string[] = [...(product.excluded_merchant_ids || []), connection.merchant_id]
     const { data: cityRows } = await supabase
       .from('kaspi_shop_product_city_prices')
-      .select('city_code, own_current_price, no_competitor_streak')
+      .select('city_code, own_current_price, no_competitor_streak, last_pushed_at')
       .eq('tracked_product_id', trackedProductId)
     const currentCityPrices: Record<string, number> = {}
     const currentCityStreaks: Record<string, number> = {}
+    const pushedRecentlyByCity: Record<string, boolean> = {}
     for (const c of cityRows || []) {
       currentCityPrices[c.city_code] = Number(c.own_current_price)
       currentCityStreaks[c.city_code] = Number(c.no_competitor_streak) || 0
+      pushedRecentlyByCity[c.city_code] = pushedRecently(c.last_pushed_at)
     }
 
     const cityOffersList: CityOffers[] = Object.entries(offers.perCityOffers).map(([cityCode, cityOffers]) => ({ cityCode, offers: cityOffers }))
+
+    // Живая цена с Kaspi важнее записи в базе: строку города, которая разошлась с ней,
+    // исправляем сразу (база только кэш), решение принимаем от живой цены. Исключение:
+    // цену в этот город мы отправили совсем недавно, Kaspi мог ещё не применить импорт и
+    // показывать старую (иначе повторная отправка и повторное списание), там верим базе.
+    const syncedAt = new Date().toISOString()
+    let liveSeen = false
+    for (const { cityCode, offers: cityOffers } of cityOffersList) {
+      const live = liveOwnPrice(cityOffers, connection.merchant_id)
+      if (live === null) continue
+      const known = currentCityPrices[cityCode]
+      if (known === undefined) {
+        // Строки города нет, а наше предложение в нём уже стоит: заводим строку по живой
+        // цене. Если цель совпала с ней, отправлять нечего (не платить за то, чего не было).
+        const { error: createError } = await supabase
+          .from('kaspi_shop_product_city_prices')
+          .insert({ tracked_product_id: trackedProductId, city_code: cityCode, own_current_price: live, no_competitor_streak: 0 })
+        if (createError) {
+          console.error('kaspi-shop checkCycle: city row create from live price failed for product', trackedProductId, 'city', cityCode, ':', createError.message)
+        } else {
+          currentCityPrices[cityCode] = live
+          currentCityStreaks[cityCode] = 0
+          liveSeen = true
+        }
+        continue
+      }
+      if (pushedRecentlyByCity[cityCode]) continue
+      liveSeen = true
+      if (known === live) continue
+      currentCityPrices[cityCode] = live
+      const { error: syncError } = await supabase
+        .from('kaspi_shop_product_city_prices')
+        .update({ own_current_price: live, updated_at: syncedAt })
+        .eq('tracked_product_id', trackedProductId)
+        .eq('city_code', cityCode)
+      if (syncError) console.error('kaspi-shop checkCycle: stale city row sync failed for product', trackedProductId, 'city', cityCode, ':', syncError.message)
+    }
+    if (liveSeen) {
+      // «Цена до» для журнала и списания считаем от живых данных каждый цикл, а не только в
+      // тот, где нашли расхождение: иначе после неудачной отправки следующий цикл писал бы в
+      // историю устаревшую цену товара.
+      const known = cityOffersList.map(c => currentCityPrices[c.cityCode]).filter((p): p is number => Number.isFinite(p))
+      if (known.length > 0) ownPriceBefore = Math.min(...known)
+    }
     const results = computePerCityReprice({
       cityOffers: cityOffersList,
       excludedMerchantIds: excludedMerchants,
@@ -728,6 +800,17 @@ export async function applyPriceCheckResult(
     }
   } else {
     const competitorOffers = offers && 'competitorOffers' in offers ? offers.competitorOffers : null
+    // Цена, которая сейчас на Kaspi (см. liveOwnPrice): от неё считаем «изменилась ли цена».
+    let liveOwn = liveOwnPrice(competitorOffers, connection.merchant_id)
+    if (liveOwn !== null) {
+      // Цену отправляли совсем недавно: верим базе (см. LIVE_PRICE_TRUST_AFTER_PUSH_MS).
+      const { data: pushRows } = await supabase
+        .from('kaspi_shop_product_city_prices')
+        .select('last_pushed_at')
+        .eq('tracked_product_id', trackedProductId)
+      if ((pushRows || []).some((r: any) => pushedRecently(r.last_pushed_at))) liveOwn = null
+    }
+    if (liveOwn !== null) ownPriceBefore = liveOwn
     // Same self-exclusion as the perCityOffers branch above -- see comment
     // there.
     const excludedMerchants: string[] = [...(product.excluded_merchant_ids || []), connection.merchant_id]
@@ -785,6 +868,19 @@ export async function applyPriceCheckResult(
           }
         }
       }
+      // Цель уже стоит на Kaspi (продавец поставил её руками), а строки городов помнят
+      // старую цену: исправляем строки и не отправляем то, что уже есть (иначе 5 ₸ за
+      // изменение, которого не было).
+      if (!rowsCreated && liveOwn !== null && liveOwn === price && cityRowList.some(r => Number(r.own_current_price) !== liveOwn)) {
+        const syncedAt = new Date().toISOString()
+        const { error: syncError } = await supabase
+          .from('kaspi_shop_product_city_prices')
+          .update({ own_current_price: liveOwn, updated_at: syncedAt })
+          .eq('tracked_product_id', trackedProductId)
+          .in('city_code', cityRowList.map(r => r.city_code))
+        if (syncError) console.error('kaspi-shop checkCycle: stale city rows sync failed for product', trackedProductId, ':', syncError.message)
+        cityRowList = cityRowList.map(r => ({ ...r, own_current_price: liveOwn }))
+      }
       const excludedCities: string[] = product.excluded_city_codes || []
       const citiesToPush = cityRowList.filter(c => !excludedCities.includes(c.city_code))
 
@@ -802,14 +898,18 @@ export async function applyPriceCheckResult(
             floorPrice: floorNumber,
             maxPrice,
             strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
-            ownCurrentPrice: Number(city.own_current_price ?? ownPriceBefore),
+            // Живая цена (если известна) одна для всех городов: цель и «цена до» считаются от неё.
+            ownCurrentPrice: liveOwn ?? Number(city.own_current_price ?? ownPriceBefore),
             noCompetitorStreak,
           })
           legacyCityPrices[city.city_code] = cityCandidate.price
           if (Number(city.own_current_price) !== cityCandidate.price) desynced = true
         }
 
-        if (priceChanged || desynced || rowsCreated) {
+        // Строки только что созданы: Kaspi-сторона неизвестна и отправка обязательна, КРОМЕ случая, когда
+        // живая цена с Kaspi уже равна цели (платить за изменение, которого нет, нельзя).
+        const kaspiAlreadyHasTarget = liveOwn !== null && liveOwn === price
+        if (priceChanged || desynced || (rowsCreated && !kaspiAlreadyHasTarget)) {
           const { data: connProducts } = await supabase
             .from('kaspi_shop_tracked_products')
             .select('id')

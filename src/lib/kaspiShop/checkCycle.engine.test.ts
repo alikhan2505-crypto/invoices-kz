@@ -862,3 +862,136 @@ describe('applyPriceCheckResult: per-city branch, city without a row (review 07.
     expect(h.tables.kaspi_shop_product_city_prices.map((r: any) => r.city_code).sort()).toEqual(['A', 'B'])
   })
 })
+
+// Живая цена нашего предложения на Kaspi важнее записи в базе (тест на магазине основателя
+// 08.11.2026): продавец поменял цену руками, база осталась прежней, бот молчал.
+describe('applyPriceCheckResult: живая цена Kaspi вместо устаревшей записи в базе', () => {
+  const mine = (price: number) => ({ merchantId: 'M1', price })
+  const rival = (price: number) => ({ merchantId: 'X', price })
+
+  it('legacy: база помнит цель (800), на Kaspi руками поставлено 1000: цена отправляется, одно списание, «до» = 1000', async () => {
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 800, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(1000), rival(900)] }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+    expect(h.debits[0].note).toBe('Изменение цены: Тест 1000 → 800 ₸')
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1, own_price_before: 1000, own_price_after: 800 })
+    expect(product().own_current_price).toBe(800)
+  })
+
+  it('legacy: на Kaspi уже стоит цель (800), база помнит 1000: строки исправлены, ничего не отправлено, бесплатно', async () => {
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(800), rival(900)] }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0, own_price_before: 800, own_price_after: 800 })
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(800)
+    expect(product().own_current_price).toBe(800)
+  })
+
+  it('legacy: нашего предложения в списке нет (снято с продажи): работаем по базе, как раньше', async () => {
+    await applyPriceCheckResult('p1', { competitorOffers: [rival(900)] }, null)
+    expect(checks()[0]).toMatchObject({ action: 'updated', own_price_before: 1000, own_price_after: 800 })
+  })
+
+  it('legacy: предложение другого продавца с похожим номером не принимается за наше', async () => {
+    await applyPriceCheckResult('p1', { competitorOffers: [{ merchantId: 'M10', price: 1000 }, rival(900)] }, null)
+    expect(checks()[0]).toMatchObject({ own_price_before: 1000 })
+    expect(h.pushCalls).toHaveLength(1)
+  })
+
+  it('по городам: база помнит цель (800), на Kaspi 1000: цена отправляется, «до» = 1000, одно списание', async () => {
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(1000), rival(900)] } }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1, own_price_before: 1000, own_price_after: 800 })
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(800)
+  })
+
+  it('по городам: на Kaspi уже цель (800), база помнит 1000: строка исправлена, ничего не отправлено, бесплатно', async () => {
+    seed({ cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 1000, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(800), rival(900)] } }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(800)
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
+    expect(product().own_current_price).toBe(800)
+  })
+
+  it('по городам: неудачная отправка при расхождении оставляет в базе живую цену Kaspi, а не старую запись', async () => {
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0 }] })
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 429' }
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(1000), rival(900)] } }, null)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(1000)
+    expect(checks()[0]).toMatchObject({ action: 'push_failed', credit_cost: 0, own_price_before: 1000, own_price_after: 1000 })
+    expect(h.debits).toHaveLength(0)
+  })
+  it('legacy: города считаются от живой цены, а не от старой строки: уходит та же цена, что записана в историю', async () => {
+    seed({ product: { own_current_price: 613, max_price: 700 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 613, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(750)] }, null)
+    const pushed = h.pushCalls[0]?.cityPrices?.find((c: any) => c.cityId === '750000000')?.value
+    expect(pushed).toBeDefined()
+    expect(checks()[0].own_price_before).toBe(750)
+    expect(pushed).toBe(checks()[0].own_price_after)
+  })
+
+  it('legacy: цену в город отправили меньше часа назад, а Kaspi ещё показывает старую: верим базе, повторной отправки и списания нет', async () => {
+    const justNow = new Date(Date.now() - 5 * 60_000).toISOString()
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 800, no_competitor_streak: 0, last_pushed_at: justNow }] })
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(1000), rival(900)] }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0, own_price_before: 800 })
+  })
+
+  it('legacy: отправка была больше часа назад, живая цена снова главнее', async () => {
+    const longAgo = new Date(Date.now() - 2 * 3600_000).toISOString()
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: '750000000', own_current_price: 800, no_competitor_streak: 0, last_pushed_at: longAgo }] })
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(1000), rival(900)] }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('по городам: цену в город отправили меньше часа назад, Kaspi показывает старую: верим базе, без повторной отправки', async () => {
+    const justNow = new Date(Date.now() - 5 * 60_000).toISOString()
+    seed({ product: { own_current_price: 800 }, cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0, last_pushed_at: justNow }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(1000), rival(900)] } }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(h.tables.kaspi_shop_product_city_prices[0].own_current_price).toBe(800)
+  })
+
+  it('по городам: после неудачной отправки следующий цикл пишет в историю живую цену, а не устаревшую цену товара', async () => {
+    // цикл 1 уже исправил строку до живой (1000), но отправка не прошла: цена товара в базе осталась 613
+    seed({ product: { own_current_price: 613 }, cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 1000, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(1000), rival(900)] } }, null)
+    expect(checks()[0]).toMatchObject({ action: 'updated', credit_cost: 1, own_price_before: 1000, own_price_after: 800 })
+    expect(h.debits[0].note).toBe('Изменение цены: Тест 1000 → 800 ₸')
+  })
+
+  it('по городам: строки города нет, а наше предложение уже стоит по цели: строка создаётся, отправки и списания нет', async () => {
+    seed({ cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(800), rival(900)], B: [mine(800), rival(900)] } }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(h.tables.kaspi_shop_product_city_prices.map((r: any) => r.city_code).sort()).toEqual(['A', 'B'])
+    expect(checks()[0]).toMatchObject({ action: 'no_change', credit_cost: 0 })
+  })
+
+  it('по городам: строки города нет, наше предложение стоит выше цели: цена отправляется, строка получает новую цену', async () => {
+    seed({ cityRows: [{ tracked_product_id: 'p1', city_code: 'A', own_current_price: 800, no_competitor_streak: 0 }] })
+    await applyPriceCheckResult('p1', { perCityOffers: { A: [mine(800), rival(900)], B: [mine(1000), rival(900)] } }, null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.pushCalls[0].cityPrices).toEqual([{ cityId: 'B', value: 800 }])
+    expect(h.tables.kaspi_shop_product_city_prices.find((r: any) => r.city_code === 'B').own_current_price).toBe(800)
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('legacy: строки только что созданы по точкам, а живая цена уже равна цели: отправки и списания нет', async () => {
+    seed({ product: { own_current_price: 800, point_city_codes: ['P1'] }, cityRows: [] })
+    await applyPriceCheckResult('p1', { competitorOffers: [mine(800), rival(900)] }, null)
+    expect(h.pushCalls).toHaveLength(0)
+    expect(h.debits).toHaveLength(0)
+    expect(h.tables.kaspi_shop_product_city_prices).toHaveLength(1)
+  })
+})
