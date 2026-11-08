@@ -180,6 +180,43 @@ describe('запись сессий', () => {
   })
 })
 
+describe('строка о записи (RecordingNotice)', () => {
+  it('видна гостю на публичной странице, пропадает при уходе в кабинет и сообщает подписчику', async () => {
+    const c = await load('/tools/schet')
+    const seen = vi.fn()
+    const off = c.subscribeReplayRequested(seen)
+    expect(c.isReplayRequested()).toBe(false)
+    c.startPosthog()
+    await flush()
+    expect(c.isReplayRequested()).toBe(true)
+    expect(seen).toHaveBeenCalledTimes(1)
+    c.trackNavigation('/dashboard')
+    expect(c.isReplayRequested()).toBe(false)
+    expect(seen).toHaveBeenCalledTimes(2)
+    off()
+    goTo('/guides/kak-vystavit-schet-ip')
+    c.trackNavigation('/guides/kak-vystavit-schet-ip')
+    c.routeCommitted('/guides/kak-vystavit-schet-ip')
+    expect(c.isReplayRequested()).toBe(true)
+    expect(seen).toHaveBeenCalledTimes(2)
+  })
+
+  it('не видна вошедшему и при «Не отслеживать»', async () => {
+    h.state.stored = true
+    const c = await load('/guides/kak-vystavit-schet-ip')
+    c.startPosthog()
+    c.setAnalyticsUser('user-1', 'INITIAL_SESSION')
+    await flush()
+    expect(c.isReplayRequested()).toBe(false)
+    vi.stubGlobal('navigator', { doNotTrack: '1' })
+    h.state.stored = false
+    const d = await load('/tools/schet')
+    d.startPosthog()
+    await flush()
+    expect(d.isReplayRequested()).toBe(false)
+  })
+})
+
 describe('запуск', () => {
   it('на странице с секретом в адресе не запускается, а на следующей запускается', async () => {
     const c = await load('/view/abc')

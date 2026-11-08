@@ -77,11 +77,33 @@ function loadRecorder(): Promise<boolean> {
   return recorder
 }
 
+// Строка «Мы записываем действия на сайте» (RecordingNotice) видна ровно тогда, когда запись
+// запрошена: гость на публичной странице, «не отслеживать» не включено.
+const replayListeners = new Set<() => void>()
+
+export function isReplayRequested(): boolean {
+  return replayRequested
+}
+
+export function subscribeReplayRequested(cb: () => void): () => void {
+  replayListeners.add(cb)
+  return () => {
+    replayListeners.delete(cb)
+  }
+}
+
 function applyReplay(): void {
   if (!ph) return
   const want = wantReplay()
   if (want === replayRequested) return
   replayRequested = want
+  replayListeners.forEach(cb => {
+    try {
+      cb()
+    } catch {
+      // подписчик не должен ломать запись
+    }
+  })
   if (!want) {
     try {
       ph.stopSessionRecording()

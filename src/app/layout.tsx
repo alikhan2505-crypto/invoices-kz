@@ -8,6 +8,7 @@ import HandoffBanner from '@/components/HandoffBanner'
 import NavAurora from '@/components/NavAurora'
 import { Analytics } from '@vercel/analytics/next'
 import AnalyticsRouteSync from '@/components/AnalyticsRouteSync'
+import RecordingNotice from '@/components/RecordingNotice'
 import StructuredData from '@/components/StructuredData'
 import { LANG_BOOT_SCRIPT, LANG_HOLD_CSS } from '@/lib/langResolve'
 
@@ -94,6 +95,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             <NavAurora />
             {children}
+            {/* Раскрытие записи сессий гостей (вопрос 34, 08.11.2026). */}
+            <RecordingNotice />
             <TopUtilityBar />
             <HandoffBanner />
             {/* Added 2026-09-04: the project had no visitor analytics of any
