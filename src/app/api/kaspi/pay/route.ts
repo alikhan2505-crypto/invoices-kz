@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByApiToken } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
-import { getWalletBalance, computeCommission } from '@/lib/kaspiPay/wallet'
+import { getWalletBalance, computeCommission, isCommissionExempt } from '@/lib/kaspiPay/wallet'
 import { isWebhookUrlShapeSafe } from '@/lib/kaspiPay/webhookSafety'
 
 const supabase = createClient(
@@ -59,10 +59,14 @@ export async function POST(req: NextRequest) {
   // holding a connection. Deliberately NOT applied to the polling cron: that
   // only resolves already-created requests (money that may already have
   // moved), so gating it would strand real payments.
-  const balance = await getWalletBalance(found.userId)
-  const required = computeCommission(Number(amount))
-  if (balance < required) {
-    return NextResponse.json({ error: 'insufficient_balance', required, balance }, { status: 402 })
+  // Освобождённая касса (commission_exempt, см. wallet.ts) комиссию не платит,
+  // поэтому и баланс ей не проверяем.
+  if (!(await isCommissionExempt(found.userId))) {
+    const balance = await getWalletBalance(found.userId)
+    const required = computeCommission(Number(amount))
+    if (balance < required) {
+      return NextResponse.json({ error: 'insufficient_balance', required, balance }, { status: 402 })
+    }
   }
 
   const { count: recentCount, error: rateError } = await supabase

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
-import { getWalletBalance, computeCommission } from '@/lib/kaspiPay/wallet'
+import { walletCoversCommission } from '@/lib/kaspiPay/wallet'
 import type { SettleableRequest } from '@/lib/kaspiPay/settlePayment'
 import { getPrintShopOwnerUserId } from './ownerAccount'
 import {
@@ -59,8 +59,7 @@ export async function getOrCreateKaspiPaymentForPrintOrder(order: {
   // «свежий». Уже выпущенный pending-платёж отдан выше и дальше опрашивается как раньше.
   if (!isOrderPayable(order)) return null
 
-  const balance = await getWalletBalance(ownerId)
-  if (balance < computeCommission(order.price)) return null
+  if (!(await walletCoversCommission(ownerId, order.price))) return null
 
   const { count: recentMints } = await supabase
     .from('kaspi_payment_requests')

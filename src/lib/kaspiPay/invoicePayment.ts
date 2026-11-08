@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from './connection'
 import { createPayment, createInvoiceByPhone } from './client'
-import { getWalletBalance, computeCommission } from './wallet'
+import { walletCoversCommission } from './wallet'
 import { checkAndSettleKaspiPayment, type SettleableRequest } from './settlePayment'
 
 const supabase = createClient(
@@ -103,8 +103,7 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   // payment, so an owner with insufficient balance keeps their still-valid
   // existing link (returned above) but gets no further payment created for
   // their invoices until they top up.
-  const balance = await getWalletBalance(invoice.user_id)
-  if (balance < computeCommission(Number(invoice.amount))) return null
+  if (!(await walletCoversCommission(invoice.user_id, Number(invoice.amount)))) return null
 
   const { count: recentMints, error: rateError } = await supabase
     .from('kaspi_payment_requests')
@@ -233,8 +232,7 @@ export async function createPhonePaymentForInvoice(
     }
   }
 
-  const balance = await getWalletBalance(invoice.user_id)
-  if (balance < computeCommission(Number(invoice.amount))) return { ok: false, reason: 'insufficient_balance' }
+  if (!(await walletCoversCommission(invoice.user_id, Number(invoice.amount)))) return { ok: false, reason: 'insufficient_balance' }
 
   const { count: recentPushes, error: rateError } = await supabase
     .from('kaspi_payment_requests')

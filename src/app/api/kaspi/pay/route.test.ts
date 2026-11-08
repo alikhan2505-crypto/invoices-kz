@@ -12,6 +12,8 @@ const h = vi.hoisted(() => ({
   inserted: [] as Record<string, unknown>[],
   connection: vi.fn(),
   createPayment: vi.fn(),
+  exempt: false,
+  balance: 100000,
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -31,7 +33,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 vi.mock('@/lib/kaspiPay/connection', () => ({ loadConnectionByApiToken: h.connection }))
 vi.mock('@/lib/kaspiPay/client', () => ({ createPayment: h.createPayment }))
-vi.mock('@/lib/kaspiPay/wallet', () => ({ getWalletBalance: async () => 100000, computeCommission: () => 20 }))
+vi.mock('@/lib/kaspiPay/wallet', () => ({ getWalletBalance: async () => h.balance, computeCommission: () => 20, isCommissionExempt: async () => h.exempt }))
 
 import { POST } from './route'
 
@@ -44,6 +46,8 @@ const good = { amount: 1000, order_id: 'ord-1' }
 
 beforeEach(() => {
   h.insertError = null
+  h.exempt = false
+  h.balance = 100000
   h.inserted = []
   h.connection.mockReset()
   h.connection.mockResolvedValue({ connection: {}, userId: 'u1', defaultWebhookUrl: null })
@@ -139,5 +143,22 @@ describe('POST /api/kaspi/pay', () => {
     const text = JSON.stringify(await res.json())
     expect(text).toBe('{"error":"tracking_failed"}')
     expect(text).not.toContain('kaspi_payment_requests')
+  })
+})
+
+describe('POST /api/kaspi/pay: баланс и касса без комиссии', () => {
+  it('обычная касса с балансом меньше 2%: 402, Kaspi не вызывается', async () => {
+    h.balance = 5
+    const res = await call(good)
+    expect(res.status).toBe(402)
+    expect(h.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('касса без комиссии с отрицательным балансом: платёж создаётся', async () => {
+    h.exempt = true
+    h.balance = -500
+    const res = await call(good)
+    expect(res.status).toBe(200)
+    expect(h.createPayment).toHaveBeenCalledOnce()
   })
 })

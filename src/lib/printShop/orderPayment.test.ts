@@ -35,7 +35,7 @@ vi.mock('@supabase/supabase-js', async () => {
 })
 vi.mock('@/lib/kaspiPay/connection', () => ({ loadConnectionByUserId: async () => h.connection }))
 vi.mock('@/lib/kaspiPay/client', () => ({ createPayment: h.createPayment }))
-vi.mock('@/lib/kaspiPay/wallet', () => ({ getWalletBalance: async () => h.balance, computeCommission: () => 10 }))
+vi.mock('@/lib/kaspiPay/wallet', () => ({ walletCoversCommission: async () => h.balance >= 10 }))
 vi.mock('./ownerAccount', () => ({ getPrintShopOwnerUserId: () => 'owner-1' }))
 
 import { getOrCreateKaspiPaymentForPrintOrder } from './orderPayment'

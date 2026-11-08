@@ -403,6 +403,16 @@ describe('платежи Kaspi', () => {
     expect(text.length).toBeLessThanOrEqual(RECONCILE_TEXT_BUDGET)
   })
 
+  it('касса без комиссии (commission_exempt): нет строки журнала — не находка; у обычной кассы — находка', async () => {
+    const r = await findUnappliedPayments(fakeDb({
+      kaspi_payment_requests: [req(), req({ id: 'k2', user_id: 'u2', kaspi_operation_id: 'op2' })],
+      invoices: [invoice()],
+      wallet_ledger: [],
+      kaspi_connections: [{ user_id: 'u1', commission_exempt: true }, { user_id: 'u2', commission_exempt: false }],
+    }), NOW)
+    expect(r.findings.filter(f => f.kind === 'commission').map(f => f.id)).toEqual(['k2'])
+  })
+
   it('заказ витрины, заказ печати и файлы печати: каждый по своей таблице', async () => {
     const r = await findUnappliedPayments(fakeDb({
       kaspi_payment_requests: [

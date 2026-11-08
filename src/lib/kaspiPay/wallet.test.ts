@@ -2,15 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const rpc = vi.fn()
 const insert = vi.fn()
+const exemptLookup = vi.fn()
+const balanceLookup = vi.fn()
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     rpc: (...args: unknown[]) => rpc(...args),
-    from: () => ({ insert: (...args: unknown[]) => insert(...args) }),
+    from: (table: string) => ({
+      insert: (...args: unknown[]) => insert(...args),
+      select: () => ({
+        eq: (column: string) => ({
+          maybeSingle: () => exemptLookup(table, column),
+          single: () => balanceLookup(table, column),
+        }),
+      }),
+    }),
   }),
 }))
 
-import { computeCommission, COMMISSION_RATE, debitWallet, debitWalletForCommission } from './wallet'
+import { computeCommission, COMMISSION_RATE, debitWallet, debitWalletForCommission, walletCoversCommission } from './wallet'
 
 describe('computeCommission', () => {
   it('is 2% of the amount', () => {
@@ -62,6 +72,8 @@ describe('debitWalletForCommission (unguarded by design)', () => {
     rpc.mockReset()
     insert.mockReset()
     insert.mockResolvedValue({ error: null })
+    exemptLookup.mockReset()
+    exemptLookup.mockResolvedValue({ data: { commission_exempt: false }, error: null })
   })
 
   it('still uses the unguarded RPC: the money already moved, so it may dip below zero', async () => {
@@ -69,5 +81,48 @@ describe('debitWalletForCommission (unguarded by design)', () => {
     const balance = await debitWalletForCommission('u1', 1000, null, 'n')
     expect(rpc).toHaveBeenCalledWith('debit_wallet_balance', { p_user_id: 'u1', p_amount: 20 })
     expect(balance).toBe(-3)
+  })
+})
+
+describe('commission exemption (commission_exempt)', () => {
+  beforeEach(() => {
+    rpc.mockReset()
+    insert.mockReset()
+    exemptLookup.mockReset()
+    balanceLookup.mockReset()
+  })
+
+  it('an exempt connection is not debited and gets no ledger row', async () => {
+    exemptLookup.mockResolvedValue({ data: { commission_exempt: true }, error: null })
+    const result = await debitWalletForCommission('u1', 1000, null, 'n')
+    expect(result).toBeNull()
+    expect(exemptLookup).toHaveBeenCalledWith('kaspi_connections', 'user_id')
+    expect(rpc).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('an exempt connection passes the mint gate even with a negative balance', async () => {
+    exemptLookup.mockResolvedValue({ data: { commission_exempt: true }, error: null })
+    balanceLookup.mockResolvedValue({ data: { kaspi_wallet_balance: -500 }, error: null })
+    expect(await walletCoversCommission('u1', 100000)).toBe(true)
+  })
+
+  it('a normal connection still needs the balance to cover 2%', async () => {
+    exemptLookup.mockResolvedValue({ data: { commission_exempt: false }, error: null })
+    balanceLookup.mockResolvedValue({ data: { kaspi_wallet_balance: 19 }, error: null })
+    expect(await walletCoversCommission('u1', 1000)).toBe(false)
+    balanceLookup.mockResolvedValue({ data: { kaspi_wallet_balance: 20 }, error: null })
+    expect(await walletCoversCommission('u1', 1000)).toBe(true)
+  })
+
+  it('no active connection row means no exemption', async () => {
+    exemptLookup.mockResolvedValue({ data: null, error: null })
+    balanceLookup.mockResolvedValue({ data: { kaspi_wallet_balance: 0 }, error: null })
+    expect(await walletCoversCommission('u1', 1000)).toBe(false)
+  })
+
+  it('a lookup error throws instead of silently granting or denying', async () => {
+    exemptLookup.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    await expect(walletCoversCommission('u1', 1000)).rejects.toThrow(/boom/)
   })
 })

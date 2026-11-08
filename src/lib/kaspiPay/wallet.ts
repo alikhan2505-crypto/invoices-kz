@@ -48,7 +48,34 @@ export async function creditWallet(userId: string, amount: number, topupId: stri
 // Postgres function does the check-free debit in one statement; going
 // negative here is an accepted outcome (see Global Constraints — gating
 // happens at mint time, not here), not a bug to guard against.
-export async function debitWalletForCommission(userId: string, amount: number, kaspiPaymentRequestId: string | null, note?: string): Promise<number> {
+// Касса с kaspi_connections.commission_exempt = true не платит 2%. Флаг ставит
+// только админ, прямо в базе, без интерфейса. Так помечена касса основателя:
+// комиссия с его же кошелька самому себе бессмысленна, и через эту кассу
+// по /api/kaspi/pay принимает оплату Qutty kun (решение основателя 08.11.2026).
+export async function isCommissionExempt(userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('kaspi_connections')
+    .select('commission_exempt')
+    // Без фильтра по статусу: касса, временно припаркованная в 'error', всё
+    // равно освобождена (ручное подтверждение оплаты списывает комиссию и без
+    // активной кассы). user_id уникален, строка максимум одна.
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw new Error(`commission exemption lookup failed for user ${userId}: ${error.message}`)
+  return data?.commission_exempt === true
+}
+
+// Единая проверка перед выпуском НОВОГО платежа: хватает ли кошелька на 2%.
+// Освобождённой кассе хватает всегда, даже при отрицательном балансе.
+export async function walletCoversCommission(userId: string, amount: number): Promise<boolean> {
+  if (await isCommissionExempt(userId)) return true
+  const balance = await getWalletBalance(userId)
+  return balance >= computeCommission(amount)
+}
+
+// null — касса освобождена от комиссии, ничего не списано и в журнал не записано.
+export async function debitWalletForCommission(userId: string, amount: number, kaspiPaymentRequestId: string | null, note?: string): Promise<number | null> {
+  if (await isCommissionExempt(userId)) return null
   const commission = computeCommission(amount)
   const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: commission })
   if (error) throw new Error(`wallet commission debit failed for user ${userId}: ${error.message}`)

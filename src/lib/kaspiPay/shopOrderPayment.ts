@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from './connection'
 import { createPayment } from './client'
-import { getWalletBalance, computeCommission } from './wallet'
+import { walletCoversCommission } from './wallet'
 import type { SettleableRequest } from './settlePayment'
 
 const supabase = createClient(
@@ -53,8 +53,7 @@ export async function getOrCreateKaspiPaymentForShopOrder(order: {
 
   if (order.status && CLOSED_ORDER_STATUSES.has(order.status)) return null
 
-  const balance = await getWalletBalance(order.connectionOwnerId)
-  if (balance < computeCommission(Number(order.amount))) return null
+  if (!(await walletCoversCommission(order.connectionOwnerId, Number(order.amount)))) return null
 
   const { count: recentMints, error: rateError } = await supabase
     .from('kaspi_payment_requests')

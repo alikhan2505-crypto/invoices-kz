@@ -85,7 +85,7 @@ export const ackKind = (paymentId: string, kind?: ReconcileKind) =>
 // Ровно те операторы запроса, которыми пользуется сверка (так их проще
 // подменить в тесте и не тянуть типы построителя запросов).
 interface QueryLike {
-  eq(column: string, value: string): QueryLike
+  eq(column: string, value: string | boolean): QueryLike
   in(column: string, values: string[]): QueryLike
   gte(column: string, value: string): QueryLike
   limit(n: number): PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
@@ -346,14 +346,23 @@ async function kaspiRequests(sb: SupabaseClient, windowStart: Date, settledBefor
   // --- комиссия ---
   // Комиссия 2% списывается один раз при подтверждении; признак — строка
   // журнала по id запроса либо по примечанию kaspi_operation:<id> (так её
-  // находит и выписка Kaspi).
+  // находит и выписка Kaspi). Касса с commission_exempt комиссию не платит
+  // и строк журнала не получает (wallet.ts), её оплаты здесь не сверяем.
+  const exempt = await selectIn<{ user_id: string }>(
+    sb, 'kaspi_connections', 'user_id', 'user_id', due.flatMap(r => (r.user_id ? [r.user_id] : [])), q => q.eq('commission_exempt', true),
+  )
+  if (exempt.error) part.errors.push(exempt.error)
+  if (exempt.failed) return part
+  const exemptUsers = new Set(exempt.rows.map(c => c.user_id))
+  const chargeable = due.filter(r => !(r.user_id && exemptUsers.has(r.user_id)))
+  if (!chargeable.length) return part
   const byRequest = await selectIn<{ kaspi_payment_request_id: string }>(
-    sb, 'wallet_ledger', 'kaspi_payment_request_id', 'kaspi_payment_request_id', due.map(r => r.id), q => q.eq('type', 'commission'),
+    sb, 'wallet_ledger', 'kaspi_payment_request_id', 'kaspi_payment_request_id', chargeable.map(r => r.id), q => q.eq('type', 'commission'),
   )
   if (byRequest.error) part.errors.push(byRequest.error)
   if (byRequest.failed) return part
   const charged = new Set(byRequest.rows.map(l => l.kaspi_payment_request_id))
-  const rest = due.filter(r => !charged.has(r.id) && r.kaspi_operation_id)
+  const rest = chargeable.filter(r => !charged.has(r.id) && r.kaspi_operation_id)
   if (!rest.length) return part
   const byNote = await selectIn<{ note: string }>(
     sb, 'wallet_ledger', 'note', 'note', rest.map(r => `kaspi_operation:${r.kaspi_operation_id}`), q => q.eq('type', 'commission'),
