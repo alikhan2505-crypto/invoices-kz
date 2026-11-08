@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByApiToken } from '@/lib/kaspiPay/connection'
-import { createPayment } from '@/lib/kaspiPay/client'
+import { createPayment, describeNetworkError } from '@/lib/kaspiPay/client'
 import { getWalletBalance, computeCommission, isCommissionExempt } from '@/lib/kaspiPay/wallet'
 import { isWebhookUrlShapeSafe } from '@/lib/kaspiPay/webhookSafety'
 
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       expire_date: payment.expiresAt,
     })
   } catch (e: any) {
-    console.error('Kaspi pay create error:', e.message)
+    console.error('Kaspi pay create error:', describeNetworkError(e))
     return NextResponse.json({ error: 'kaspi_unavailable' }, { status: 502 })
   }
 }

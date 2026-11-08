@@ -26,6 +26,43 @@ import { deriveGeoLocation, deriveClientIp } from './deviceContext'
 // again on the next run.
 export class KaspiAuthError extends Error {}
 
+// 08.11.2026: запрос к qrpay.kaspi.kz однажды повис ~12 с и упал «fetch failed»
+// (соединение не установилось), а повтор через 15 с прошёл за 1 с. Без своего
+// предела ждём системный таймаут соединения (~10 с), пока покупатель смотрит
+// на пустую страницу. Обычный ответ Kaspi приходит за ~1 с.
+export const KASPI_REQUEST_TIMEOUT_MS = 5000
+
+// Сетевой сбой (соединение не установилось/оборвалось, наш таймаут) — в отличие
+// от ответа Kaspi с ошибкой, который повторять бессмысленно.
+export function isNetworkFailure(e: unknown): boolean {
+  const name = (e as { name?: string } | null)?.name
+  return e instanceof TypeError || name === 'AbortError' || name === 'TimeoutError'
+}
+
+// Один повтор при сетевом сбое. attempt(signal) каждый раз заново строит
+// подписанные заголовки (в них время и одноразовый код). Повтор безопасен для
+// создания QR: если первый запрос всё же дошёл до Kaspi, лишний QR никому не
+// показан, оплатить его нельзя, и он сам истечёт.
+export async function withNetworkRetry<T>(
+  attempt: (signal: AbortSignal) => Promise<T>,
+  timeoutMs = KASPI_REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  try {
+    return await attempt(AbortSignal.timeout(timeoutMs))
+  } catch (e) {
+    if (!isNetworkFailure(e)) throw e
+    console.error('Kaspi network failure, retrying once:', describeNetworkError(e))
+    return await attempt(AbortSignal.timeout(timeoutMs))
+  }
+}
+
+// «fetch failed» сам по себе ничего не говорит; причина лежит в e.cause.
+export function describeNetworkError(e: unknown): string {
+  const err = e as { name?: string; message?: string; cause?: { code?: string; message?: string } } | null
+  const cause = err?.cause ? ` (${err.cause.code ?? ''} ${err.cause.message ?? ''})`.replace('( ', '(') : ''
+  return `${err?.name ?? 'Error'}: ${err?.message ?? String(e)}${cause}`
+}
+
 const KASPI_ENTRANCE_URL = 'https://entrance-pay.kaspi.kz'
 const KASPI_MTOKEN_URL = 'https://mtoken.kaspi.kz'
 const KASPI_QRPAY_URL = 'https://qrpay.kaspi.kz'
@@ -326,9 +363,11 @@ export async function createPayment(
     Latitude: latitude,
     Longitude: longitude,
   })
-  const headers = { ...buildSignedHeaders(url, connection, payload), 'Content-Type': 'application/json' }
-  const res = await fetch(url, { method: 'POST', headers, body: payload })
-  const json = await res.json()
+  const json = await withNetworkRetry(async (signal) => {
+    const headers = { ...buildSignedHeaders(url, connection, payload), 'Content-Type': 'application/json' }
+    const res = await fetch(url, { method: 'POST', headers, body: payload, signal })
+    return res.json()
+  })
   const d = json.Data
   if (!d?.QrOperationId) throw new Error('Kaspi qr-token/create failed: ' + JSON.stringify(json))
 
@@ -456,7 +495,8 @@ export async function checkStatus(
   operationId: string
 ): Promise<{ status: 'pending' | 'paid' | 'expired' | 'failed' | 'scanning' }> {
   const url = `${KASPI_QRPAY_URL}/v02/kaspi-qr/status?qrOperationId=${operationId}`
-  const res = await fetch(url, { headers: buildSignedHeaders(url, connection) })
+  // Без повтора: статус опрашивают каждые несколько секунд, следующий опрос и есть повтор.
+  const res = await fetch(url, { headers: buildSignedHeaders(url, connection), signal: AbortSignal.timeout(KASPI_REQUEST_TIMEOUT_MS) })
 
   // 401/403 = Kaspi refused this connection's signed request, not "the
   // payment isn't done yet". Without this the poller read the missing

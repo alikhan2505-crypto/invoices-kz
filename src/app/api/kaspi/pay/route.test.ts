@@ -32,7 +32,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }))
 vi.mock('@/lib/kaspiPay/connection', () => ({ loadConnectionByApiToken: h.connection }))
-vi.mock('@/lib/kaspiPay/client', () => ({ createPayment: h.createPayment }))
+vi.mock('@/lib/kaspiPay/client', () => ({ createPayment: h.createPayment, describeNetworkError: (e: any) => String(e?.message) }))
 vi.mock('@/lib/kaspiPay/wallet', () => ({ getWalletBalance: async () => h.balance, computeCommission: () => 20, isCommissionExempt: async () => h.exempt }))
 
 import { POST } from './route'
