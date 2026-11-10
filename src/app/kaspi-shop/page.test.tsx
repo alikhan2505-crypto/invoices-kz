@@ -69,6 +69,7 @@ type World = {
   applyNow: { status: number; body: any }
   suggest: { status: number; body: any }
   sync: { status: number; body: any }
+  sessionRefresh: { status: number; body: any; onCall?: () => void }
   calls: Calls
 }
 
@@ -106,6 +107,10 @@ function installFetch() {
     if (url === '/api/kaspi-shop/connections/switch') return json(200, { ok: true })
     if (url === '/api/kaspi-shop/apply-now') return json(world.applyNow.status, world.applyNow.body)
     if (url === '/api/kaspi-shop/catalog/sync') return json(world.sync.status, world.sync.body)
+    if (url === '/api/kaspi-shop/session/refresh' && method === 'POST') {
+      world.sessionRefresh.onCall?.()
+      return json(world.sessionRefresh.status, world.sessionRefresh.body)
+    }
     return json(404, { error: `unexpected ${method} ${url}` })
   }) as any
 }
@@ -167,6 +172,7 @@ beforeEach(() => {
     applyNow: { status: 202, body: { ok: true, count: 1, queued: 1 } },
     suggest: { status: 200, body: { floorPrice: 900, undercutStep: 50, reasoning: 'Конкуренты дешевле на 5%.', estimate: true } },
     sync: { status: 200, body: { ok: true, imported: 3, total: 3 } },
+    sessionRefresh: { status: 200, body: { status: 'needs_sms' } },
     calls: [],
   }
   installFetch()
@@ -598,5 +604,59 @@ describe('K46: истёкшая сессия активного магазина
     expect(byText('button', 'Открыть «Второй магазин»')).toBeTruthy()
     // данные истёкшего магазина по-прежнему скрыты (решение основателя 03.09.2026)
     expect(text()).not.toContain('Чехол для телефона')
+  })
+})
+
+// Тихое продление сессии без SMS (10.11.2026): страница сама пробует один раз, прежде чем
+// просить телефон и код.
+describe('тихое продление истёкшей сессии', () => {
+  const expired = () => okWallet({ sessionStatus: 'session_expired' })
+  const REFRESH = '/api/kaspi-shop/session/refresh'
+
+  it('истёкшая сессия: один тихий запрос продления, при отказе остаётся обычное окно входа по SMS', async () => {
+    world.wallet = expired()
+    world.sessionRefresh = { status: 200, body: { status: 'needs_sms' } }
+    await mount()
+    expect(countCalls('POST', REFRESH)).toBe(1)
+    expect(text()).toContain('Сессия истекла')
+    expect(text()).not.toContain('Пробуем продлить')
+    expect(byText('button', 'Получить SMS-код')).toBeTruthy()
+    // повторных попыток при перерисовках нет
+    expect(countCalls('POST', REFRESH)).toBe(1)
+  })
+
+  it('продление получилось: страница перечитывает данные и окно входа уходит без SMS', async () => {
+    world.wallet = expired()
+    world.sessionRefresh = {
+      status: 200,
+      body: { status: 'refreshed' },
+      onCall: () => { world.wallet = okWallet() },
+    }
+    await mount()
+    expect(countCalls('POST', REFRESH)).toBe(1)
+    expect(text()).not.toContain('Сессия истекла')
+    expect(text()).toContain('Чехол для телефона')
+  })
+
+  it('«busy» (слишком часто или Kaspi не ответил) тоже перечитывает состояние, но SMS не навязывает раньше времени', async () => {
+    world.wallet = expired()
+    world.sessionRefresh = { status: 200, body: { status: 'busy' } }
+    await mount()
+    expect(countCalls('POST', REFRESH)).toBe(1)
+    expect(text()).toContain('Сессия истекла')
+  })
+
+  it('сбой самого запроса продления не ломает страницу: остаётся вход по SMS', async () => {
+    world.wallet = expired()
+    world.sessionRefresh = { status: 500, body: { error: 'x' } }
+    await mount()
+    expect(countCalls('POST', REFRESH)).toBe(1)
+    expect(text()).toContain('Сессия истекла')
+  })
+
+  it('живая сессия: тихого запроса нет вообще', async () => {
+    world.wallet = okWallet()
+    await mount()
+    expect(countCalls('POST', REFRESH)).toBe(0)
   })
 })

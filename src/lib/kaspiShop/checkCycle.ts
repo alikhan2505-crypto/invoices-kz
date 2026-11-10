@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { computeRepriceCandidate, DempingStrategy, resolveTargetCities, computePerCityReprice, computeMarketPosition, CompetitorOffer, CityOffers } from './pricing'
 import { debitKaspiShopWallet, getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from './wallet'
-import { getKey, markSessionExpired } from './connection'
+import { getKey, markSessionExpired, refreshStoredSession } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
 import { pushOfferState } from './cabinetPricePush'
@@ -294,8 +294,6 @@ async function pushProductPrices(params: {
   // followed by Kaspi removing the offer with «Не указано наличие в прайс
   // листе», and listing only one of several points zeroed the others'
   // остаток.
-  const storeCodes = await fetchOfferPointCodes(params.sessionCookies, params.merchantId, params.sku, params.storeId)
-
   // Seller-entered остаток per point (kaspi_shop_point_stocks, saved from
   // the «Цена и остатки» modal) rides along so Kaspi's pipeline doesn't
   // wipe it to «Не указан» on every price change -- founder-approved
@@ -310,17 +308,40 @@ async function pushProductPrices(params: {
     if (Number.isFinite(Number(row.stock_count)) && Number(row.stock_count) > 0) stockByStore[row.store_code] = Number(row.stock_count)
   }
 
-  const result = await pushOfferState({
-    sessionCookies: params.sessionCookies,
-    merchantUid: params.merchantId,
-    sku: params.sku,
-    masterSku: params.masterSku,
-    model: params.model,
-    storeCodes,
-    cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
-    available: 'yes',
-    stockByStore,
-  })
+  // Коды точек читаются теми же cookies, что и отправка: после продления сессии (ниже)
+  // их надо прочитать заново, иначе с мёртвыми cookies вернулся бы запасной список из одной
+  // точки, а отправка одной точки из нескольких обнуляет остальные (проверено 21.08.2026).
+  const pushWith = async (cookies: string) => {
+    const storeCodes = await fetchOfferPointCodes(cookies, params.merchantId, params.sku, params.storeId)
+    return pushOfferState({
+      sessionCookies: cookies,
+      merchantUid: params.merchantId,
+      sku: params.sku,
+      masterSku: params.masterSku,
+      model: params.model,
+      storeCodes,
+      cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
+      available: 'yes',
+      stockByStore,
+    })
+  }
+
+  let result = await pushWith(params.sessionCookies)
+  if (!result.success && result.reason === 'session_expired') {
+    // Kaspi отказал сессии (401/403): до уведомления продавцу пробуем получить новую
+    // без SMS по сохранённому единому входу (refreshSessionSilently). Получилось -- одна
+    // повторная отправка с новой сессией; нет -- всё как раньше (статус, уведомление).
+    // Проверка кошелька и пол цены уже пройдены выше, повтор их не меняет.
+    try {
+      const refreshed = await refreshStoredSession(params.connectionId, 'push')
+      // skipped_newer: сессию уже обновил кто-то другой (соседнее продление, вход по SMS):
+      // повторяем на его свежей сессии, а не считаем сессию мёртвой.
+      const retryCookies = refreshed.outcome === 'refreshed' || refreshed.outcome === 'skipped_newer' ? refreshed.sessionCookies : undefined
+      if (retryCookies) result = await pushWith(retryCookies)
+    } catch (err: any) {
+      console.error('kaspi-shop checkCycle: silent session refresh failed for connection', params.connectionId, ':', err?.message || err)
+    }
+  }
 
   if (result.success) return { pushed: true, sessionExpired: false }
   if (result.reason === 'session_expired') {

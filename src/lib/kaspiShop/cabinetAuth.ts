@@ -42,6 +42,27 @@ function cookieHeader(jar: CookieJar): string {
   return Array.from(jar.entries()).map(([k, v]) => `${k}=${v}`).join('; ')
 }
 
+// Срок жизни cookie, который Kaspi объявляет в Set-Cookie (Max-Age или Expires), без
+// значений: «имя:max-age=43200», «имя:expires=...», «имя:session» (без срока). Нужно для
+// журнала тихого продления входа: по нему видно, сколько живёт сессия кабинета и сколько
+// единый вход idmc. Значения cookie сюда никогда не попадают.
+function cookieLifetimeNotes(res: Response): string[] {
+  const raw: string[] = typeof (res.headers as any).getSetCookie === 'function'
+    ? (res.headers as any).getSetCookie()
+    : (res.headers.get('set-cookie') ? [res.headers.get('set-cookie') as string] : [])
+  const notes: string[] = []
+  for (const line of raw) {
+    const parts = line.split(';').map(p => p.trim())
+    const eq = parts[0].indexOf('=')
+    if (eq <= 0) continue
+    const name = parts[0].slice(0, eq).trim()
+    const maxAge = parts.find(p => /^max-age=/i.test(p))
+    const expires = parts.find(p => /^expires=/i.test(p))
+    notes.push(`${name}:${maxAge ? maxAge.toLowerCase() : expires ? expires.toLowerCase() : 'session'}`)
+  }
+  return notes
+}
+
 function mergeJar(into: CookieJar, from: CookieJar) {
   for (const [k, v] of from) into.set(k, v)
 }
@@ -329,8 +350,12 @@ export function isResumeToken(token: unknown): boolean {
 // response's Set-Cookie header, and mc-session/mc-sid are minted partway
 // through (the login/oauth2/code/1 hop), not on the first or last one.
 // Every hop is an idempotent GET, so each is retried on connection failures.
-async function walkSessionRedirects(jar: CookieJar): Promise<{ ok: true } | { ok: false; offSite: true } | { ok: false; error: KaspiNetworkError }> {
+async function walkSessionRedirects(
+  jar: CookieJar,
+  notes?: string[],
+): Promise<{ ok: true; lastStatus: number } | { ok: false; offSite: true } | { ok: false; error: KaspiNetworkError }> {
   let nextUrl = MC_URL
+  let lastStatus = 0
   for (let hop = 0; hop < 10; hop++) {
     if (!isTrustedKaspiHost(nextUrl)) return { ok: false, offSite: true }
     let hopRes: Response
@@ -341,12 +366,14 @@ async function walkSessionRedirects(jar: CookieJar): Promise<{ ok: true } | { ok
       throw err
     }
     mergeJar(jar, parseSetCookies(hopRes))
+    if (notes) notes.push(...cookieLifetimeNotes(hopRes))
+    lastStatus = hopRes.status
     if (hopRes.status < 300 || hopRes.status >= 400) break
     const location = hopRes.headers.get('location')
     if (!location) break
     nextUrl = new URL(location, nextUrl).toString()
   }
-  return { ok: true }
+  return { ok: true, lastStatus }
 }
 
 // `code` may be omitted ONLY when otpToken is a resume token (see above): the
@@ -406,6 +433,107 @@ export async function submitOtp(otpToken: string, code?: string): Promise<LoginR
     }
   }
   return { status: 'success', sessionCookies }
+}
+
+// ---------------------------------------------------------------------------
+// Тихое продление сессии кабинета без SMS (10.11.2026).
+//
+// Сессия кабинета (mc-session/mc-sid) живёт около 12-14 часов, после чего бот молчит,
+// пока владелец не введёт новый код из SMS. Но в сохранённых cookies лежат и cookies
+// единого входа idmc (MS_AUTH_SSO и др.): вся цепочка OAuth2 (см. MC_URL) на втором шаге
+// «молча одобряется» живым входом idmc. Если вход idmc живёт дольше сессии кабинета, то
+// достаточно пройти ту же цепочку заново с сохранёнными cookies idmc и без старых
+// mc-session/mc-sid, чтобы получить новые без SMS. Живьём ещё не проверено: результат
+// каждой попытки пишется в журнал (см. refreshStoredSession), срок cookie берётся из
+// Set-Cookie.
+//
+//   refreshed   -- получены новые mc-session/mc-sid и Kaspi их принимает;
+//   sso_expired -- единый вход idmc тоже мёртв (цепочка не выдала сессию или выданная
+//                  не принимается): нужен SMS;
+//   unreachable -- Kaspi не ответил по сети, ничего не решено;
+//   error       -- сохранённые cookies непригодны (пусто, битый формат, уход со своих хостов).
+// `notes` -- сроки cookie из Set-Cookie без значений, для журнала.
+// ---------------------------------------------------------------------------
+export type SilentRefreshResult =
+  | { status: 'refreshed'; sessionCookies: string; notes: string[] }
+  | { status: 'sso_expired'; reason: 'no_session_issued' | 'session_rejected'; notes: string[] }
+  | { status: 'unreachable'; detail?: string; notes: string[] }
+  | { status: 'error'; reason: 'bad_cookies' | 'redirect_off_site' | 'unexpected'; notes: string[] }
+
+function jarFromCookieHeader(sessionCookies: string): CookieJar | null {
+  const entries: [string, string][] = []
+  for (const part of sessionCookies.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq === -1) continue
+    entries.push([part.slice(0, eq).trim(), part.slice(eq + 1).trim()])
+  }
+  return toJar(entries)
+}
+
+// Тот же запрос, что живьём подтверждён при входе (список магазинов номера, /s/m):
+// «живая ли сессия». Три исхода, потому что «не знаю» не равно «мертва»:
+//   valid   -- 200 и список магазинов не пуст;
+//   invalid -- 401/403 дважды подряд (одиночный 401 у Kaspi бывает случайным, см.
+//              fetchWithRetryOn401 в cabinetApi.ts: проверено живьём 14.09.2026);
+//   unknown -- сеть, таймаут, 5xx/429, не тот формат ответа: ничего не решаем.
+export async function probeSession(sessionCookies: string): Promise<'valid' | 'invalid' | 'unknown'> {
+  const attempt = () => fetch('https://mc.shop.kaspi.kz/s/m', {
+    headers: {
+      'x-auth-version': '3',
+      'content-type': 'application/json',
+      'origin': 'https://kaspi.kz',
+      'referer': 'https://kaspi.kz/',
+      'cookie': sessionCookies,
+    },
+    signal: AbortSignal.timeout(kaspiFetchTuning.timeoutMs),
+  })
+  try {
+    let res = await attempt()
+    if (res.status === 401 || res.status === 403) {
+      await sleep(500)
+      res = await attempt()
+      if (res.status === 401 || res.status === 403) return 'invalid'
+    }
+    if (!res.ok) return 'unknown'
+    const json = await res.json().catch(() => null)
+    return Array.isArray(json?.merchants) && json.merchants.length > 0 ? 'valid' : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+export async function refreshSessionSilently(sessionCookies: string): Promise<SilentRefreshResult> {
+  const notes: string[] = []
+  try {
+    const jar = typeof sessionCookies === 'string' && sessionCookies ? jarFromCookieHeader(sessionCookies) : null
+    if (!jar || jar.size === 0) return { status: 'error', reason: 'bad_cookies', notes }
+
+    // Старые cookie кабинета убираем: так любая «новая сессия» на выходе точно выдана
+    // сейчас, а не осталась от прошлого раза.
+    jar.delete('mc-session')
+    jar.delete('mc-sid')
+
+    const walk = await walkSessionRedirects(jar, notes)
+    if (!walk.ok) {
+      if ('offSite' in walk) return { status: 'error', reason: 'redirect_off_site', notes }
+      return { status: 'unreachable', ...(walk.error.causeCode ? { detail: walk.error.causeCode } : {}), notes }
+    }
+    if (!jar.has('mc-session') || !jar.has('mc-sid')) {
+      // Kaspi ответил сбоем или лимитом (5xx/429): это не «единый вход мёртв», решать рано.
+      if (walk.lastStatus >= 500 || walk.lastStatus === 429) return { status: 'unreachable', detail: `HTTP_${walk.lastStatus}`, notes }
+      return { status: 'sso_expired', reason: 'no_session_issued', notes }
+    }
+
+    const fresh = cookieHeader(jar)
+    const verdict = await probeSession(fresh)
+    if (verdict === 'invalid') return { status: 'sso_expired', reason: 'session_rejected', notes }
+    if (verdict === 'unknown') return { status: 'unreachable', detail: 'probe_unknown', notes }
+    return { status: 'refreshed', sessionCookies: fresh, notes }
+  } catch {
+    // Непредвиденное исключение (например, кривой адрес перехода): текст ошибки может
+    // содержать параметры OAuth, поэтому наружу идёт только признак.
+    return { status: 'error', reason: 'unexpected', notes }
+  }
 }
 
 // Makes one lightweight authenticated call (the same getMerchant query

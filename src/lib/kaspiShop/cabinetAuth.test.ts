@@ -8,6 +8,8 @@ import {
   KASPI_FETCH_MAX_ATTEMPTS,
   withConnectionRetry,
   resumeTokenFromSession,
+  refreshSessionSilently,
+  probeSession,
 } from './cabinetAuth'
 
 // All traffic is mocked: nothing here ever reaches Kaspi or sends an SMS.
@@ -323,5 +325,167 @@ describe('startPhoneLogin input handling (K48)', () => {
     const result = await startPhoneLogin(value as any)
     expect(result).toMatchObject({ status: 'error', code: 'phone_rejected' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// Тихое продление сессии кабинета без SMS (10.11.2026): та же цепочка входа с сохранёнными
+// cookies единого входа, без старых mc-session/mc-sid.
+describe('refreshSessionSilently', () => {
+  const STORED = 'MS_AUTH_SSO=sso1; IDMC_SSO=ID1; mc-session=old; mc-sid=oldsid'
+  const SESSION_OK = () => new Response(JSON.stringify({ merchants: [{ uid: '30067228' }] }), { status: 200 })
+
+  it('walks the OAuth chain without the old mc cookies and returns the NEW session', async () => {
+    for (const r of happyHops()) fetchMock.mockResolvedValueOnce(r)
+    fetchMock.mockResolvedValueOnce(SESSION_OK())
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result.status).toBe('refreshed')
+    if (result.status !== 'refreshed') return
+    expect(result.sessionCookies).toContain('mc-session=abc')
+    expect(result.sessionCookies).toContain('mc-sid=def')
+    expect(result.sessionCookies).toContain('MS_AUTH_SSO=sso1')
+    expect(result.sessionCookies).not.toContain('mc-session=old')
+    // Первый заход цепочки идёт без старой сессии кабинета, но с cookies единого входа.
+    const firstCookie = (fetchMock.mock.calls[0][1].headers as Record<string, string>).cookie
+    expect(firstCookie).toContain('MS_AUTH_SSO=sso1')
+    expect(firstCookie).not.toContain('mc-session')
+    expect(firstCookie).not.toContain('mc-sid')
+    // Новая сессия проверена живым запросом к кабинету.
+    const check = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]
+    expect(String(check[0])).toBe('https://mc.shop.kaspi.kz/s/m')
+    expect((check[1].headers as Record<string, string>).cookie).toContain('mc-session=abc')
+  })
+
+  it('reports cookie lifetimes from Set-Cookie without any cookie value', async () => {
+    fetchMock
+      .mockResolvedValueOnce(resp(302, { location: 'https://idmc.shop.kaspi.kz/oauth2/authorize?x=1', cookies: ['IDMC_SSO=SECRETVALUE; Max-Age=2592000; Path=/'] }))
+      .mockResolvedValueOnce(resp(302, { location: 'https://mc.shop.kaspi.kz/login/oauth2/code/1?c=1' }))
+      .mockResolvedValueOnce(resp(302, { location: 'https://kaspi.kz/mc/', cookies: ['mc-session=abc; Expires=Wed, 11 Nov 2026 00:00:00 GMT; Path=/', 'mc-sid=def; Path=/'] }))
+      .mockResolvedValueOnce(resp(200))
+      .mockResolvedValueOnce(SESSION_OK())
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result.status).toBe('refreshed')
+    expect(result.notes).toEqual([
+      'IDMC_SSO:max-age=2592000',
+      'mc-session:expires=wed, 11 nov 2026 00:00:00 gmt',
+      'mc-sid:session',
+    ])
+    expect(JSON.stringify(result.notes)).not.toContain('SECRETVALUE')
+    expect(JSON.stringify(result.notes)).not.toContain('abc')
+  })
+
+  it('the single sign-on is dead too (the chain ends on the login page, no new session): sso_expired, SMS needed', async () => {
+    fetchMock
+      .mockResolvedValueOnce(resp(302, { location: 'https://idmc.shop.kaspi.kz/oauth2/authorize?x=1' }))
+      .mockResolvedValueOnce(resp(302, { location: 'https://idmc.shop.kaspi.kz/login' }))
+      .mockResolvedValueOnce(resp(200))
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result).toMatchObject({ status: 'sso_expired', reason: 'no_session_issued' })
+    // Новую сессию не проверяли: проверять нечего.
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('a minted session that Kaspi does not accept is not returned: sso_expired / session_rejected', async () => {
+    for (const r of happyHops()) fetchMock.mockResolvedValueOnce(r)
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 401 }))
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 403 }))
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result).toMatchObject({ status: 'sso_expired', reason: 'session_rejected' })
+  })
+
+  it('a single random 401 on the check is retried and does not reject a good new session', async () => {
+    for (const r of happyHops()) fetchMock.mockResolvedValueOnce(r)
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 401 }))
+    fetchMock.mockResolvedValueOnce(SESSION_OK())
+
+    expect((await refreshSessionSilently(STORED)).status).toBe('refreshed')
+  })
+
+  it('an unknown answer on the check (5xx) is unreachable, never SMS-needed and never saved', async () => {
+    for (const r of happyHops()) fetchMock.mockResolvedValueOnce(r)
+    fetchMock.mockResolvedValueOnce(new Response('oops', { status: 503 }))
+
+    expect(await refreshSessionSilently(STORED)).toMatchObject({ status: 'unreachable', detail: 'probe_unknown' })
+  })
+
+  it('Kaspi answering 5xx/429 on the walk is unreachable, not a dead single sign-on', async () => {
+    fetchMock
+      .mockResolvedValueOnce(resp(302, { location: 'https://idmc.shop.kaspi.kz/oauth2/authorize?x=1' }))
+      .mockResolvedValueOnce(resp(503))
+    expect(await refreshSessionSilently(STORED)).toMatchObject({ status: 'unreachable', detail: 'HTTP_503' })
+
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValueOnce(resp(429))
+    expect(await refreshSessionSilently(STORED)).toMatchObject({ status: 'unreachable', detail: 'HTTP_429' })
+  })
+
+  it('never throws: an unexpected exception becomes an error result without the message', async () => {
+    fetchMock.mockRejectedValue(new Error('Invalid URL https://x?code=SECRET&state=S'))
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result).toMatchObject({ status: 'error', reason: 'unexpected' })
+    expect(JSON.stringify(result)).not.toContain('SECRET')
+  })
+
+  it('Kaspi unreachable: unreachable with the network cause, nothing decided', async () => {
+    fetchMock.mockRejectedValue(fetchFailed('ETIMEDOUT'))
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result).toMatchObject({ status: 'unreachable', detail: 'ETIMEDOUT' })
+  })
+
+  it('a redirect off kaspi.kz stops the walk and never sends cookies there', async () => {
+    fetchMock.mockResolvedValueOnce(resp(302, { location: 'https://evil.example.com/steal' }))
+
+    const result = await refreshSessionSilently(STORED)
+
+    expect(result).toMatchObject({ status: 'error', reason: 'redirect_off_site' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('empty or malformed stored cookies: error, no request at all', async () => {
+    expect(await refreshSessionSilently('')).toMatchObject({ status: 'error', reason: 'bad_cookies' })
+    expect(await refreshSessionSilently('just-garbage')).toMatchObject({ status: 'error', reason: 'bad_cookies' })
+    expect(await refreshSessionSilently('bad name=1')).toMatchObject({ status: 'error', reason: 'bad_cookies' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('probeSession', () => {
+  it('valid on a 200 with a non-empty merchant list', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ merchants: [{ uid: '1' }] }), { status: 200 }))
+    expect(await probeSession('a=1')).toBe('valid')
+  })
+
+  it('invalid only after two auth failures in a row', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 401 })).mockResolvedValueOnce(new Response('', { status: 403 }))
+    expect(await probeSession('a=1')).toBe('invalid')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('unknown for network errors, 5xx, an empty list and a strange body', async () => {
+    fetchMock.mockRejectedValueOnce(fetchFailed())
+    expect(await probeSession('a=1')).toBe('unknown')
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 502 }))
+    expect(await probeSession('a=1')).toBe('unknown')
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ merchants: [] }), { status: 200 }))
+    expect(await probeSession('a=1')).toBe('unknown')
+    fetchMock.mockResolvedValueOnce(new Response('<html>', { status: 200 }))
+    expect(await probeSession('a=1')).toBe('unknown')
+  })
+
+  it('every probe has a timeout signal', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ merchants: [{ uid: '1' }] }), { status: 200 }))
+    await probeSession('a=1')
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
   })
 })

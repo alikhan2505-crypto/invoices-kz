@@ -27,6 +27,13 @@ const h = vi.hoisted(() => ({
   markExpiredCalls: [] as string[],
   markExpiredThrows: false,
   lowBalanceNotified: [] as string[][],
+  // Тихое продление сессии (10.11.2026): исход refreshStoredSession и журнал вызовов;
+  // очередь ответов пуша (сначала из неё, потом pushResult).
+  refreshResult: { outcome: 'sso_expired', detail: 'no_session_issued' } as any,
+  refreshThrows: false,
+  refreshCalls: [] as Array<{ connectionId: string; trigger: string }>,
+  pushQueue: [] as any[],
+  detailCookies: [] as string[],
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -104,16 +111,21 @@ vi.mock('./connection', () => ({
     const c = (h.tables.kaspi_shop_connections || []).find(x => x.id === connectionId)
     if (c) c.session_status = 'session_expired'
   },
+  refreshStoredSession: async (connectionId: string, trigger: string) => {
+    h.refreshCalls.push({ connectionId, trigger })
+    if (h.refreshThrows) throw new Error('refresh blew up')
+    return h.refreshResult
+  },
 }))
 vi.mock('@/lib/kaspiPay/crypto', () => ({ decryptAtRest: () => Buffer.from('cookie=1') }))
 vi.mock('./cabinetPricePush', () => ({
   pushOfferState: async (params: any) => {
     h.pushCalls.push(params)
     if (h.pushThrows) throw new Error('socket hang up')
-    return h.pushResult
+    return h.pushQueue.length > 0 ? h.pushQueue.shift() : h.pushResult
   },
 }))
-vi.mock('./cabinetApi', () => ({ fetchOfferDetails: async () => null }))
+vi.mock('./cabinetApi', () => ({ fetchOfferDetails: async (cookies: string) => { h.detailCookies.push(cookies); return null } }))
 vi.mock('./planGate', () => ({
   ownerHasKaspiShopAccess: async (userId: string) => !h.accessDenied.has(userId),
   loadOwnerPlanProfiles: async (ids: (string | null)[]) => new Map(ids.filter(Boolean).map(id => [id as string, { ok: !h.accessDenied.has(id as string) }])),
@@ -171,6 +183,11 @@ beforeEach(() => {
   h.markExpiredCalls = []
   h.markExpiredThrows = false
   h.lowBalanceNotified = []
+  h.refreshResult = { outcome: 'sso_expired', detail: 'no_session_issued' }
+  h.refreshThrows = false
+  h.refreshCalls = []
+  h.pushQueue = []
+  h.detailCookies = []
   seed()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -445,6 +462,80 @@ describe('applyPriceCheckResult: a price is recorded only after Kaspi accepted i
     expect(checks()[0].action).toBe('push_failed')
     // Продавца предупреждает markSessionExpired (Telegram + колокольчик), а не только запись статуса.
     expect(h.markExpiredCalls).toEqual(['c1'])
+  })
+
+  it('401 on push: first tries a silent session refresh (trigger push) before giving up', async () => {
+    h.pushResult = { success: false, reason: 'session_expired', message: 'HTTP 401' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.refreshCalls).toEqual([{ connectionId: 'c1', trigger: 'push' }])
+    // Продление не вышло: прежнее поведение (статус, уведомление, push_failed, бесплатно).
+    expect(h.markExpiredCalls).toEqual(['c1'])
+    expect(checks()[0].action).toBe('push_failed')
+    expect(h.debits).toHaveLength(0)
+    expect(h.pushCalls).toHaveLength(1)
+  })
+
+  it('401 on push, silent refresh works: one retry with the NEW cookies, price pushed, one charge, no expired mark', async () => {
+    h.pushQueue = [{ success: false, reason: 'session_expired', message: 'HTTP 401' }]
+    h.pushResult = { success: true }
+    h.refreshResult = { outcome: 'refreshed', sessionCookies: 'mc-session=NEW; mc-sid=NEW' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(2)
+    expect(h.pushCalls[0].sessionCookies).toBe('cookie=1')
+    expect(h.pushCalls[1].sessionCookies).toBe('mc-session=NEW; mc-sid=NEW')
+    // Точки магазина перечитаны ТЕМИ ЖЕ cookies, что и повторная отправка (иначе запасной список
+    // из одной точки обнулил бы остальные: инцидент 21.08.2026).
+    expect(h.detailCookies).toEqual(['cookie=1', 'mc-session=NEW; mc-sid=NEW'])
+    expect(h.markExpiredCalls).toEqual([])
+    expect(product().own_current_price).toBe(800)
+    expect(checks()[0].action).toBe('updated')
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('someone else already saved a newer session (skipped_newer): retry on THEIR cookies, not marked expired', async () => {
+    h.pushQueue = [{ success: false, reason: 'session_expired', message: 'HTTP 401' }]
+    h.pushResult = { success: true }
+    h.refreshResult = { outcome: 'skipped_newer', sessionCookies: 'mc-session=OTHER; mc-sid=OTHER' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(2)
+    expect(h.pushCalls[1].sessionCookies).toBe('mc-session=OTHER; mc-sid=OTHER')
+    expect(h.markExpiredCalls).toEqual([])
+    expect(checks()[0].action).toBe('updated')
+    expect(h.debits).toHaveLength(1)
+  })
+
+  it('skipped_newer without a readable newer session: old 401 handling (marked expired)', async () => {
+    h.pushResult = { success: false, reason: 'session_expired', message: 'HTTP 401' }
+    h.refreshResult = { outcome: 'skipped_newer' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(1)
+    expect(h.markExpiredCalls).toEqual(['c1'])
+  })
+
+  it('silent refresh works but the retry is refused again: marked expired, still free', async () => {
+    h.pushResult = { success: false, reason: 'session_expired', message: 'HTTP 401' }
+    h.refreshResult = { outcome: 'refreshed', sessionCookies: 'mc-session=NEW; mc-sid=NEW' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.pushCalls).toHaveLength(2)
+    expect(h.markExpiredCalls).toEqual(['c1'])
+    expect(checks()[0].action).toBe('push_failed')
+    expect(h.debits).toHaveLength(0)
+  })
+
+  it('a throwing silent refresh never breaks the cycle: falls back to the old 401 handling', async () => {
+    h.pushResult = { success: false, reason: 'session_expired', message: 'HTTP 401' }
+    h.refreshThrows = true
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.markExpiredCalls).toEqual(['c1'])
+    expect(checks()[0].action).toBe('push_failed')
+    expect(h.debits).toHaveLength(0)
+  })
+
+  it('a non-401 push failure does not try to refresh the session', async () => {
+    h.pushResult = { success: false, reason: 'other', message: 'HTTP 500' }
+    await applyPriceCheckResult('p1', legacyOffer(900), null)
+    expect(h.refreshCalls).toEqual([])
+    expect(checks()[0].action).toBe('push_failed')
   })
 
   it('a failing markSessionExpired does not crash the cycle: still a push_failed, free', async () => {

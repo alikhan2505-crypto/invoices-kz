@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeSecDb, type SecDb } from './secDb.testkit'
 
-const { state, notifySessionExpired, resetSessionExpiredNotices } = vi.hoisted(() => ({
+const { state, notifySessionExpired, resetSessionExpiredNotices, refreshSessionSilently, probeSession } = vi.hoisted(() => ({
   state: { db: null as unknown as SecDb },
   notifySessionExpired: vi.fn(async () => ({ status: 'sent', telegram: true })),
   resetSessionExpiredNotices: vi.fn(async () => {}),
+  refreshSessionSilently: vi.fn(),
+  probeSession: vi.fn(),
 }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => state.db.client.from(t) }) }))
 vi.mock('@/lib/kaspiShop/sessionExpiredNotice', () => ({ notifySessionExpired, resetSessionExpiredNotices }))
+vi.mock('@/lib/kaspiShop/cabinetAuth', () => ({ refreshSessionSilently, probeSession }))
 
-import { markSessionExpired, purgeKaspiConnectionsForUser, saveConnection } from './connection'
+import { markSessionExpired, purgeKaspiConnectionsForUser, saveConnection, refreshStoredSession } from './connection'
+import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
 
 const SECRET = 'enc-secret'
 function seed(): SecDb {
@@ -136,5 +140,174 @@ describe('saveConnection (K45 episode reset)', () => {
   it('a save without session cookies does not reset it', async () => {
     await saveConnection({ userId: 'u1', apiToken: 'tok', merchantId: 'm1', companyName: 'Shop One' })
     expect(resetSessionExpiredNotices).not.toHaveBeenCalled()
+  })
+
+  it('a real SMS reconnect stamps the session timestamp used by the silent refresh schedule', async () => {
+    await saveConnection({ userId: 'u1', sessionCookies: 'cookie=1', merchantId: 'm1', companyName: 'Shop One' })
+    const upsert = state.db.writes.filter(w => w.op === 'upsert').pop()!
+    expect(typeof upsert.payload!.session_refreshed_at).toBe('string')
+  })
+})
+
+// Тихое продление сессии кабинета без SMS (10.11.2026).
+describe('refreshStoredSession', () => {
+  const KEY = 'a'.repeat(64)
+  const OLD = 'MS_AUTH_SSO=sso1; mc-session=old; mc-sid=oldsid'
+  const NEW = 'MS_AUTH_SSO=sso1; mc-session=NEW; mc-sid=NEWSID'
+  const row = () => state.db.tables.kaspi_shop_connections.find(r => r.id === 'c9')!
+  const logs = () => state.db.tables.kaspi_shop_session_refresh_log ?? []
+
+  beforeEach(() => {
+    state.db.tables.kaspi_shop_connections.push({
+      id: 'c9', user_id: 'u9', merchant_id: 'm9', company_name: 'Refresh Shop', session_cookies: encryptAtRest(OLD, KEY),
+      api_token_enc: null, session_status: 'active', status: 'active', paused: false, is_active: true,
+      session_refreshed_at: '2026-11-09T08:44:00.000Z', session_refresh_attempt_at: null,
+    })
+    refreshSessionSilently.mockReset()
+    probeSession.mockReset()
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+  })
+
+  it('success: new cookies saved encrypted, status active, timestamps set, one journal row with cookie lifetimes', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'refreshed', sessionCookies: NEW, notes: ['mc-session:max-age=43200'] })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r).toEqual({ outcome: 'refreshed', sessionCookies: NEW })
+    expect(refreshSessionSilently).toHaveBeenCalledWith(OLD)
+    expect(decryptAtRest(row().session_cookies, KEY).toString('utf8')).toBe(NEW)
+    expect(row().session_status).toBe('active')
+    expect(row().session_refreshed_at).not.toBe('2026-11-09T08:44:00.000Z')
+    expect(row().session_refresh_attempt_at).toBeTruthy()
+    expect(logs()).toHaveLength(1)
+    expect(logs()[0]).toMatchObject({ connection_id: 'c9', trigger: 'cron', outcome: 'refreshed', cookie_lifetimes: 'mc-session:max-age=43200' })
+    expect(typeof logs()[0].session_age_hours).toBe('number')
+    expect(resetSessionExpiredNotices).not.toHaveBeenCalled()
+    expect(JSON.stringify(logs())).not.toContain('NEWSID')
+  })
+
+  it('a session that was already marked expired comes back to life and the outage notice allowance resets', async () => {
+    row().session_status = 'session_expired'
+    refreshSessionSilently.mockResolvedValue({ status: 'refreshed', sessionCookies: NEW, notes: [] })
+
+    await refreshStoredSession('c9', 'user')
+
+    expect(row().session_status).toBe('active')
+    expect(resetSessionExpiredNotices).toHaveBeenCalledWith(expect.anything(), 'u9')
+  })
+
+  it('single sign-on dead on a cron attempt and the old session is dead too: marked expired right away (seller notified)', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'sso_expired', reason: 'no_session_issued', notes: [] })
+    probeSession.mockResolvedValue('invalid')
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r).toEqual({ outcome: 'sso_expired', detail: 'no_session_issued' })
+    expect(row().session_status).toBe('session_expired')
+    expect(notifySessionExpired).toHaveBeenCalledWith(expect.anything(), 'u9', ['Refresh Shop'])
+    expect(decryptAtRest(row().session_cookies, KEY).toString('utf8')).toBe(OLD)
+    expect(logs()[0]).toMatchObject({ outcome: 'sso_expired', detail: 'no_session_issued' })
+  })
+
+  it('single sign-on dead but the old session still works: nothing is marked, the old cookies stay', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'sso_expired', reason: 'no_session_issued', notes: [] })
+    probeSession.mockResolvedValue('valid')
+
+    await refreshStoredSession('c9', 'cron')
+
+    expect(row().session_status).toBe('active')
+    expect(notifySessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('single sign-on dead but the old session probe is only unknown (Kaspi hiccup): no false alarm to the seller', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'sso_expired', reason: 'no_session_issued', notes: [] })
+    probeSession.mockResolvedValue('unknown')
+
+    await refreshStoredSession('c9', 'cron')
+
+    expect(row().session_status).toBe('active')
+    expect(notifySessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('on a push-triggered attempt the caller owns the expired mark: this function does not mark or probe', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'sso_expired', reason: 'session_rejected', notes: [] })
+
+    const r = await refreshStoredSession('c9', 'push')
+
+    expect(r.outcome).toBe('sso_expired')
+    expect(probeSession).not.toHaveBeenCalled()
+    expect(row().session_status).toBe('active')
+    expect(notifySessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('Kaspi unreachable: nothing changes except the attempt stamp (so cron backs off), journal says unreachable', async () => {
+    refreshSessionSilently.mockResolvedValue({ status: 'unreachable', detail: 'ETIMEDOUT', notes: [] })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r).toEqual({ outcome: 'unreachable', detail: 'ETIMEDOUT' })
+    expect(decryptAtRest(row().session_cookies, KEY).toString('utf8')).toBe(OLD)
+    expect(row().session_status).toBe('active')
+    expect(row().session_refresh_attempt_at).toBeTruthy()
+    expect(probeSession).not.toHaveBeenCalled()
+  })
+
+  it('a newer session saved while the attempt ran (SMS reconnect) is never overwritten', async () => {
+    refreshSessionSilently.mockImplementation(async () => {
+      row().session_cookies = encryptAtRest('MS_AUTH_SSO=fromsms; mc-session=SMS; mc-sid=SMS', KEY)
+      row().session_refreshed_at = '2026-11-10T07:00:00.000Z'
+      return { status: 'refreshed', sessionCookies: NEW, notes: [] }
+    })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    // Вызывающему отдаётся чужая свежая сессия: на ней можно повторить операцию.
+    expect(r).toEqual({ outcome: 'skipped_newer', sessionCookies: 'MS_AUTH_SSO=fromsms; mc-session=SMS; mc-sid=SMS' })
+    expect(decryptAtRest(row().session_cookies, KEY).toString('utf8')).toContain('fromsms')
+    expect(row().session_refreshed_at).toBe('2026-11-10T07:00:00.000Z')
+  })
+
+  it('cookies wiped by account deletion while the attempt ran are never restored', async () => {
+    refreshSessionSilently.mockImplementation(async () => {
+      row().session_cookies = null
+      row().session_status = 'session_expired'
+      return { status: 'refreshed', sessionCookies: NEW, notes: [] }
+    })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r).toEqual({ outcome: 'skipped_newer' })
+    expect(row().session_cookies).toBeNull()
+    expect(row().session_status).toBe('session_expired')
+  })
+
+  it('an old row without a refresh timestamp gets its first one (compare against null)', async () => {
+    row().session_refreshed_at = null
+    refreshSessionSilently.mockResolvedValue({ status: 'refreshed', sessionCookies: NEW, notes: [] })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r.outcome).toBe('refreshed')
+    expect(row().session_refreshed_at).toBeTruthy()
+    expect(logs()[0].session_age_hours).toBeNull()
+  })
+
+  it('no stored cookies, unreadable cookies and unknown connection: nothing is tried', async () => {
+    row().session_cookies = null
+    expect(await refreshStoredSession('c9', 'cron')).toEqual({ outcome: 'no_session' })
+    row().session_cookies = 'garbage-not-encrypted'
+    expect(await refreshStoredSession('c9', 'cron')).toEqual({ outcome: 'error', detail: 'decrypt_failed' })
+    expect(await refreshStoredSession('missing', 'cron')).toEqual({ outcome: 'error', detail: 'connection_not_found' })
+    expect(refreshSessionSilently).not.toHaveBeenCalled()
+  })
+
+  it('a failing journal insert does not break the refresh', async () => {
+    state.db.fail.add('kaspi_shop_session_refresh_log:insert')
+    refreshSessionSilently.mockResolvedValue({ status: 'refreshed', sessionCookies: NEW, notes: [] })
+
+    const r = await refreshStoredSession('c9', 'cron')
+
+    expect(r.outcome).toBe('refreshed')
+    expect(decryptAtRest(row().session_cookies, KEY).toString('utf8')).toBe(NEW)
   })
 })

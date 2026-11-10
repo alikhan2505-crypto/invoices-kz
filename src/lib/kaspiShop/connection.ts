@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { notifySessionExpired, resetSessionExpiredNotices } from '@/lib/kaspiShop/sessionExpiredNotice'
+import { refreshSessionSilently, probeSession } from '@/lib/kaspiShop/cabinetAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -177,6 +178,140 @@ export async function markSessionExpired(connectionId: string): Promise<void> {
   }
 }
 
+// Не пытаться продлить по расписанию чаще, чем раз в это время на подключение (успешно или
+// нет): если единый вход мёртв, повтор каждые 10 минут только нагружал бы Kaspi.
+export const SESSION_REFRESH_RETRY_MS = 60 * 60_000
+// Сохранённая сессия старше этого возраста считается «пора продлить заранее»: до того, как
+// она умрёт (живёт ~12-14 часов). Попытка продления безвредна: при отказе старая сессия
+// остаётся как есть.
+export const SESSION_REFRESH_AFTER_MS = 5 * 3_600_000
+
+export type StoredRefreshTrigger = 'cron' | 'push' | 'user'
+export type StoredRefreshResult =
+  | { outcome: 'refreshed'; sessionCookies: string }
+  // skipped_newer: за время попытки кто-то сохранил сессию новее (вход по SMS, соседнее
+  // продление); если её удалось прочитать, она в sessionCookies и годится для повтора.
+  | { outcome: 'skipped_newer'; sessionCookies?: string }
+  | { outcome: 'sso_expired' | 'unreachable' | 'error' | 'no_session'; detail?: string }
+
+// Тихое продление сохранённой сессии кабинета без SMS (см. refreshSessionSilently).
+// Не бросает при сбое Kaspi; бросает только если не читается база. Порядок:
+//  1. штамп попытки (session_refresh_attempt_at): и неудача не даёт долбить Kaspi;
+//  2. расшифровка и сама попытка;
+//  3. запись в журнал и в логи сервера (сроки cookie без значений);
+//  4. при успехе новые cookies пишутся ТОЛЬКО если за время попытки никто не сохранил
+//     сессию новее (вход по SMS или параллельное продление): сверка по session_refreshed_at.
+export async function refreshStoredSession(connectionId: string, trigger: StoredRefreshTrigger): Promise<StoredRefreshResult> {
+  const { data: row, error } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id, user_id, session_cookies, session_status, session_refreshed_at')
+    .eq('id', connectionId)
+    .maybeSingle()
+  if (error) throw new Error(`kaspi_shop_connections lookup failed for connection ${connectionId}: ${error.message}`)
+  if (!row) return { outcome: 'error', detail: 'connection_not_found' }
+
+  const startedAt = Date.now()
+  await supabase
+    .from('kaspi_shop_connections')
+    .update({ session_refresh_attempt_at: new Date(startedAt).toISOString() })
+    .eq('id', connectionId)
+
+  const ageHours = row.session_refreshed_at ? Math.round(((startedAt - Date.parse(row.session_refreshed_at)) / 3_600_000) * 10) / 10 : null
+
+  const record = async (result: StoredRefreshResult, notes: string[] = []) => {
+    const detail = 'detail' in result ? result.detail ?? null : null
+    console.info(
+      `[kaspi-session-refresh] conn=${connectionId} trigger=${trigger} outcome=${result.outcome}` +
+        `${detail ? ` detail=${detail}` : ''} age_h=${ageHours ?? 'unknown'} cookies=${notes.join(',') || 'none'}`,
+    )
+    const { error: logError } = await supabase.from('kaspi_shop_session_refresh_log').insert({
+      connection_id: connectionId,
+      trigger,
+      outcome: result.outcome,
+      detail,
+      cookie_lifetimes: notes.length ? notes.join(',').slice(0, 1000) : null,
+      session_age_hours: ageHours,
+    })
+    if (logError) console.error('kaspi-session-refresh: log insert failed:', logError.message)
+  }
+
+  if (!row.session_cookies) {
+    const r: StoredRefreshResult = { outcome: 'no_session' }
+    await record(r)
+    return r
+  }
+  let plain: string
+  try {
+    plain = decryptAtRest(row.session_cookies, getKey()).toString('utf8')
+  } catch {
+    const r: StoredRefreshResult = { outcome: 'error', detail: 'decrypt_failed' }
+    await record(r)
+    return r
+  }
+
+  const result = await refreshSessionSilently(plain)
+  if (result.status !== 'refreshed') {
+    const mapped: StoredRefreshResult =
+      result.status === 'sso_expired' ? { outcome: 'sso_expired', detail: result.reason }
+      : result.status === 'unreachable' ? { outcome: 'unreachable', ...(result.detail ? { detail: result.detail } : {}) }
+      : { outcome: 'error', detail: result.reason }
+    await record(mapped, result.notes)
+    // Продление по расписанию не вышло, потому что вход мёртв: заодно выясняем, жива ли
+    // ещё старая сессия. Только явный отказ Kaspi (401/403 дважды подряд) делает её
+    // мёртвой: «не знаю» (сбой сети, 5xx, незнакомый ответ) продавцу ложную тревогу не
+    // шлёт. Статус и уведомление идут сразу, а не когда боту понадобится отправить цену
+    // (проверка без изменений цены обрыва не замечает).
+    if (trigger === 'cron' && mapped.outcome === 'sso_expired' && (await probeSession(plain)) === 'invalid') {
+      try {
+        await markSessionExpired(connectionId)
+      } catch (err: any) {
+        console.error('kaspi-session-refresh: markSessionExpired failed for connection', connectionId, ':', err?.message || err)
+      }
+    }
+    return mapped
+  }
+
+  const nowIso = new Date().toISOString()
+  let update = supabase
+    .from('kaspi_shop_connections')
+    .update({ session_cookies: encryptAtRest(result.sessionCookies, getKey()), session_status: 'active', session_refreshed_at: nowIso })
+    .eq('id', connectionId)
+    // Записи, у которых секреты уже затёрты (удаление аккаунта), не оживляем.
+    .not('session_cookies', 'is', null)
+  update = row.session_refreshed_at ? update.eq('session_refreshed_at', row.session_refreshed_at) : update.is('session_refreshed_at', null)
+  const { data: saved, error: saveError } = await update.select('id')
+  if (saveError) {
+    const r: StoredRefreshResult = { outcome: 'error', detail: 'save_failed' }
+    await record(r, result.notes)
+    return r
+  }
+  if (!saved || saved.length === 0) {
+    // Кто-то успел раньше: отдаём его сессию (если читается), чтобы вызывающий мог на ней
+    // повторить свою операцию, а не считал продление неудачей.
+    let newer: string | undefined
+    const { data: current } = await supabase
+      .from('kaspi_shop_connections')
+      .select('session_cookies')
+      .eq('id', connectionId)
+      .maybeSingle()
+    if (current?.session_cookies && current.session_cookies !== row.session_cookies) {
+      try {
+        newer = decryptAtRest(current.session_cookies, getKey()).toString('utf8')
+      } catch {
+        newer = undefined
+      }
+    }
+    const r: StoredRefreshResult = { outcome: 'skipped_newer', ...(newer ? { sessionCookies: newer } : {}) }
+    await record(r, result.notes)
+    return r
+  }
+  // Сессия была мёртвой и ожила: следующий обрыв снова вправе уведомить продавца.
+  if (row.session_status !== 'active') await resetSessionExpiredNotices(supabase, row.user_id)
+  const ok: StoredRefreshResult = { outcome: 'refreshed', sessionCookies: result.sessionCookies }
+  await record(ok, result.notes)
+  return ok
+}
+
 export async function saveConnection(params: {
   userId: string
   apiToken?: string
@@ -194,6 +329,7 @@ export async function saveConnection(params: {
   if (params.sessionCookies) {
     row.session_cookies = encryptAtRest(params.sessionCookies, getKey())
     row.session_status = 'active'
+    row.session_refreshed_at = new Date().toISOString()
   }
 
   // is_active is deliberately omitted for everyone except a user's very

@@ -500,6 +500,37 @@ export default function KaspiShop() {
     await load()
   }
 
+  // Сессия кабинета истекла: до того как просить телефон и код из SMS, один раз тихо
+  // пробуем получить новую по сохранённому единому входу Kaspi (10.11.2026, см.
+  // /api/kaspi-shop/session/refresh). Получилось -- страница сама оживает, SMS не нужен.
+  // Не вышло -- ничего не меняется: обычное окно подключения. Раз на магазин за открытие
+  // страницы; сервер дополнительно не пускает чаще раза в минуту.
+  const silentRefreshKey = useRef<string | null>(null)
+  const [silentTrying, setSilentTrying] = useState(false)
+  useEffect(() => {
+    if (!connectionKnown || !connected || sessionStatus !== 'session_expired' || addingNew) return
+    const key = companyName || 'store'
+    if (silentRefreshKey.current === key) return
+    silentRefreshKey.current = key
+    setSilentTrying(true)
+    ;(async () => {
+      try {
+        const headers = await authHeader()
+        const res = await fetch('/api/kaspi-shop/session/refresh', { method: 'POST', headers })
+        const data = await res.json().catch(() => null)
+        if (res.ok && (data?.status === 'refreshed' || data?.status === 'busy')) {
+          window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
+          await load()
+        }
+      } catch {
+        // сеть или сервер: остаётся обычный вход по SMS
+      } finally {
+        setSilentTrying(false)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionKnown, connected, sessionStatus, addingNew, companyName])
+
   async function startConnect() {
     if (!phone) return
     if (connectInFlight.current) return
@@ -1217,6 +1248,11 @@ export default function KaspiShop() {
               {needsReconnect && (
                 <p className="text-sm mb-4 -mt-3" style={{ color: 'var(--nav-text-secondary)' }}>
                   Товары и настройки сохранены — просто войдите в тот же магазин ещё раз, чтобы обновить сессию.
+                </p>
+              )}
+              {needsReconnect && silentTrying && (
+                <p className="text-sm mb-4" role="status" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Пробуем продлить сессию без SMS…
                 </p>
               )}
               {connectError && (

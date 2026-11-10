@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   githubStatus: 204,
   githubThrows: false,
   fetchCalls: [] as Array<{ url: string; init: any }>,
+  keepalive: { attempted: 0, refreshed: 0 } as { attempted: number; refreshed: number },
+  keepaliveThrows: false,
+  keepaliveCalls: 0,
 }))
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({}) }))
@@ -33,6 +36,14 @@ vi.mock('@/lib/kaspiShop/dispatchGuard', () => ({
   },
   releaseDispatchSlot: async (_s: unknown, key: string) => {
     h.released.push(key)
+  },
+}))
+
+vi.mock('@/lib/kaspiShop/sessionKeepalive', () => ({
+  refreshAgingSessions: async () => {
+    h.keepaliveCalls += 1
+    if (h.keepaliveThrows) throw new Error('keepalive lookup failed')
+    return h.keepalive
   },
 }))
 
@@ -55,6 +66,9 @@ beforeEach(() => {
   h.githubStatus = 204
   h.githubThrows = false
   h.fetchCalls = []
+  h.keepalive = { attempted: 0, refreshed: 0 }
+  h.keepaliveThrows = false
+  h.keepaliveCalls = 0
   vi.stubGlobal('fetch', async (url: string, init: any) => {
     h.fetchCalls.push({ url, init })
     if (h.githubThrows) throw new Error('network down')
@@ -134,5 +148,40 @@ describe('POST /api/hooks/kaspi-check-dispatch', () => {
     const second = await call()
     expect(await second.json()).toEqual({ ok: true, throttled: true })
     expect(h.fetchCalls).toHaveLength(1)
+  })
+
+  // Продление сессий кабинета идёт тем же тиком (10.11.2026).
+  it('sessions that were refreshed this tick are reported next to the dispatch result', async () => {
+    h.keepalive = { attempted: 2, refreshed: 1 }
+    const res = await call()
+    expect(await res.json()).toEqual({ ok: true, due: 1, dispatched: true, keepalive: { attempted: 2, refreshed: 1 } })
+  })
+
+  it('keepalive runs even when nothing is due to check (a session can age with no price check pending)', async () => {
+    h.due = []
+    h.keepalive = { attempted: 1, refreshed: 1 }
+    const res = await call()
+    expect(await res.json()).toEqual({ ok: true, due: 0, dispatched: false, keepalive: { attempted: 1, refreshed: 1 } })
+    expect(h.keepaliveCalls).toBe(1)
+  })
+
+  it('a failing keepalive never changes the dispatch answer', async () => {
+    h.keepaliveThrows = true
+    const res = await call()
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, due: 1, dispatched: true })
+  })
+
+  it('a dispatch error keeps its status, keepalive still ran', async () => {
+    h.githubStatus = 401
+    const res = await call()
+    expect(res.status).toBe(502)
+    expect(h.keepaliveCalls).toBe(1)
+  })
+
+  it('unauthorized and throttled calls do no keepalive work', async () => {
+    process.env.HOOKS_PG_NET_SECRET = 's3cret'
+    expect((await call()).status).toBe(401)
+    expect(h.keepaliveCalls).toBe(0)
   })
 })
