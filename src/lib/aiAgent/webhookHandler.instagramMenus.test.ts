@@ -523,10 +523,19 @@ describe('токен напоминания в ответе на КОНТРАГ�
     expect(tokens[1]).toBe(tokens[0])
   })
 
-  it('другие кодовые слова (СЧЁТ) токен не получают и напоминаний не создают', async () => {
+  it('СЧЁТ (с 13.11.2026) получает токен и создаёт напоминание с пометкой инструмента schet', async () => {
     h.state.templates = [...SPECIAL, REM, SCHET]
     await handleTenantIncoming(conn, dm('d1', 'счёт'))
-    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: 'Ссылка на счёт https://invoices.kz/go/dm-schet' }])
+    expect(h.state.sends).toHaveLength(1)
+    expect(h.state.sends[0].text).toMatch(/^Ссылка на счёт https:\/\/invoices\.kz\/go\/dm-schet\?utm_content=[A-Za-z0-9_-]{16}$/)
+    expect(h.state.reminders).toHaveLength(1)
+    expect(h.state.reminders[0]).toMatchObject({ status: 'pending', agent_id: 'agent1', tool: 'schet' })
+  })
+
+  it('другие кодовые слова (ПРЕДЛОЖЕНИЕ) токен не получают и напоминаний не создают', async () => {
+    h.state.templates = [...SPECIAL, REM, t('kp', 'dm', ['=предложение', '@codeword'], 'КП https://invoices.kz/go/dm-kp')]
+    await handleTenantIncoming(conn, dm('d1', 'предложение'))
+    expect(h.state.sends).toEqual([{ kind: 'dm', to: 'u1', text: 'КП https://invoices.kz/go/dm-kp' }])
     expect(h.state.reminders).toEqual([])
   })
 

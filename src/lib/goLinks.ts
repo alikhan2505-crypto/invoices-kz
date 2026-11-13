@@ -97,6 +97,8 @@ export const GO_LINKS: readonly GoLink[] = [
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
   // Личные сообщения (25.10.2026, ещё 8 кодовых слов из роликов).
   link('dm-schet', '/tools/schet', 'dm', 'outreach', 'schet_oct', 'личные сообщения: ответ на слово СЧЁТ'),
+  // Ссылка в НАПОМИНАНИИ через ~2 часа после ответа на слово СЧЁТ (13.11.2026, aiAgent/dmReminder.ts).
+  link('dm-schet-rem', '/tools/schet', 'dm', 'outreach', 'schet_oct_rem', 'личные сообщения: ссылка в напоминании через 2 часа после слова СЧЁТ'),
   hostLink('dm-podpis', 'docs.invoices.kz', '/invoices-landing', 'dm', 'outreach', 'esign_oct', 'личные сообщения: ответ на слово ПОДПИСЬ (лендинг Счетов, блок ЭЦП, тариф Про)'),
   link('dm-kp', '/tools/kp', 'dm', 'outreach', 'kp_oct', 'личные сообщения: ответ на слово ПРЕДЛОЖЕНИЕ'),
   link('dm-akt', '/tools/avr', 'dm', 'outreach', 'avr_oct', 'личные сообщения: ответ на слово АКТ'),

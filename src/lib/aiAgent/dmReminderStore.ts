@@ -50,7 +50,7 @@ export function createReminderStore(db: SupabaseClient): ReminderStore {
       if (agentIds.length === 0) return []
       const now = Date.parse(nowIso)
       const { data, error } = await table()
-        .select('id, agent_id, conversation_id, token, link_sent_at, last_inbound_at')
+        .select('id, agent_id, conversation_id, token, link_sent_at, last_inbound_at, tool')
         .eq('status', 'pending')
         .in('agent_id', agentIds)
         .lte('link_sent_at', new Date(now - REMINDER_AFTER_MS).toISOString())

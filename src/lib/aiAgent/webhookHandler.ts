@@ -33,7 +33,7 @@ import {
   SPECIAL_TRIGGERS, type TemplateRow, type AttachmentRule,
 } from './instagramSpecialTemplates'
 import { ownerHasCommentsScope } from './instagramScopes'
-import { reminderConfigFromRows, replyHasTrackedLink, withTokenInReply, prepareReminderTracking, confirmReminderLinkSent } from './dmReminder'
+import { reminderConfigFromRows, replyHasTrackedLink, reminderToolOf, withTokenInReply, prepareReminderTracking, confirmReminderLinkSent } from './dmReminder'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -469,7 +469,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     // кнопка) как utm_content. Любой сбой трекинга -- ответ уходит как раньше, без токена.
     let reminderToken: string | null = null
     if (params.source === 'dm' && reminderConfigFromRows(templates).enabled && replyHasTrackedLink(match)) {
-      reminderToken = await prepareReminderTracking(supabase, { agentId: conn.agentId, conversationId: conversation.id })
+      reminderToken = await prepareReminderTracking(supabase, { agentId: conn.agentId, conversationId: conversation.id, tool: reminderToolOf(match) })
       if (reminderToken) match = withTokenInReply(match, reminderToken)
     }
     try {

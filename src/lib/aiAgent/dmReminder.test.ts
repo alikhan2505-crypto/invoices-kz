@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import {
-  DEFAULT_REMINDER_TEXT, REMINDER_AFTER_MS, REMINDER_DAILY_LIMIT, REMINDER_PER_RUN_LIMIT, REMINDER_STUCK_AFTER_MS, REMINDER_WINDOW_MAX_MS,
+  DEFAULT_REMINDER_TEXT, REMINDER_AFTER_MS, REMINDER_DAILY_LIMIT, REMINDER_PER_RUN_LIMIT, REMINDER_STUCK_AFTER_MS, REMINDER_WINDOW_MAX_MS, SCHET_REMINDER_TEXT,
   attributionReady, confirmReminderLinkSent, decideReminder, failureReason, hasTrackedLink, isQuietHoursAlmaty, newReminderToken,
-  prepareReminderTracking, reminderConfigFromRows, replyHasTrackedLink, resetAttributionCache, runDmReminders,
+  prepareReminderTracking, reminderConfigFromRows, reminderTextFor, reminderToolOf, replyHasTrackedLink, resetAttributionCache, runDmReminders,
   withReminderToken, withTokenInReply,
   type ReminderConfig, type ReminderConversation, type ReminderDeps, type ReminderRow, type ReminderStore,
 } from './dmReminder'
@@ -30,7 +30,7 @@ describe('токен и ссылки', () => {
     expect(withReminderToken(text, tok)).toBe(`Вот проверка по БИН 👇 https://invoices.kz/go/dm-kontragent?utm_content=${tok}\n\nПокажет долги.`)
     expect(withReminderToken('https://invoices.kz/go/dm-kontragent-btn', tok)).toBe(`https://invoices.kz/go/dm-kontragent-btn?utm_content=${tok}`)
     // чужие ссылки и ссылка напоминания не меняются
-    for (const same of ['https://invoices.kz/go/dm-schet', 'https://invoices.kz/go/dm-kontragent-rem', 'https://invoices.kz/go/dm-kontragent2', 'https://example.com/go/dm-kontragent']) {
+    for (const same of ['https://invoices.kz/go/dm-kp', 'https://invoices.kz/go/dm-kontragent-rem', 'https://invoices.kz/go/dm-schet-rem', 'https://invoices.kz/go/dm-kontragent2', 'https://example.com/go/dm-kontragent']) {
       expect(withReminderToken(same, tok)).toBe(same)
     }
     // уже есть query: добавляем через &, повторно не добавляем
@@ -46,7 +46,7 @@ describe('токен и ссылки', () => {
       button: { title: 'Т', subtitle: 'П', buttonTitle: 'Открыть', url: 'https://invoices.kz/go/dm-kontragent-btn' },
     }
     expect(replyHasTrackedLink(r)).toBe(true)
-    expect(replyHasTrackedLink({ reply_text: 'Счёт: https://invoices.kz/go/dm-schet', button: null })).toBe(false)
+    expect(replyHasTrackedLink({ reply_text: 'КП: https://invoices.kz/go/dm-kp', button: null })).toBe(false)
     expect(replyHasTrackedLink({ reply_text: 'без ссылки', button: { ...r.button } })).toBe(true)
     const t = withTokenInReply(r, 'AbCdEf0123456789')
     expect(t.reply_text).toContain('?utm_content=AbCdEf0123456789')
@@ -59,6 +59,25 @@ describe('токен и ссылки', () => {
     expect(withReminderToken('https://invoices.kz/go/ad-kontragent', tok)).toBe(`https://invoices.kz/go/ad-kontragent?utm_content=${tok}`)
     expect(withReminderToken('https://invoices.kz/go/ad-kontragent-btn', tok)).toBe(`https://invoices.kz/go/ad-kontragent-btn?utm_content=${tok}`)
     expect(hasTrackedLink('https://invoices.kz/go/ad-marzha')).toBe(false)
+  })
+
+  it('СЧЁТ (13.11.2026): ссылки dm-schet, ad-schet, ad-schet-btn получают токен, ссылка напоминания dm-schet-rem нет', () => {
+    const tok = 'AbCdEf0123456789'
+    for (const code of ['dm-schet', 'ad-schet', 'ad-schet-btn']) {
+      expect(hasTrackedLink(`https://invoices.kz/go/${code}`), code).toBe(true)
+      expect(withReminderToken(`Вот счёт https://invoices.kz/go/${code}\n\nТекст`, tok)).toBe(`Вот счёт https://invoices.kz/go/${code}?utm_content=${tok}\n\nТекст`)
+    }
+    expect(hasTrackedLink('https://invoices.kz/go/dm-schet-rem')).toBe(false)
+  })
+
+  it('reminderToolOf: инструмент по ссылке в тексте или на кнопке; чужая ссылка и ссылка напоминания дают null', () => {
+    const b = null
+    expect(reminderToolOf({ reply_text: 'https://invoices.kz/go/dm-schet', button: b })).toBe('schet')
+    expect(reminderToolOf({ reply_text: 'x https://invoices.kz/go/ad-schet?utm_content=AbCdEf0123456789 y', button: b })).toBe('schet')
+    expect(reminderToolOf({ reply_text: 'https://invoices.kz/go/dm-kontragent', button: b })).toBe('kontragent')
+    expect(reminderToolOf({ reply_text: 'без ссылки', button: { title: 'Т', subtitle: 'П', buttonTitle: 'О', url: 'https://invoices.kz/go/ad-schet-btn' } })).toBe('schet')
+    expect(reminderToolOf({ reply_text: 'https://invoices.kz/go/dm-kp', button: b })).toBeNull()
+    expect(reminderToolOf({ reply_text: 'https://invoices.kz/go/dm-schet-rem', button: b })).toBeNull()
   })
 
   it('в токене нет персональных данных: ссылка = только адрес + случайная строка', () => {
@@ -83,6 +102,13 @@ describe('настройка: выключатель и текст', () => {
   it('служебный блок @@button в тексте клиенту не уходит', () => {
     const cfg = reminderConfigFromRows([row(['@reminder'], 'Текст\n\n@@button\ntitle: T\nbutton: B\nurl: https://x.kz')])
     expect(cfg.text).toBe('Текст')
+  })
+  it('текст напоминания про счёт: короткий, своя ссылка dm-schet-rem, без давления; для остальных текст агента', () => {
+    expect(SCHET_REMINDER_TEXT.length).toBeLessThan(200)
+    expect(SCHET_REMINDER_TEXT).toContain('https://invoices.kz/go/dm-schet-rem')
+    expect(SCHET_REMINDER_TEXT).not.toMatch(/срочно|последн|только сегодня|!/i)
+    expect(reminderTextFor('ТЕКСТ АГЕНТА', 'schet')).toBe(SCHET_REMINDER_TEXT)
+    for (const t of ['kontragent', null, undefined, 'неизвестно']) expect(reminderTextFor('ТЕКСТ АГЕНТА', t)).toBe('ТЕКСТ АГЕНТА')
   })
   it('текст по умолчанию: короткий, русский, ссылка на ту же проверку, без давления', () => {
     expect(DEFAULT_REMINDER_TEXT.length).toBeLessThan(200)
@@ -227,6 +253,15 @@ describe('runDmReminders', () => {
     expect(sends).toEqual([{ to: 'IGSID-1', text: 'НАПОМИНАНИЕ', creds: { connectionId: 'c1', externalAccountId: 'ig1', accessToken: 'SECRET-TOKEN' } }])
     expect(rows[0].status).toBe('sent')
     expect(log.outbound).toEqual([{ conversationId: 'conv1', text: 'НАПОМИНАНИЕ' }])
+  })
+
+  it('строка с tool=schet получает текст про счёт (в отправке и в журнале), без tool или kontragent -- текст агента', async () => {
+    const rows = [mkRow(1, { tool: 'schet' }), mkRow(2, { tool: 'kontragent' }), mkRow(3)]
+    const { store, log } = fakeStore(rows)
+    const { deps, sends } = depsFor(store)
+    await runDmReminders(deps)
+    expect(sends.map(s => s.text)).toEqual([SCHET_REMINDER_TEXT, 'НАПОМИНАНИЕ', 'НАПОМИНАНИЕ'])
+    expect(log.outbound.map(o => o.text)).toEqual([SCHET_REMINDER_TEXT, 'НАПОМИНАНИЕ', 'НАПОМИНАНИЕ'])
   })
 
   it('ещё нет 2 часов -- не шлём, строка остаётся pending', async () => {
@@ -616,6 +651,14 @@ describe('prepareReminderTracking / confirmReminderLinkSent', () => {
     expect(state.reminders).toHaveLength(1)
     expect(state.reminders[0]).toMatchObject({ status: 'prepared', agent_id: 'a1', conversation_id: 'c1' })
     expect(state.upserts[0].opts).toEqual({ onConflict: 'conversation_id', ignoreDuplicates: true })
+  })
+
+  it('инструмент записывается в строку (schet), без него -- null', async () => {
+    const { db, state } = fakeDb()
+    await prepareReminderTracking(db, { agentId: 'a1', conversationId: 'c1', tool: 'schet' })
+    await prepareReminderTracking(db, { agentId: 'a1', conversationId: 'c2' })
+    expect(state.reminders[0].tool).toBe('schet')
+    expect(state.reminders[1].tool).toBeNull()
   })
 
   it('два разных диалога -- два разных токена', async () => {

@@ -109,6 +109,14 @@ describe('ссылка в напоминании КОНТРАГЕНТ', () => {
   })
 })
 
+describe('ссылка в напоминании СЧЁТ (13.11.2026)', () => {
+  it('dm-schet-rem: тот же инструмент, отдельная кампания schet_oct_rem, ответ на слово не тронут', () => {
+    expect(resolveGo('dm-schet-rem')).toBe('/tools/schet?utm_source=dm&utm_medium=outreach&utm_campaign=schet_oct_rem')
+    expect(resolveGo('dm-schet')).toBe('/tools/schet?utm_source=dm&utm_medium=outreach&utm_campaign=schet_oct')
+    expect(goRedirects().find(x => x.source === '/go/dm-schet-rem')?.destination).toBe(resolveGo('dm-schet-rem'))
+  })
+})
+
 describe('goDestination / resolveGo', () => {
   it('builds the path with the three utm params', () => {
     expect(resolveGo('nakladnye')).toBe('/tools/waybills?utm_source=tg_chat&utm_medium=chat_post&utm_campaign=waybills_oct')

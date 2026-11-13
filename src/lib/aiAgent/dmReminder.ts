@@ -80,11 +80,33 @@ export const REMINDER_TIME_BUDGET_MS = 30_000
 export const REMINDER_STUCK_AFTER_MS = 10 * 60_000
 
 /** Ссылки /go/<код>, которые получают токен. Остальные ответы агента не затрагиваются. */
-export const REMINDER_TRACKED_GO_CODES = ['dm-kontragent-btn', 'dm-kontragent', 'ad-kontragent-btn', 'ad-kontragent'] as const
+export const REMINDER_TRACKED_GO_CODES = [
+  'dm-kontragent-btn', 'dm-kontragent', 'ad-kontragent-btn', 'ad-kontragent',
+  // 13.11.2026: СЧЁТ. В разборе директа 27.10-08.11 две трети чатов были про счёт, а напоминание
+  // существовало только для КОНТРАГЕНТ.
+  'dm-schet', 'ad-schet-btn', 'ad-schet',
+] as const
+
+/** Инструмент, к которому относится ответ со ссылкой: от него зависит текст напоминания. */
+export type ReminderTool = 'kontragent' | 'schet'
+
+const TOOL_BY_GO_CODE: Record<(typeof REMINDER_TRACKED_GO_CODES)[number], ReminderTool> = {
+  'dm-kontragent-btn': 'kontragent', 'dm-kontragent': 'kontragent', 'ad-kontragent-btn': 'kontragent', 'ad-kontragent': 'kontragent',
+  'dm-schet': 'schet', 'ad-schet-btn': 'schet', 'ad-schet': 'schet',
+}
 
 /** Ссылка в напоминании -- отдельная кампания, чтобы отличать заходы по напоминанию (goLinks.ts). */
 export const DEFAULT_REMINDER_TEXT =
   'Если проверка по БИН ещё нужна, ссылка здесь: https://invoices.kz/go/dm-kontragent-rem\n\n3 проверки в квартал бесплатно.'
+
+/** Напоминание для СЧЁТ: текст в коде (строка @reminder агента хранит текст про КОНТРАГЕНТ). */
+export const SCHET_REMINDER_TEXT =
+  'Если счёт ещё нужен, ссылка здесь: https://invoices.kz/go/dm-schet-rem\n\n3 счёта в квартал бесплатно, без регистрации.'
+
+/** Текст напоминания: для счёта свой, для остальных (в том числе старых строк без tool) -- из настройки агента. */
+export function reminderTextFor(agentText: string, tool: string | null | undefined): string {
+  return tool === 'schet' ? SCHET_REMINDER_TEXT : agentText
+}
 
 // ---------------------------------------------------------------- чистая логика
 
@@ -119,6 +141,17 @@ export interface ReplyWithButton {
 /** Ответ шаблона содержит отслеживаемую ссылку (в тексте или на кнопке). */
 export function replyHasTrackedLink(r: ReplyWithButton): boolean {
   return hasTrackedLink(r.reply_text) || (!!r.button && hasTrackedLink(r.button.url))
+}
+
+/** Инструмент по первой отслеживаемой ссылке ответа (текст, затем кнопка) или null. */
+export function reminderToolOf(r: ReplyWithButton): ReminderTool | null {
+  for (const s of [r.reply_text, r.button?.url ?? '']) {
+    const m = new RegExp(TRACKED_LINK_RE.source).exec(typeof s === 'string' ? s : '')
+    if (!m) continue
+    const code = m[0].replace('https://invoices.kz/go/', '').replace(/\?.*$/, '') as keyof typeof TOOL_BY_GO_CODE
+    return TOOL_BY_GO_CODE[code] ?? null
+  }
+  return null
 }
 
 /** Тот же ответ, но со ссылками, несущими токен (текст и кнопка). */
@@ -215,12 +248,12 @@ export async function latestInboundAt(db: SupabaseClient, conversationId: string
  * после confirmReminderLinkSent. Повторный вызов в том же диалоге отдаёт тот же токен.
  * Не бросает: сбой трекинга не должен мешать ответу клиенту.
  */
-export async function prepareReminderTracking(db: SupabaseClient, args: { agentId: string; conversationId: string }): Promise<string | null> {
+export async function prepareReminderTracking(db: SupabaseClient, args: { agentId: string; conversationId: string; tool?: ReminderTool | null }): Promise<string | null> {
   try {
     if (!(await attributionReady(db))) return null
     const nowIso = new Date().toISOString()
     const { error } = await db.from(REMINDER_TABLE).upsert(
-      { agent_id: args.agentId, conversation_id: args.conversationId, token: newReminderToken(), status: 'prepared', link_sent_at: nowIso, last_inbound_at: nowIso },
+      { agent_id: args.agentId, conversation_id: args.conversationId, token: newReminderToken(), status: 'prepared', link_sent_at: nowIso, last_inbound_at: nowIso, tool: args.tool ?? null },
       { onConflict: 'conversation_id', ignoreDuplicates: true },
     )
     if (error) {
@@ -263,6 +296,8 @@ export interface ReminderRow {
   token: string
   link_sent_at: string
   last_inbound_at: string
+  /** Инструмент ответа со ссылкой (null у строк до 13.11.2026 и у КОНТРАГЕНТ): от него зависит текст. */
+  tool?: string | null
 }
 
 export interface ReminderConversation {
@@ -427,8 +462,9 @@ export async function runDmReminders(deps: ReminderDeps): Promise<ReminderRunSum
       if (!(await store.claim(row.id, nowIso))) continue // параллельный запуск успел раньше
       remaining.set(row.agent_id, (remaining.get(row.agent_id) ?? 0) - 1)
 
+      const text = reminderTextFor(cfg.text, row.tool)
       try {
-        await deps.sendText(conn, conv.external_thread_id, cfg.text)
+        await deps.sendText(conn, conv.external_thread_id, text)
       } catch (err) {
         const reason = failureReason(err)
         await store.markFailed(row.id, reason)
@@ -441,7 +477,7 @@ export async function runDmReminders(deps: ReminderDeps): Promise<ReminderRunSum
       }
       await store.markSent(row.id, nowIso)
       summary.sent++
-      try { await store.logOutbound(row.conversation_id, cfg.text) } catch { /* сообщение ушло; журнал вторичен */ }
+      try { await store.logOutbound(row.conversation_id, text) } catch { /* сообщение ушло; журнал вторичен */ }
     } catch (err) {
       // Сбой чтения/записи по одной строке: считаем и идём дальше. Строка остаётся pending
       // (если сбой до claim) и будет рассмотрена в следующий тик, пока открыто окно.
