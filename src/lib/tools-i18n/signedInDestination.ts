@@ -23,7 +23,7 @@ import { PRODUCTS } from '@/lib/products'
 // utm params ride along like on the anonymous links, so analytics can still
 // tell which tool and which block sent the click.
 
-export type ToolCtaMedium = 'cta' | 'limit' | 'fullcard'
+export type ToolCtaMedium = 'cta' | 'limit' | 'fullcard' | 'after_doc'
 
 export const KASPI_BOT_LANDING_ORIGIN =
   PRODUCTS.find(p => p.key === 'kaspiShop')?.landing ?? 'https://kaspi.invoices.kz'

@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, toolGuidePath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import ToolAfterDocCard from '@/lib/tools-i18n/ToolAfterDocCard'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
@@ -122,6 +123,8 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
   // иначе двойной клик открыл бы два окна, списал две попытки и дважды
   // записал email. Ref — чтобы защита не зависела от перерисовки.
   const [generating, setGenerating] = useState(false)
+  // Документ уже создан в этой вкладке: после него показываем приглашение в кабинет (ToolAfterDocCard).
+  const [docMade, setDocMade] = useState(false)
   const busy = useRef(false)
   const setRow = (i: number, patch: Partial<Row>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
@@ -196,6 +199,7 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
         },
       }, win)
       logToolEvent('doc', 'nakladnaya', { lang })
+      setDocMade(true)
       // Email продавца — в базу контактов только с согласием и только после того,
       // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
       // записи документу не мешает. Сам email в бланк не печатается.
@@ -401,6 +405,8 @@ export default function NakladnayaTool({ lang, children }: { lang: ToolLang; chi
             )}
           </div>
         )}
+
+        <ToolAfterDocCard source="nakladnaya" lang={lang} show={docMade && !signedIn && !limitReached} />
 
         {children}
 

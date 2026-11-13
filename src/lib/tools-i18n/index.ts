@@ -203,6 +203,10 @@ export interface ToolChromeCopy {
   ctaTitle: string
   ctaBody: string
   ctaButton: string
+  /** Приглашение сразу после созданного документа (ToolAfterDocCard, 13.11.2026). kk здесь намеренно те же уже вычитанные строки, что у карточки внизу. */
+  afterDocTitle: string
+  afterDocBody: string
+  afterDocButton: string
   /** Та же карточка для вошедшего (с 15.10.2026): не «попробуйте», а «вы уже здесь». */
   ctaSignedInTitle: string
   ctaSignedInBody: string
@@ -229,6 +233,10 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Счета с оплатой Kaspi прямо в счёте, клиенты и история, проверка контрагентов без лимита. Бесплатный тариф — 3 счёта в месяц, а первые 7 дней — тариф Базовый бесплатно. Вход по ссылке на почту, карта не нужна.',
     ctaButton: 'Попробовать бесплатно',
+    afterDocTitle: 'Документ готов. Не вводите реквизиты заново',
+    afterDocBody:
+      'Войдите по ссылке на почту: реквизиты из этого документа сохранятся в кабинете одним нажатием, а клиенты и история документов будут в одном месте. Карта не нужна.',
+    afterDocButton: 'Сохранить реквизиты в кабинете',
     ctaSignedInTitle: 'Вы уже в invoices.kz',
     ctaSignedInBody: 'Продолжите в кабинете: счета с оплатой Kaspi, клиенты и история документов.',
     ctaSignedInButton: 'Открыть кабинет',
@@ -247,6 +255,11 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Kaspi төлемі тікелей шоттың ішінде, клиенттер мен тарих, контрагенттерді шектеусіз тексеру. Тегін тариф — айына 3 шот, ал алғашқы 7 күн Базалық тариф тегін. Кіру поштаға келген сілтеме арқылы, карта қажет емес.',
     ctaButton: 'Тегін байқап көру',
+    // Новых kk-строк не пишем (реестр вычитки src/lib/kkReview.ts): берём уже вычитанные.
+    afterDocTitle: 'Ұнады ма? Кабинетте мүмкіндік көбірек.',
+    afterDocBody:
+      'Kaspi төлемі тікелей шоттың ішінде, клиенттер мен тарих, контрагенттерді шектеусіз тексеру. Тегін тариф — айына 3 шот, ал алғашқы 7 күн Базалық тариф тегін. Кіру поштаға келген сілтеме арқылы, карта қажет емес.',
+    afterDocButton: 'Тегін байқап көру',
     ctaSignedInTitle: 'Сіз invoices.kz жүйесіне кіріп тұрсыз',
     ctaSignedInBody: 'Жұмысты кабинетте жалғастырыңыз: Kaspi арқылы төленетін шоттар, клиенттер және құжаттар тарихы.',
     ctaSignedInButton: 'Кабинетті ашу',
@@ -265,6 +278,10 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Kaspi payment right inside the invoice, clients and history, unlimited counterparty checks. The free plan gives 3 invoices a month, and your first 7 days are on the Basic plan for free. Sign in with an email link, no card required.',
     ctaButton: 'Try it free',
+    afterDocTitle: 'Your document is ready. Do not retype your details',
+    afterDocBody:
+      'Sign in with an email link and the details from this document are saved in your account in one click, with your clients and document history in one place. No card needed.',
+    afterDocButton: 'Save my details in the account',
     ctaSignedInTitle: 'You are already signed in to invoices.kz',
     ctaSignedInBody: 'Carry on in your account: invoices with Kaspi payment, clients and your document history.',
     ctaSignedInButton: 'Open my account',

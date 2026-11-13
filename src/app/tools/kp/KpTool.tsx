@@ -10,6 +10,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, isToolLocalized, toolGuidePath, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import ToolAfterDocCard from '@/lib/tools-i18n/ToolAfterDocCard'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
@@ -98,6 +99,8 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
   // а кнопка всё равно спросит сервер при нажатии.
   const [quota, setQuota] = useState<Quota | null>(null)
   const [generating, setGenerating] = useState(false)
+  // Документ уже создан в этой вкладке: после него показываем приглашение в кабинет (ToolAfterDocCard).
+  const [docMade, setDocMade] = useState(false)
   // Язык печатного документа: по умолчанию язык страницы, в черновик не пишем -
   // иначе русская страница наследовала бы выбор, сделанный на английской.
   const [docLang, setDocLang] = useState<KpLang>(lang)
@@ -248,6 +251,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
         },
       }, win)
       logToolEvent('doc', 'kp', { lang })
+      setDocMade(true)
       // Email поставщика — в базу контактов только с согласием. Email
       // покупателя не сохраняется никогда. Ошибка записи КП не ломает.
       const email = f.email.trim()
@@ -473,6 +477,8 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
             )}
           </div>
         )}
+
+        <ToolAfterDocCard source="kp" lang={lang} show={docMade && !signedIn && !limitReached} />
 
         {children}
 

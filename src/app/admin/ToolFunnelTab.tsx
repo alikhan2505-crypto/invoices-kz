@@ -40,6 +40,7 @@ const MEDIUM_LABELS: Record<string, string> = {
   product: 'Kaspi Bot',
   upgrade: 'подключить',
   export: 'Excel',
+  after_doc: 'после документа',
   other: 'прочее',
 }
 
