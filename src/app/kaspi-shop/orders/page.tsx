@@ -8,7 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES, PACKING_STATUS } from '@/lib/kaspiShop/orderStatuses'
-import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
+import { filterByDeliveryCutoff, deliveryDueLabel, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
 import { paginateOrders, partialLoadMessage, almatyDateStamp } from '@/lib/kaspiShop/ordersPaging'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { getActivePlan } from '@/lib/plan'
@@ -617,6 +617,12 @@ function KaspiShopOrdersInner() {
                   </div>
                   <div className="text-[10px] max-sm:text-xs mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
                   <div className="text-[10px] max-sm:text-xs font-mono truncate" style={{ color: 'var(--nav-text-muted)' }}>№{o.code}</div>
+                  {(() => {
+                    const due = deliveryDueLabel(o.plannedDeliveryDate)
+                    return due ? (
+                      <div data-testid="order-due" className="text-[10px] max-sm:text-xs mt-0.5 truncate font-medium" style={{ color: due.urgent ? 'var(--nav-critical)' : 'var(--nav-text-secondary)' }}>{due.text}</div>
+                    ) : null
+                  })()}
                   <div className="flex items-center justify-between gap-1 mt-1">
                     <div className="font-mono font-bold text-xs max-sm:text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
                     <button type="button" aria-label="Подробнее о заказе"
