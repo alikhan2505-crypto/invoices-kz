@@ -587,7 +587,8 @@ function KaspiShopOrdersInner() {
           </div>
           )
         ) : (() => {
-          const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 min-[2000px]:grid-cols-10 gap-2.5'
+          // На телефоне 2 колонки (P24, 13.11.2026): в 3 колонки текст по 10-11 px и кнопки по 29 px не читались и не нажимались.
+          const CARD_GRID = 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 min-[2000px]:grid-cols-10 gap-2.5'
 
           function renderCard(o: Order, i: number) {
             const firstItem = o.items[0]
@@ -602,7 +603,7 @@ function KaspiShopOrdersInner() {
                 {selectable && (
                   <input type="checkbox" checked={selected.has(o.code)} onClick={e => e.stopPropagation()}
                     onChange={() => toggleSelected(o.code)}
-                    className="absolute top-1.5 left-1.5 z-10 accent-[var(--nav-success)] w-3.5 h-3.5" />
+                    className="absolute top-1.5 left-1.5 z-10 accent-[var(--nav-success)] w-3.5 h-3.5 max-sm:w-5 max-sm:h-5" />
                 )}
                 {firstItem?.imageUrl ? (
                   <img src={firstItem.imageUrl} alt={firstItem.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
@@ -610,17 +611,17 @@ function KaspiShopOrdersInner() {
                   <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
                 )}
                 <div className="p-2">
-                  <div className="text-[11px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>
+                  <div className="text-[11px] max-sm:text-[13px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>
                     {firstItem?.name || `Заказ №${o.code}`}
                     {extraCount > 0 && <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}> +{extraCount}</span>}
                   </div>
-                  <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
-                  <div className="text-[10px] font-mono truncate" style={{ color: 'var(--nav-text-muted)' }}>№{o.code}</div>
+                  <div className="text-[10px] max-sm:text-xs mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
+                  <div className="text-[10px] max-sm:text-xs font-mono truncate" style={{ color: 'var(--nav-text-muted)' }}>№{o.code}</div>
                   <div className="flex items-center justify-between gap-1 mt-1">
-                    <div className="font-mono font-bold text-xs tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+                    <div className="font-mono font-bold text-xs max-sm:text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
                     <button type="button" aria-label="Подробнее о заказе"
                       onClick={e => { e.stopPropagation(); router.push(`/kaspi-shop/orders/${o.code}`) }}
-                      className="flex-shrink-0 rounded-full p-2 -m-1.5 transition-colors hover:opacity-70" style={{ color: 'var(--nav-text-muted)' }}>
+                      className="flex-shrink-0 rounded-full p-2 -m-1.5 max-sm:w-11 max-sm:h-11 max-sm:-m-2.5 max-sm:flex max-sm:items-center max-sm:justify-center transition-colors hover:opacity-70" style={{ color: 'var(--nav-text-muted)' }}>
                       <ChevronRightIcon />
                     </button>
                     <button type="button" aria-label="Запросить отзыв в WhatsApp"
@@ -633,7 +634,7 @@ function KaspiShopOrdersInner() {
                           text: `Здравствуйте! Спасибо за заказ «${name}» 🙏 Будем очень благодарны, если оставите отзыв на Kaspi — это помогает нам и другим покупателям.`,
                         })
                       }}
-                      className="flex-shrink-0 rounded-full p-2 -m-1.5 transition-colors hover:opacity-70" style={{ color: 'var(--nav-success)' }}>
+                      className="flex-shrink-0 rounded-full p-2 -m-1.5 max-sm:w-11 max-sm:h-11 max-sm:-m-2.5 max-sm:flex max-sm:items-center max-sm:justify-center transition-colors hover:opacity-70" style={{ color: 'var(--nav-success)' }}>
                       <WhatsAppIcon />
                     </button>
                   </div>
