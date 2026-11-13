@@ -756,3 +756,18 @@ describe('P9: поиск и фильтр списка товаров', () => {
     expect(cardCount()).toBe(3)
   })
 })
+
+describe('P11: ссылка в калькулятор маржи из окна настроек товара', () => {
+  it('несёт название, цену Kaspi и признак «в наличии»', async () => {
+    await mount()
+    await openCard()
+    const link = byText('a', 'посчитать в калькуляторе') as HTMLAnchorElement
+    expect(link).not.toBeNull()
+    const href = link.getAttribute('href') || ''
+    expect(href.startsWith('/kaspi-shop/margin?')).toBe(true)
+    const q = new URLSearchParams(href.split('?')[1])
+    expect(q.get('name')).toBe('Чехол для телефона')
+    expect(q.get('price')).toBe('1500')
+    expect(q.get('instock')).toBe('1')
+  })
+})

@@ -25,6 +25,7 @@ import {
 import { FLOOR_LOW_SHARE } from '@/lib/kaspiShop/productSettings'
 import { PRODUCTS_PAGE_SIZE, filterCounts, filterProducts, type ProductFilterKey } from '@/lib/kaspiShop/productFilter'
 import { freshnessLine } from '@/lib/kaspiShop/productFreshness'
+import { marginHref } from '@/lib/kaspiShop/source1688'
 
 type Product = {
   id: string
@@ -1764,7 +1765,7 @@ export default function KaspiShop() {
                               </div>
                               <div className="text-[11px] mb-3 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
                                 <b>Минимум</b>: ниже этой цены бот цену не опустит. Введите свою закупку + комиссию Kaspi + доставку + прибыль, которую не хотите терять
-                                (<a href="/kaspi-shop/margin" style={{ color: 'var(--nav-accent)' }}>посчитать в калькуляторе</a>).{' '}
+                                (<a href={marginHref({ name: p.product_name, price: p.own_current_price, weightGrams: null, inStock: true })} style={{ color: 'var(--nav-accent)' }}>посчитать в калькуляторе</a>).{' '}
                                 <b>Максимум</b> необязателен: выше этой цены бот не поднимет. <b>Шаг</b>: на сколько тенге ниже конкурента ставить цену.
                               </div>
                               {/* Остатки живут по складам/городам (founder,

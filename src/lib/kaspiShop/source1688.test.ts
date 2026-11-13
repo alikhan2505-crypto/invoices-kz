@@ -114,7 +114,14 @@ describe('калькулятор маржи', () => {
   it('ссылка и чтение возвращают то же самое', () => {
     const href = marginHref({ name: 'Влажные салфетки 80 шт', price: 1999.6, weightGrams: 350 })
     expect(href.startsWith('/kaspi-shop/margin?')).toBe(true)
-    expect(readMarginPrefill(href.split('?')[1])).toEqual({ name: 'Влажные салфетки 80 шт', price: '2000', weight: '350' })
+    expect(readMarginPrefill(href.split('?')[1])).toEqual({ name: 'Влажные салфетки 80 шт', price: '2000', weight: '350', inStock: false })
+  })
+  it('товар «в наличии» едет в ссылке и читается обратно; по умолчанию его нет', () => {
+    const href = marginHref({ name: 'Elma 72 шт', price: 600, weightGrams: null, inStock: true })
+    expect(href).toBe('/kaspi-shop/margin?name=Elma+72+%D1%88%D1%82&price=600&instock=1')
+    expect(readMarginPrefill(href.split('?')[1]).inStock).toBe(true)
+    expect(readMarginPrefill('instock=0').inStock).toBe(false)
+    expect(readMarginPrefill('name=X').inStock).toBe(false)
   })
   it('нет веса и цены: параметров нет', () => {
     expect(marginHref({ name: 'X', price: 0, weightGrams: null })).toBe('/kaspi-shop/margin?name=X')

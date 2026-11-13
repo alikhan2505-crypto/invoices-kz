@@ -72,6 +72,8 @@ export default function KaspiShopMargin() {
   const [weightGrams, setWeightGrams] = useState('')
   const [packagingCost, setPackagingCost] = useState('')
   const [cargoRatePerKg, setCargoRatePerKg] = useState(String(DEFAULT_CARGO_RATE_PER_KG))
+  // Товар уже на складе продавца (например, из Демпинга): карго за него не платят, поле скрыто.
+  const [inStock, setInStock] = useState(false)
   const [categorySelection, setCategorySelection] = useState('')
   const [commissionRatePercent, setCommissionRatePercent] = useState('')
   const [deliveryFee, setDeliveryFee] = useState('')
@@ -101,6 +103,7 @@ export default function KaspiShopMargin() {
     if (pre.name) setProductName(pre.name)
     if (pre.price) setKaspiPrice(pre.price)
     if (pre.weight) setWeightGrams(pre.weight)
+    if (pre.inStock) setInStock(true)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
@@ -179,10 +182,10 @@ export default function KaspiShopMargin() {
     commissionRatePercent: Number(commissionRatePercent) || 0,
     sourcingPrice: Number(sourcingPrice) || 0,
     weightGrams: Number(weightGrams) || 0,
-    cargoRatePerKgTenge: Number(cargoRatePerKg) || 0,
+    cargoRatePerKgTenge: inStock ? 0 : Number(cargoRatePerKg) || 0,
     packagingCost: Number(packagingCost) || 0,
     deliveryFee: Number(deliveryFee) || 0,
-  }), [kaspiPrice, commissionRatePercent, sourcingPrice, weightGrams, cargoRatePerKg, packagingCost, deliveryFee])
+  }), [kaspiPrice, commissionRatePercent, sourcingPrice, weightGrams, cargoRatePerKg, inStock, packagingCost, deliveryFee])
 
   const result = useMemo(() => computeMargin(baseInputs), [baseInputs])
   // Solved, not hunted for with the slider below: commission is a share OF
@@ -306,7 +309,7 @@ export default function KaspiShopMargin() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className={`grid ${inStock ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
                 <label className="block">
                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Вес, г</span>
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
@@ -317,12 +320,18 @@ export default function KaspiShopMargin() {
                   <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                     value={packagingCost} onChange={e => setPackagingCost(e.target.value)} inputMode="decimal" />
                 </label>
-                <label className="block">
-                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Карго, ₸/кг</span>
-                  <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    value={cargoRatePerKg} onChange={e => setCargoRatePerKg(e.target.value)} inputMode="decimal" />
-                </label>
+                {!inStock && (
+                  <label className="block">
+                    <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Карго, ₸/кг</span>
+                    <input className={`${INPUT_CLS} font-mono`} type="number" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+                      value={cargoRatePerKg} onChange={e => setCargoRatePerKg(e.target.value)} inputMode="decimal" />
+                  </label>
+                )}
               </div>
+              <label className="flex items-center gap-2.5 min-h-[44px] cursor-pointer text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                <input type="checkbox" checked={inStock} onChange={e => setInStock(e.target.checked)} className="w-4 h-4 flex-shrink-0" style={{ accentColor: 'var(--nav-accent)' }} />
+                Товар уже есть в наличии: карго не считаем
+              </label>
 
               <label className="block">
                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Категория Kaspi</span>
@@ -414,7 +423,9 @@ export default function KaspiShopMargin() {
                   </div>
                   <div className="pl-3 space-y-1 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                     <div className="flex items-center justify-between"><span>Закупка</span><span className="font-mono">{fmt(baseInputs.sourcingPrice)} ₸</span></div>
-                    <div className="flex items-center justify-between"><span>Карго ({(baseInputs.weightGrams / 1000).toFixed(2)} кг × {fmt(baseInputs.cargoRatePerKgTenge)})</span><span className="font-mono">{fmt(result.cargoCost)} ₸</span></div>
+                    {!inStock && (
+                      <div className="flex items-center justify-between"><span>Карго ({(baseInputs.weightGrams / 1000).toFixed(2)} кг × {fmt(baseInputs.cargoRatePerKgTenge)})</span><span className="font-mono">{fmt(result.cargoCost)} ₸</span></div>
+                    )}
                     <div className="flex items-center justify-between"><span>Упаковка</span><span className="font-mono">{fmt(baseInputs.packagingCost)} ₸</span></div>
                   </div>
                   <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>

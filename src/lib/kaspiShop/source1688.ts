@@ -173,23 +173,27 @@ export function risksFor(name: string, brand?: string | null): Source1688Risk[] 
 
 // ---- калькулятор маржи ----
 
-/** Ссылка в калькулятор маржи с подставленными названием, ценой Kaspi и оценкой веса. */
-export function marginHref(p: { name: string; price: number; weightGrams: number | null }): string {
+/**
+ * Ссылка в калькулятор маржи с подставленными названием, ценой Kaspi и оценкой веса.
+ * inStock: товар уже лежит на складе продавца, карго за него платить не нужно (P11, 13.11.2026).
+ */
+export function marginHref(p: { name: string; price: number; weightGrams: number | null; inStock?: boolean }): string {
   const q = new URLSearchParams()
   q.set('name', p.name.slice(0, 120))
   if (Number.isFinite(p.price) && p.price > 0) q.set('price', String(Math.round(p.price)))
   if (p.weightGrams) q.set('weight', String(p.weightGrams))
+  if (p.inStock) q.set('instock', '1')
   return `/kaspi-shop/margin?${q.toString()}`
 }
 
 /** Что калькулятор читает из адреса. Только положительные числа и короткое название. */
-export function readMarginPrefill(search: string): { name: string; price: string; weight: string } {
+export function readMarginPrefill(search: string): { name: string; price: string; weight: string; inStock: boolean } {
   const q = new URLSearchParams(search)
   const num = (k: string) => {
     const n = Number(q.get(k))
     return Number.isFinite(n) && n > 0 && n < 100_000_000 ? String(Math.round(n)) : ''
   }
-  return { name: (q.get('name') ?? '').trim().slice(0, 120), price: num('price'), weight: num('weight') }
+  return { name: (q.get('name') ?? '').trim().slice(0, 120), price: num('price'), weight: num('weight'), inStock: q.get('instock') === '1' }
 }
 
 /** Нормализованное название для кэша: регистр, пробелы, спецсимволы. */
