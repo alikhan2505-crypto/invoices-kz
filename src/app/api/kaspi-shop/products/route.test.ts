@@ -196,3 +196,41 @@ describe('GET /api/kaspi-shop/products: stats.activeCount', () => {
     expect((await (await get()).json()).stats.activeCount).toBe(0)
   })
 })
+
+// Строка на карточке «цена изменена … (750 → 600 ₸)»: последнее изменение берётся из журнала
+// проверок (P13, 13.11.2026). Сбой журнала не ломает список товаров.
+describe('GET /api/kaspi-shop/products: последнее изменение цены', () => {
+  function get() {
+    return GET(new NextRequest('http://localhost/api/kaspi-shop/products', { headers: { authorization: 'Bearer t' } }))
+  }
+  const row = (id: string) => ({ id, user_id: 'u1', connection_id: 'c1', enabled: true, held_at_floor: false, last_checked_at: null, check_frequency_minutes: 60 })
+
+  beforeEach(() => {
+    db.tables.kaspi_shop_connections = [{ id: 'c1', session_status: 'active' }]
+    db.tables.kaspi_shop_tracked_products = [row('a'), row('b'), row('c')]
+  })
+
+  it('кладёт в товар самое свежее изменение; без изменений поля нет; чужие и не-«updated» строки не берутся', async () => {
+    db.tables.kaspi_shop_price_checks = [
+      { id: 1, tracked_product_id: 'a', action: 'updated', checked_at: '2026-11-10T10:00:00.000Z', own_price_before: 800, own_price_after: 750 },
+      { id: 2, tracked_product_id: 'a', action: 'updated', checked_at: '2026-11-12T10:00:00.000Z', own_price_before: 750, own_price_after: 600 },
+      { id: 3, tracked_product_id: 'a', action: 'no_change', checked_at: '2026-11-13T10:00:00.000Z', own_price_before: 600, own_price_after: 600 },
+      { id: 4, tracked_product_id: 'b', action: 'held_at_floor', checked_at: '2026-11-13T09:00:00.000Z', own_price_before: 600, own_price_after: 600 },
+      { id: 5, tracked_product_id: 'zzz', action: 'updated', checked_at: '2026-11-13T09:00:00.000Z', own_price_before: 1, own_price_after: 2 },
+    ]
+    const json = await (await get()).json()
+    const byId = Object.fromEntries(json.products.map((p: any) => [p.id, p]))
+    expect(byId.a).toMatchObject({ last_price_change_at: '2026-11-12T10:00:00.000Z', last_price_change_from: 750, last_price_change_to: 600 })
+    expect(byId.b.last_price_change_at).toBeUndefined()
+    expect(byId.c.last_price_change_at).toBeUndefined()
+  })
+
+  it('журнал проверок недоступен: список товаров всё равно отдаётся, просто без изменений цены', async () => {
+    db.failTables.add('kaspi_shop_price_checks')
+    const res = await get()
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.products).toHaveLength(3)
+    expect(json.products[0].last_price_change_at).toBeUndefined()
+  })
+})

@@ -660,3 +660,99 @@ describe('тихое продление истёкшей сессии', () => {
     expect(countCalls('POST', REFRESH)).toBe(0)
   })
 })
+
+// P13 и P9 из прогона воронки (13.11.2026): строка «проверено … / цена изменена …» на карточке
+// и поиск с фильтром для магазина на сотни товаров.
+async function pick(el: HTMLSelectElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')!.set!
+  await act(async () => {
+    setter.call(el, value)
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await flush()
+}
+const cardCount = () => document.body.querySelectorAll('div[role="button"]').length
+const many = (n: number, over: (i: number) => Record<string, unknown> = () => ({})) =>
+  Array.from({ length: n }, (_, i) => product({ id: `m${i}`, product_name: `Товар номер ${i + 1}`, kaspi_sku: `QZ-${String(i + 1).padStart(3, '0')}`, kaspi_master_sku: `MS-${String(i + 1).padStart(3, '0')}`, ...over(i) }))
+
+describe('P13: когда бот смотрел товар и менял ли цену', () => {
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
+
+  it('включённый товар: «Проверено … · цена изменена … (750 → 600 ₸)»', async () => {
+    world.products = [product({ last_checked_at: ago(12 * 60_000), last_price_change_at: ago(2 * 3_600_000), last_price_change_from: 750, last_price_change_to: 600 })]
+    await mount()
+    const line = document.body.querySelector('[data-testid="product-freshness"]')?.textContent || ''
+    expect(line).toBe('Проверено 12 мин назад · цена изменена 2 ч назад (750 → 600 ₸)')
+  })
+
+  it('ни разу не проверялся: «Ещё не проверялся»', async () => {
+    world.products = [product({ last_checked_at: null })]
+    await mount()
+    expect(document.body.querySelector('[data-testid="product-freshness"]')?.textContent).toBe('Ещё не проверялся')
+  })
+
+  it('на паузе и снятый с продажи: строки нет (бот их не смотрит)', async () => {
+    world.products = [product({ enabled: false, last_checked_at: ago(60_000) }), product({ id: 'p2', available_for_sale: false, last_checked_at: ago(60_000) })]
+    await mount()
+    expect(document.body.querySelector('[data-testid="product-freshness"]')).toBeNull()
+  })
+})
+
+describe('P9: поиск и фильтр списка товаров', () => {
+  it('меньше 8 товаров: панели поиска нет', async () => {
+    world.products = many(7)
+    await mount()
+    expect(document.body.querySelector('[data-testid="products-toolbar"]')).toBeNull()
+    expect(cardCount()).toBe(7)
+  })
+
+  it('много товаров: рисуем первую порцию (48) и «Показать ещё» добавляет остальные', async () => {
+    world.products = many(60)
+    await mount()
+    expect(document.body.querySelector('[data-testid="products-toolbar"]')).not.toBeNull()
+    expect(cardCount()).toBe(48)
+    expect(document.body.querySelector('[data-testid="products-show-more"]')?.textContent).toContain('Показать ещё 12')
+    await click(document.body.querySelector('[data-testid="products-show-more"]'))
+    expect(cardCount()).toBe(60)
+    expect(document.body.querySelector('[data-testid="products-show-more"]')).toBeNull()
+  })
+
+  it('поиск по названию и артикулу; «Найдено X из Y»; пустой результат объяснён; очистка возвращает список', async () => {
+    world.products = many(60)
+    await mount()
+    const input = document.body.querySelector('input[type="search"]') as HTMLInputElement
+    await type(input, 'номер 17')
+    await flush()
+    expect(cardCount()).toBe(1)
+    expect(text()).toContain('Найдено 1 из 60.')
+    await type(input, 'qz-006')
+    await flush()
+    expect(cardCount()).toBe(1)
+    expect(text()).toContain('Товар номер 6')
+    await type(input, 'такого нет')
+    await flush()
+    expect(cardCount()).toBe(0)
+    expect(text()).toContain('Ничего не нашли')
+    await type(input, '')
+    await flush()
+    expect(cardCount()).toBe(48)
+  })
+
+  it('фильтр «На паузе» и счётчики в списке; поиск с фильтром работают вместе', async () => {
+    world.products = many(20, i => ({ enabled: i % 4 !== 0 }))
+    await mount()
+    const select = document.body.querySelector('select[aria-label="Показать товары"]') as HTMLSelectElement
+    const labels = Array.from(select.options).map(o => o.textContent)
+    expect(labels).toContain('Все (20)')
+    expect(labels).toContain('Включены (15)')
+    expect(labels).toContain('На паузе (5)')
+    await pick(select, 'paused')
+    expect(cardCount()).toBe(5)
+    expect(text()).toContain('Найдено 5 из 20.')
+    const input = document.body.querySelector('input[type="search"]') as HTMLInputElement
+    await type(input, 'номер 1')
+    await flush()
+    // из пяти товаров на паузе (1, 5, 9, 13, 17-й) под «номер 1» подходят 1, 13 и 17
+    expect(cardCount()).toBe(3)
+  })
+})

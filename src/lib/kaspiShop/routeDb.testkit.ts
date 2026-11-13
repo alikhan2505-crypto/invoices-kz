@@ -63,6 +63,7 @@ export function createFakeClient(): any {
         in(c: string, vs: any[]) { filters.push(r => vs.includes(r[c])); return b },
         gte(c: string, v: any) { filters.push(r => r[c] !== undefined && r[c] !== null && r[c] >= v); return b },
         order() { return b },
+        limit() { return b },
         maybeSingle: () => Promise.resolve(run('maybeSingle')),
         single: () => Promise.resolve(run('single')),
         then: (res: any, rej: any) => Promise.resolve(run('many')).then(res, rej),

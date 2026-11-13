@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -23,6 +23,8 @@ import {
   pluralProducts, suggestionBlockReason, summarizeSchedule, validateBulkSettings, validateProductSettings,
 } from '@/lib/kaspiShop/dempingForm'
 import { FLOOR_LOW_SHARE } from '@/lib/kaspiShop/productSettings'
+import { PRODUCTS_PAGE_SIZE, filterCounts, filterProducts, type ProductFilterKey } from '@/lib/kaspiShop/productFilter'
+import { freshnessLine } from '@/lib/kaspiShop/productFreshness'
 
 type Product = {
   id: string
@@ -45,6 +47,11 @@ type Product = {
   // Пусто у старых строк = в продаже.
   available_for_sale?: boolean | null
   last_checked_at: string | null
+  // Последнее изменение цены ботом (из журнала проверок, пусто = бот цену ещё не менял).
+  last_price_change_at?: string | null
+  last_price_change_from?: number | null
+  last_price_change_to?: number | null
+  held_at_floor?: boolean | null
   last_competitor_price: number | null
   demping_strategy: string
   excluded_city_codes: string[]
@@ -116,7 +123,10 @@ function pluralSellers(n: number): string {
 // kept identical rather than inventing a second "house" ease.
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
-const INPUT_CLS = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+// Поиск и фильтр показываем, когда товаров достаточно, чтобы в списке можно было потеряться.
+const PRODUCTS_TOOLBAR_MIN = 8
+
+const INPUT_CLS ='w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
 // Always normalizes to +7, regardless of whether the seller types the
 // domestic 8-prefix or the international 7 -- the leading digit is
@@ -296,6 +306,20 @@ export default function KaspiShop() {
   const [companyName, setCompanyName] = useState<string | null>(null)
   const [balance, setBalance] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
+  // Поиск и фильтр списка (у магазина на сотни товаров иначе нужный не найти). Запрос
+  // откладываем: поле остаётся отзывчивым, пока список перерисовывается.
+  const [productQuery, setProductQuery] = useState('')
+  const [productFilter, setProductFilter] = useState<ProductFilterKey>('all')
+  const [visibleLimit, setVisibleLimit] = useState(PRODUCTS_PAGE_SIZE)
+  const deferredQuery = useDeferredValue(productQuery)
+  const filteredProducts = useMemo(() => filterProducts(products, deferredQuery, productFilter), [products, deferredQuery, productFilter])
+  const productCounts = useMemo(() => filterCounts(products), [products])
+  // «Проверено 12 мин назад» на карточках: пересчитываем раз в минуту, а не на каждый кадр.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [cityPrices, setCityPrices] = useState<Record<string, { cityCode: string; cityName: string; ownPrice: number; competitorPrice: number | null; marketPosition: number | null; marketOfferCount: number | null }[]>>({})
 
@@ -1544,13 +1568,48 @@ export default function KaspiShop() {
                 with the live price, competitor, region, seller count and a
                 real Kaspi link. An expanded card spans the full row so its
                 settings form keeps comfortable width. */}
+            {products.length >= PRODUCTS_TOOLBAR_MIN && (
+              <div data-testid="products-toolbar" className="flex flex-col sm:flex-row gap-2 mb-3">
+                <input type="search" value={productQuery} aria-label="Найти товар"
+                  onChange={e => { setProductQuery(e.target.value); setVisibleLimit(PRODUCTS_PAGE_SIZE) }}
+                  placeholder="Название, бренд или артикул"
+                  autoComplete="off" spellCheck={false}
+                  className={`${INPUT_CLS} sm:flex-1 min-h-[44px]`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                {/* appearance-none + своя стрелка: родной select в WebKit в тёмной теме рисует белую
+                    коробку, и светлый текст на ней не виден. */}
+                <div className="relative sm:w-auto">
+                  <select value={productFilter} aria-label="Показать товары"
+                    onChange={e => { setProductFilter(e.target.value as ProductFilterKey); setVisibleLimit(PRODUCTS_PAGE_SIZE) }}
+                    className={`${INPUT_CLS} appearance-none pr-9 min-h-[44px]`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}>
+                    <option value="all">{`Все (${productCounts.all})`}</option>
+                    <option value="active">{`Включены (${productCounts.active})`}</option>
+                    <option value="paused">{`На паузе (${productCounts.paused})`}</option>
+                    <option value="floor">{`Упёрлись в минимум (${productCounts.floor})`}</option>
+                    <option value="offsale">{`Сняты с продажи (${productCounts.offsale})`}</option>
+                  </select>
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--nav-text-muted)' }}>
+                    <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
+            )}
+            {products.length >= PRODUCTS_TOOLBAR_MIN && (productQuery.trim() !== '' || productFilter !== 'all') && (
+              <div role="status" data-testid="products-shown" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
+                {filteredProducts.length === 0
+                  ? 'Ничего не нашли. Измените запрос или выберите «Все».'
+                  : `Найдено ${filteredProducts.length} из ${products.length}.`}
+              </div>
+            )}
+
             <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5 gap-3 items-start">
               <AnimatePresence initial={false}>
-                {products.map((p, i) => {
+                {filteredProducts.slice(0, visibleLimit).map((p, i) => {
                   const otherSellers = p.market_offer_count !== null ? Math.max(0, p.market_offer_count - 1) : null
+                  // Без exit у карточки: убранные поиском или фильтром пропадают сразу. С затуханием они
+                  // ещё долю секунды занимали место в сетке, и список дёргался на каждой букве запроса.
                   return (
                     <motion.div key={p.id}
-                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
                       className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
                       {/* div, not <button>: the card carries a real nested <a>
@@ -1606,6 +1665,12 @@ export default function KaspiShop() {
                           </div>
                         </div>
                         <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} maxPrice={p.max_price} enabled={p.enabled} />
+                        {(() => {
+                          const line = freshnessLine(p, nowMs)
+                          return line ? (
+                            <div data-testid="product-freshness" className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{line}</div>
+                          ) : null
+                        })()}
                         <div className="flex items-center justify-between gap-2 flex-wrap mt-2.5">
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                             <span title="Города, по которым демпингуется этот товар">{productRegionLabel(p)}</span>
@@ -1639,6 +1704,14 @@ export default function KaspiShop() {
                 </div>
               )}
             </div>
+            {filteredProducts.length > visibleLimit && (
+              <div className="flex justify-center mt-4">
+                <button data-testid="products-show-more" onClick={() => setVisibleLimit(n => n + PRODUCTS_PAGE_SIZE)}
+                  className="nav-glass min-h-[44px] rounded-xl px-5 text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
+                  {`Показать ещё ${Math.min(PRODUCTS_PAGE_SIZE, filteredProducts.length - visibleLimit)} (показано ${visibleLimit} из ${filteredProducts.length})`}
+                </button>
+              </div>
+            )}
 
             {/* Product settings as a centered modal (2026-08-21 founder
                 request: "карточка плывёт в центр и открывается как модал"

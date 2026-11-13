@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
+import { loadLastPriceChanges } from '@/lib/kaspiShop/lastPriceChanges'
 import { isCheckDue, isSessionActive } from '@/lib/kaspiShop/checkCycle'
 import { validateProductCreate, validateProductPatch } from '@/lib/kaspiShop/productSettings'
 import { isUuid } from '@/lib/uuidFormat'
@@ -86,7 +87,15 @@ export async function GET(req: NextRequest) {
     blockedAtFloor: products.filter((p: any) => p.enabled && p.held_at_floor).length,
   }
 
-  return NextResponse.json({ products, stats })
+  // Когда бот последний раз менял цену товара: для строки на карточке. Сбой чтения журнала
+  // не роняет список (loadLastPriceChanges не бросает), карточка тогда просто без этой части.
+  const changes = await loadLastPriceChanges(supabase, products.map((p: any) => p.id))
+  const withChanges = products.map((p: any) => {
+    const c = changes.get(p.id)
+    return c ? { ...p, last_price_change_at: c.at, last_price_change_from: c.from, last_price_change_to: c.to } : p
+  })
+
+  return NextResponse.json({ products: withChanges, stats })
 }
 
 export async function POST(req: NextRequest) {
