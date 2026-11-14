@@ -62,6 +62,8 @@ function product(over: Record<string, unknown> = {}) {
 
 type World = {
   products: any[]
+  /** spentTodayTenge из ответа списка: сколько бот списал сегодня (null: журнал не прочитался). */
+  spentToday?: number | null
   wallet: { status: number; body: any }
   productsStatus: number
   connections: any[]
@@ -91,7 +93,7 @@ function installFetch() {
       if (world.productsStatus !== 200) return json(world.productsStatus, { error: 'Сбой чтения товаров' })
       // как на сервере: «Активных» = включённые и в продаже (снятые с продажи не считаются)
       const active = world.products.filter(p => p.enabled && p.available_for_sale !== false).length
-      return json(200, { products: world.products, stats: { totalRules: world.products.length, activeCount: active, readyToApply: active, blockedAtFloor: 0 } })
+      return json(200, { products: world.products, stats: { totalRules: world.products.length, activeCount: active, readyToApply: active, blockedAtFloor: 0 }, spentTodayTenge: world.spentToday ?? null })
     }
     if (url === '/api/kaspi-shop/products' && method === 'PATCH') {
       const r = world.patch(body)
@@ -769,5 +771,31 @@ describe('P11: ссылка в калькулятор маржи из окна �
     expect(q.get('name')).toBe('Чехол для телефона')
     expect(q.get('price')).toBe('1500')
     expect(q.get('instock')).toBe('1')
+  })
+})
+
+// «Списано сегодня» рядом с балансом (P16, 14.11.2026).
+describe('P16: «Списано сегодня»', () => {
+  const text = () => document.body.querySelector('[data-testid="spent-today"]')?.textContent ?? null
+
+  it('показывает сумму списаний за сегодня рядом с балансом', async () => {
+    world.products = [product({ enabled: true })]
+    world.spentToday = 15
+    await mount()
+    expect(text()).toBe('Списано сегодня: 15 ₸')
+  })
+
+  it('сегодня не списывали: честный ноль, а не пустое место', async () => {
+    world.products = [product({ enabled: true })]
+    world.spentToday = 0
+    await mount()
+    expect(text()).toBe('Списано сегодня: 0 ₸')
+  })
+
+  it('журнал кошелька не прочитался (null): строки нет, а не выдуманный 0', async () => {
+    world.products = [product({ enabled: true })]
+    world.spentToday = null
+    await mount()
+    expect(text()).toBeNull()
   })
 })

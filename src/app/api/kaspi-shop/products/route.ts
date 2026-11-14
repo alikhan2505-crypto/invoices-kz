@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 import { loadLastPriceChanges } from '@/lib/kaspiShop/lastPriceChanges'
+import { loadSpentTodayTenge } from '@/lib/kaspiShop/spentToday'
 import { isCheckDue, isSessionActive } from '@/lib/kaspiShop/checkCycle'
 import { validateProductCreate, validateProductPatch } from '@/lib/kaspiShop/productSettings'
 import { isUuid } from '@/lib/uuidFormat'
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     // connection problems (loadError banner, session-expired banner).
   }
   if (!connectionId) {
-    return NextResponse.json({ products: [], stats: { totalRules: 0, activeCount: 0, readyToApply: 0, blockedAtFloor: 0 } })
+    return NextResponse.json({ products: [], stats: { totalRules: 0, activeCount: 0, readyToApply: 0, blockedAtFloor: 0 }, spentTodayTenge: null })
   }
 
   const { data, error } = await supabase
@@ -89,13 +90,17 @@ export async function GET(req: NextRequest) {
 
   // Когда бот последний раз менял цену товара: для строки на карточке. Сбой чтения журнала
   // не роняет список (loadLastPriceChanges не бросает), карточка тогда просто без этой части.
-  const changes = await loadLastPriceChanges(supabase, products.map((p: any) => p.id))
+  const [changes, spentTodayTenge] = await Promise.all([
+    loadLastPriceChanges(supabase, products.map((p: any) => p.id)),
+    // «Списано сегодня» рядом с балансом (P16); null, если журнал кошелька не прочитался.
+    loadSpentTodayTenge(supabase, user.id),
+  ])
   const withChanges = products.map((p: any) => {
     const c = changes.get(p.id)
     return c ? { ...p, last_price_change_at: c.at, last_price_change_from: c.from, last_price_change_to: c.to } : p
   })
 
-  return NextResponse.json({ products: withChanges, stats })
+  return NextResponse.json({ products: withChanges, stats, spentTodayTenge })
 }
 
 export async function POST(req: NextRequest) {

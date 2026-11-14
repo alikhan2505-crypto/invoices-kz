@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // PATCH/POST /api/kaspi-shop/products: серверная проверка денежных полей
@@ -232,5 +232,49 @@ describe('GET /api/kaspi-shop/products: последнее изменение ц
     const json = await res.json()
     expect(json.products).toHaveLength(3)
     expect(json.products[0].last_price_change_at).toBeUndefined()
+  })
+})
+
+// «Списано сегодня» рядом с балансом (P16, 14.11.2026): сумма списаний бота за сутки по Алматы.
+describe('GET /api/kaspi-shop/products: spentTodayTenge', () => {
+  const NOW = Date.parse('2026-11-14T10:00:00.000Z') // 15:00 по Алматы
+  function get() {
+    return GET(new NextRequest('http://localhost/api/kaspi-shop/products', { headers: { authorization: 'Bearer t' } }))
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(NOW))
+    db.tables.kaspi_shop_connections = [{ id: 'c1', session_status: 'active' }]
+    db.tables.kaspi_shop_tracked_products = []
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('считает только свои списания kaspi_shop_check за сегодняшние сутки по Алматы; пополнения, чужие и вчерашние не входят', async () => {
+    db.tables.kaspi_shop_tracked_products = [{ id: 'a', user_id: 'u1', connection_id: 'c1', enabled: true, held_at_floor: false, last_checked_at: null, check_frequency_minutes: 60 }]
+    db.tables.wallet_ledger = [
+      { user_id: 'u1', type: 'kaspi_shop_check', amount: -5, created_at: '2026-11-14T09:00:00.000Z' },
+      { user_id: 'u1', type: 'kaspi_shop_check', amount: -5, created_at: '2026-11-13T19:00:01.000Z' }, // 00:00:01 по Алматы: уже сегодня
+      { user_id: 'u1', type: 'kaspi_shop_check', amount: -5, created_at: '2026-11-13T18:59:59.000Z' }, // 23:59:59 вчера
+      { user_id: 'u1', type: 'topup', amount: 1000, created_at: '2026-11-14T08:00:00.000Z' },
+      { user_id: 'u1', type: 'ai_agent_reply', amount: -5, created_at: '2026-11-14T08:00:00.000Z' },
+      { user_id: 'other', type: 'kaspi_shop_check', amount: -5, created_at: '2026-11-14T09:00:00.000Z' },
+    ]
+    expect((await (await get()).json()).spentTodayTenge).toBe(10)
+  })
+
+  it('сегодня списаний не было: ровно 0, а не null', async () => {
+    db.tables.kaspi_shop_tracked_products = [{ id: 'a', user_id: 'u1', connection_id: 'c1', enabled: true, held_at_floor: false, last_checked_at: null, check_frequency_minutes: 60 }]
+    db.tables.wallet_ledger = []
+    expect((await (await get()).json()).spentTodayTenge).toBe(0)
+  })
+
+  it('журнал кошелька недоступен: список товаров отдаётся, spentTodayTenge = null (страница строку не рисует)', async () => {
+    db.tables.kaspi_shop_tracked_products = [{ id: 'a', user_id: 'u1', connection_id: 'c1', enabled: true, held_at_floor: false, last_checked_at: null, check_frequency_minutes: 60 }]
+    db.failTables.add('wallet_ledger')
+    const res = await get()
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.products).toHaveLength(1)
+    expect(json.spentTodayTenge).toBeNull()
   })
 })

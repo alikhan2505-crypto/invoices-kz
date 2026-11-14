@@ -360,6 +360,9 @@ export default function KaspiShop() {
   // fresh competitor prices synchronously here (Vercel's IPs are blocked by
   // Kaspi -- the real fetch happens in GitHub Actions).
   const [stats, setStats] = useState<{ totalRules: number; activeCount: number; readyToApply: number; blockedAtFloor: number } | null>(null)
+  // «Списано сегодня» (P16): тенге, которые бот взял с кошелька за сутки по Алматы; null до загрузки
+  // и если журнал кошелька не прочитался (тогда строку не рисуем, чем показывать неверный 0).
+  const [spentToday, setSpentToday] = useState<number | null>(null)
   const [applyingNow, setApplyingNow] = useState(false)
   const [applyNowMessage, setApplyNowMessage] = useState('')
   const [syncingCatalog, setSyncingCatalog] = useState(false)
@@ -478,6 +481,7 @@ export default function KaspiShop() {
         setProducts(list)
         setProductsLoaded(true)
         setStats(data.stats || null)
+        setSpentToday(typeof data.spentTodayTenge === 'number' ? data.spentTodayTenge : null)
         setEditValues(prev => {
           const next = { ...prev }
           for (const p of list) {
@@ -1463,6 +1467,11 @@ export default function KaspiShop() {
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
                     ₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>пополнить</button>
                   </div>
+                  {spentToday !== null && (
+                    <div data-testid="spent-today" className="text-xs mt-1 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
+                      Списано сегодня: {spentToday.toLocaleString('ru-KZ')} ₸
+                    </div>
+                  )}
                 </div>
               </div>
               )}
