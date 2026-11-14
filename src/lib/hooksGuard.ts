@@ -1,14 +1,14 @@
 import { timingSafeEqual } from 'crypto'
 
 // Защита маршрутов /api/hooks/*, которые зовёт pg_net из базы (триггер
-// notify_new_signup_trigger, pg_cron welcome-instant). Заголовка с секретом
-// SQL-часть пока не шлёт, поэтому проверка включается только когда в окружении
-// задан HOOKS_PG_NET_SECRET: сначала основатель правит SQL (добавляет заголовок
-// x-internal-secret в net.http_post), потом задаёт переменную. Пока её нет —
-// поведение прежнее, а от зацикленных вызовов защищает throttle ниже.
+// notify_new_signup_trigger, pg_cron welcome-instant, kaspi-check-dispatch). SQL шлёт
+// заголовок x-internal-secret из Vault (hooks_pg_net_secret), а HOOKS_PG_NET_SECRET
+// задан в Vercel (Production, 03.11.2026). С 14.11.2026 (аудит) проверка закрытая:
+// переменная не задана или пуста -- не пускаем никого. Раньше без переменной пускало всех,
+// и забытая переменная в новом окружении (Preview, новый проект) открыла бы маршруты.
 
 export function hookSecretOk(headers: Headers, expected = process.env.HOOKS_PG_NET_SECRET): boolean {
-  if (!expected) return true
+  if (!expected) return false
   const got = headers.get('x-internal-secret') || ''
   const a = Buffer.from(got)
   const b = Buffer.from(expected)

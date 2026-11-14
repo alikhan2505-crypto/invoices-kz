@@ -50,13 +50,14 @@ vi.mock('@/lib/kaspiShop/sessionKeepalive', () => ({
 import { POST } from './route'
 import { resetThrottle } from '@/lib/hooksGuard'
 
-function call(headers: Record<string, string> = {}) {
+// По умолчанию вызов идёт с верным секретом, как у pg_net из базы; call({}) - без заголовка.
+function call(headers: Record<string, string> = { 'x-internal-secret': 's3cret' }) {
   return POST(new NextRequest('http://localhost/api/hooks/kaspi-check-dispatch', { method: 'POST', headers }))
 }
 
 beforeEach(() => {
   resetThrottle()
-  delete process.env.HOOKS_PG_NET_SECRET
+  process.env.HOOKS_PG_NET_SECRET = 's3cret'
   process.env.KASPI_SHOP_GITHUB_PAT = 'gh-token'
   h.due = [{ id: 'p1' }]
   h.dueError = null
@@ -136,9 +137,8 @@ describe('POST /api/hooks/kaspi-check-dispatch', () => {
     expect(h.fetchCalls).toHaveLength(0)
   })
 
-  it('with a secret configured the header is required', async () => {
-    process.env.HOOKS_PG_NET_SECRET = 's3cret'
-    expect((await call()).status).toBe(401)
+  it('the header is required and must match', async () => {
+    expect((await call({})).status).toBe(401)
     expect((await call({ 'x-internal-secret': 'wrong' })).status).toBe(401)
     expect((await call({ 'x-internal-secret': 's3cret' })).status).toBe(200)
   })
@@ -179,9 +179,16 @@ describe('POST /api/hooks/kaspi-check-dispatch', () => {
     expect(h.keepaliveCalls).toBe(1)
   })
 
+  it('without HOOKS_PG_NET_SECRET in the environment nobody gets in, header or not (audit 14.11)', async () => {
+    delete process.env.HOOKS_PG_NET_SECRET
+    expect((await call({})).status).toBe(401)
+    expect((await call({ 'x-internal-secret': 'anything' })).status).toBe(401)
+    expect(h.fetchCalls).toHaveLength(0)
+    expect(h.keepaliveCalls).toBe(0)
+  })
+
   it('unauthorized and throttled calls do no keepalive work', async () => {
-    process.env.HOOKS_PG_NET_SECRET = 's3cret'
-    expect((await call()).status).toBe(401)
+    expect((await call({})).status).toBe(401)
     expect(h.keepaliveCalls).toBe(0)
   })
 })
