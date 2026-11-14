@@ -17,6 +17,13 @@ const supabase = createClient(
 // Подключения без включённых товаров не трогаем: нечего защищать, и чужие кабинеты, где
 // бот не работает, не получают лишних входов.
 
+// ОПЫТ 14.11.2026: попытки продления выключены. Живой журнал показал, что вход Kaspi не
+// выдаёт новую сессию, а сессия кабинета прожила 5-6 ч вместо прежних ~13 ч (08-09.11,
+// когда попыток не было). Проверяем, не сама ли попытка сокращает жизнь сессии. Если
+// после переподключения сессия снова проживёт ~13 ч, продление убираем совсем; если 5-6 ч,
+// включаем обратно и делаем уведомление «подтвердите вход». Включается сменой значения.
+export const KEEPALIVE_ENABLED = false
+
 export const KEEPALIVE_MAX_PER_TICK = 3
 // Запас по времени на тик: маршрут живёт до 60 с, а один заход в Kaspi может занять много
 // секунд. Не начинаем новое продление, если с начала тика прошло больше этого.
@@ -52,7 +59,8 @@ export function selectConnectionsToRefresh(rows: KeepaliveRow[], now: number, li
   return due.slice(0, Math.max(0, limit)).map(r => r.id)
 }
 
-export async function refreshAgingSessions(now: number = Date.now()): Promise<{ attempted: number; refreshed: number }> {
+export async function refreshAgingSessions(now: number = Date.now(), enabled: boolean = KEEPALIVE_ENABLED): Promise<{ attempted: number; refreshed: number }> {
+  if (!enabled) return { attempted: 0, refreshed: 0 }
   const { data: products, error: productsError } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('connection_id')

@@ -33,7 +33,7 @@ vi.mock('./planGate', () => ({
     items.filter(i => profiles.get(ownerOf(i) as string)?.ok),
 }))
 
-import { refreshAgingSessions, selectConnectionsToRefresh, KEEPALIVE_MAX_PER_TICK, type KeepaliveRow } from './sessionKeepalive'
+import { refreshAgingSessions, selectConnectionsToRefresh, KEEPALIVE_MAX_PER_TICK, KEEPALIVE_ENABLED, type KeepaliveRow } from './sessionKeepalive'
 
 const NOW = Date.parse('2026-11-10T12:00:00.000Z')
 const ago = (hours: number) => new Date(NOW - hours * 3_600_000).toISOString()
@@ -100,7 +100,7 @@ describe('refreshAgingSessions', () => {
       [conn('with-product'), conn('only-disabled'), conn('no-products')],
       [{ id: 'p1', connection_id: 'with-product', enabled: true }, { id: 'p2', connection_id: 'only-disabled', enabled: false }],
     )
-    const r = await refreshAgingSessions(NOW)
+    const r = await refreshAgingSessions(NOW, true)
     expect(h.calls).toEqual([{ id: 'with-product', trigger: 'cron' }])
     expect(r).toEqual({ attempted: 1, refreshed: 1 })
   })
@@ -108,12 +108,19 @@ describe('refreshAgingSessions', () => {
   it('counts only real refreshes: a refused attempt is attempted but not refreshed', async () => {
     seed([conn('c1')], [{ id: 'p1', connection_id: 'c1', enabled: true }])
     h.outcome = { outcome: 'sso_expired', detail: 'no_session_issued' }
-    expect(await refreshAgingSessions(NOW)).toEqual({ attempted: 1, refreshed: 0 })
+    expect(await refreshAgingSessions(NOW, true)).toEqual({ attempted: 1, refreshed: 0 })
+  })
+
+  it('experiment 14.11: by default the keepalive is off, nothing is attempted', async () => {
+    expect(KEEPALIVE_ENABLED).toBe(false)
+    seed([conn('c1')], [{ id: 'p1', connection_id: 'c1', enabled: true }])
+    expect(await refreshAgingSessions(NOW)).toEqual({ attempted: 0, refreshed: 0 })
+    expect(h.calls).toEqual([])
   })
 
   it('no enabled products anywhere: no connection lookup beyond the products, nothing attempted', async () => {
     seed([conn('c1')], [])
-    expect(await refreshAgingSessions(NOW)).toEqual({ attempted: 0, refreshed: 0 })
+    expect(await refreshAgingSessions(NOW, true)).toEqual({ attempted: 0, refreshed: 0 })
     expect(h.calls).toEqual([])
   })
 
@@ -123,7 +130,7 @@ describe('refreshAgingSessions', () => {
       [{ id: 'p1', connection_id: 'bad', enabled: true }, { id: 'p2', connection_id: 'good', enabled: true }],
     )
     h.throwFor.add('bad')
-    const r = await refreshAgingSessions(NOW)
+    const r = await refreshAgingSessions(NOW, true)
     expect(h.calls.map(c => c.id)).toEqual(['bad', 'good'])
     expect(r).toEqual({ attempted: 2, refreshed: 1 })
   })
@@ -134,7 +141,7 @@ describe('refreshAgingSessions', () => {
       [{ id: 'p1', connection_id: 'pro', enabled: true }, { id: 'p2', connection_id: 'lapsed', enabled: true }],
     )
     h.deniedOwners.add('owner-of-lapsed')
-    const r = await refreshAgingSessions(NOW)
+    const r = await refreshAgingSessions(NOW, true)
     expect(h.calls.map(c => c.id)).toEqual(['pro'])
     expect(r).toEqual({ attempted: 1, refreshed: 1 })
   })
@@ -142,6 +149,6 @@ describe('refreshAgingSessions', () => {
   it('a failing lookup is loud (throws), not a silent "nothing to do"', async () => {
     seed([conn('c1')], [{ id: 'p1', connection_id: 'c1', enabled: true }])
     h.db.fail.add('kaspi_shop_tracked_products:select')
-    await expect(refreshAgingSessions(NOW)).rejects.toThrow(/keepalive tracked products lookup failed/)
+    await expect(refreshAgingSessions(NOW, true)).rejects.toThrow(/keepalive tracked products lookup failed/)
   })
 })
