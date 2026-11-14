@@ -13,6 +13,8 @@ const supabaseAuth = createClient(
 )
 
 const MIN_TOPUP_TENGE = 500
+// Потолок разового пополнения (аудит 14.11.2026): сумма уходит в Kaspi как есть.
+const MAX_TOPUP_TENGE = 1_000_000
 
 // Same shared platform Kaspi connection Kaspi Pay Cashier's own wallet
 // top-up uses -- reusing it here, not minting a second one, is deliberate.
@@ -28,9 +30,11 @@ export async function POST(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { amountTenge } = await req.json()
-  if (!amountTenge || typeof amountTenge !== 'number' || amountTenge < MIN_TOPUP_TENGE) {
-    return NextResponse.json({ error: 'invalid_amount', min: MIN_TOPUP_TENGE }, { status: 400 })
+  const body = await req.json().catch(() => null)
+  const amountTenge = body?.amountTenge
+  // Целое число тенге в пределах от минимума до потолка: 500.7 и 1e12 не доходят до Kaspi.
+  if (typeof amountTenge !== 'number' || !Number.isInteger(amountTenge) || amountTenge < MIN_TOPUP_TENGE || amountTenge > MAX_TOPUP_TENGE) {
+    return NextResponse.json({ error: 'invalid_amount', min: MIN_TOPUP_TENGE, max: MAX_TOPUP_TENGE }, { status: 400 })
   }
 
   const { count: recentCount, error: rateError } = await supabase

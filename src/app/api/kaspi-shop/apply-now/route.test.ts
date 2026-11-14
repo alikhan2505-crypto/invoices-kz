@@ -213,4 +213,28 @@ describe('POST /api/kaspi-shop/apply-now', () => {
   it('a productId that is not a uuid is 400', async () => {
     expect((await call({ productId: 'abc' })).status).toBe(400)
   })
+
+  it('a per-seller hourly ceiling: per-product windows cannot be multiplied by the number of products (audit 14.11)', async () => {
+    const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const stamp = '2026-11-06T09:00:00Z'
+    db.tables.kaspi_shop_tracked_products = Array.from({ length: 14 }, (_, i) => ({
+      id: uuid(i + 1), connection_id: 'c1', enabled: true, available_for_sale: true, last_checked_at: stamp,
+    }))
+    const statuses: number[] = []
+    for (let i = 1; i <= 14; i++) statuses.push((await call({ productId: uuid(i) })).status)
+    expect(statuses.slice(0, 12).every(s => s === 202)).toBe(true)
+    expect(statuses.slice(12)).toEqual([429, 429])
+    expect(fetchMock).toHaveBeenCalledTimes(12)
+    // отказанный по часу товар не сжигает собственное 10-минутное окно: слот возвращён
+    const again = await call({ productId: uuid(13) })
+    expect(again.status).toBe(429)
+    expect(Number(again.headers.get('retry-after'))).toBeGreaterThan(0)
+  })
+
+  it('a refused dispatch gives the hourly slot back too', async () => {
+    for (let i = 0; i < 3; i++) fetchMock.mockImplementationOnce(async () => ({ ok: false, status: 503 }))
+    for (let i = 0; i < 3; i++) expect((await call()).status).toBe(502)
+    // три неудачных запуска часового слота не съели
+    expect((await call()).status).toBe(202)
+  })
 })

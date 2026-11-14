@@ -4,7 +4,7 @@ import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 import { getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from '@/lib/kaspiShop/wallet'
 import { isSessionActive } from '@/lib/kaspiShop/checkCycle'
-import { claimWindowSlot, releaseWindowSlot, windowKey } from '@/lib/windowLimits'
+import { claimWindowSlot, hourBucket, releaseWindowSlot, windowKey } from '@/lib/windowLimits'
 import { isUuid } from '@/lib/uuidFormat'
 
 const supabase = createClient(
@@ -40,6 +40,8 @@ const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 // пройдут, дальше -- не чаще раза в окно.
 const APPLY_NOW_COOLDOWN_MS = 10 * 60_000
 const APPLY_NOW_PREFIX = 'kaspiapply'
+const APPLY_NOW_USER_PREFIX = 'kaspiapplyh'
+const APPLY_NOW_PER_USER_HOUR = 12
 
 // "Применить сейчас" on /kaspi-shop. IMPORTANT: this route does NOT fetch
 // competitor prices itself, and never will from Vercel -- Kaspi returns a
@@ -158,6 +160,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Не удалось проверить лимит запуска, попробуйте через минуту' }, { status: 503 })
   }
 
+  // Общий потолок на продавца в час (аудит 14.11.2026): окно выше считается на товар,
+  // и по числу включённых товаров продавец мог бы запускать workflow GitHub по раз в
+  // 10 минут на каждый. Здесь слот часа; не вышло — слот товара возвращаем.
+  const userHourKey = windowKey(APPLY_NOW_USER_PREFIX, user.id, hourBucket(now))
+  const userClaim = await claimWindowSlot(supabase, userHourKey, APPLY_NOW_PER_USER_HOUR)
+  if (!userClaim.ok) {
+    await releaseWindowSlot(supabase, slotKey)
+    if (userClaim.reason === 'limit') {
+      const retryAfterSeconds = Math.max(60, Math.ceil(((hourBucket(now) + 1) * 3_600_000 - now) / 1000))
+      return NextResponse.json(
+        { error: 'Слишком много запусков за час. Бот и так проверяет цены сам, повторите позже.', retryAfterSeconds },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+      )
+    }
+    return NextResponse.json({ error: 'Не удалось проверить лимит запуска, попробуйте через минуту' }, { status: 503 })
+  }
+
   // Сначала запуск проверки...
   let dispatchOk = false
   try {
@@ -179,6 +198,7 @@ export async function POST(req: NextRequest) {
   }
   if (!dispatchOk) {
     await releaseWindowSlot(supabase, slotKey)
+    await releaseWindowSlot(supabase, userHourKey)
     return NextResponse.json({ error: 'Не удалось запустить проверку' }, { status: 502 })
   }
 
@@ -190,6 +210,7 @@ export async function POST(req: NextRequest) {
     .in('id', ids)
   if (resetError) {
     await releaseWindowSlot(supabase, slotKey)
+    await releaseWindowSlot(supabase, userHourKey)
     return NextResponse.json({ error: resetError.message }, { status: 500 })
   }
 
