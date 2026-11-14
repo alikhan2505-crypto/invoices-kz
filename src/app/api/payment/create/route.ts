@@ -216,6 +216,7 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
     })
   } catch (e: any) {
     console.error('Payment create error:', e)
-    return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })
+    // Текст ошибки Kaspi или базы клиенту не отдаём (аудит 14.11.2026): он в логе выше.
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

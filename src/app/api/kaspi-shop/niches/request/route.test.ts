@@ -185,4 +185,16 @@ describe('POST /api/kaspi-shop/niches/request', () => {
     db.failTables.delete('kaspi_niche_checks')
     expect((await call()).status).toBe(202)
   })
+
+  it('запрос не строка или длиннее 200 символов: 400, а не 500 и не запуск (аудит 14.11)', async () => {
+    const raw = (body: unknown) => POST(new NextRequest('http://localhost/api/kaspi-shop/niches/request', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer t' }, body: JSON.stringify(body),
+    }))
+    expect((await raw({ query: 12345 })).status).toBe(400)
+    expect((await raw({ query: { a: 1 } })).status).toBe(400)
+    expect((await raw({ query: ['x'] })).status).toBe(400)
+    expect((await raw({ query: 'я'.repeat(201) })).status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect((await call('я'.repeat(200))).status).toBe(202)
+  })
 })

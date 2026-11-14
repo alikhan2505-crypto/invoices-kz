@@ -58,8 +58,11 @@ export async function POST(req: NextRequest) {
   if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
-  const query = body?.query?.trim()
+  // Строка и не длиннее 200 символов (аудит 14.11.2026): не-строка раньше давала 500,
+  // а длина была не ограничена и уходила в запуск проверки и в базу.
+  const query = typeof body?.query === 'string' ? body.query.trim() : ''
   if (!query) return NextResponse.json({ error: 'query обязателен' }, { status: 400 })
+  if (query.length > 200) return NextResponse.json({ error: 'query слишком длинный: не больше 200 символов' }, { status: 400 })
 
   // Real per-check cost, same wallet/price the репрайсер's own price checks
   // already debit (2026-09-03, founder: monetize genuinely valuable

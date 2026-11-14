@@ -80,8 +80,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   for (const [key, limit] of limits) {
     const claim = await claimWindowSlot(supabase, key, limit)
     if (claim.ok) continue
-    if (claim.reason === 'limit') return NextResponse.json({ error: 'Слишком много заявок, попробуйте позже' }, { status: 429 })
-    return NextResponse.json({ error: 'Не удалось оформить заявку, попробуйте позже' }, { status: 503 })
+    // Тексты те же, что уже переведены на kk и en в словаре витрины (src/lib/i18n/storefront.ts).
+    if (claim.reason === 'limit') return NextResponse.json({ error: 'Слишком много заказов подряд, попробуйте позже' }, { status: 429 })
+    return NextResponse.json({ error: 'Не удалось оформить заявку' }, { status: 503 })
   }
 
   let resolved: (ResolvedWholesaleLine | null)[]

@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
       expectedRPID: RP_ID,
     })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 400 })
+    // Текст ошибки библиотеки клиенту не отдаём (аудит 14.11.2026).
+    console.error('webauthn register-verify failed:', e?.message || e)
+    return NextResponse.json({ error: 'Verification failed' }, { status: 400 })
   }
 
   await supabase.from('webauthn_challenges').delete().eq('id', challengeId)
@@ -62,7 +64,10 @@ export async function POST(req: NextRequest) {
     device_label: deviceLabel || null,
   })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('webauthn credential insert failed:', error.message)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true })
 }

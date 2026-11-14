@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { secretEquals } from '@/lib/secretEquals'
 import { findMatchingTemplate } from '@/lib/instagramReplyMatch'
 import { replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const challenge = req.nextUrl.searchParams.get('hub.challenge')
 
   const expected = process.env.IG_WEBHOOK_VERIFY_TOKEN
-  if (mode === 'subscribe' && token === expected && challenge) {
+  if (mode === 'subscribe' && secretEquals(token, expected) && challenge) {
     return new NextResponse(challenge, { status: 200 })
   }
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
