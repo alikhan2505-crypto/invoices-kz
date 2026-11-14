@@ -4,6 +4,8 @@ import { resolveStorefrontBySlug } from '@/lib/kaspiShop/storefront'
 import { getOrCreateKaspiPaymentForShopOrder } from '@/lib/kaspiPay/shopOrderPayment'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { isUuid } from '@/lib/uuidFormat'
+import { clientIp, quotaIp } from '@/lib/toolQuota'
+import { claimWindowSlot, hourBucket, windowKey } from '@/lib/windowLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +21,9 @@ const supabase = createClient(
 // to get a fresh mint. This caps genuinely new orders per storefront.
 const ORDER_RATE_WINDOW_MS = 10 * 60 * 1000
 const ORDER_RATE_LIMIT = 10
+// Свой потолок на IP впереди потолка витрины: иначе один адрес 10 заказами в 10 минут
+// закрывает витрину для всех настоящих покупателей и тратит выпуск Kaspi QR продавца.
+const ORDER_PER_IP_HOUR = 8
 const MAX_CART_LINES = 20
 const MAX_LINE_QTY = 99
 
@@ -100,6 +105,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (items.some((it: { id: string }) => !isUuid(it.id))) {
     return NextResponse.json({ error: 'Часть товаров в корзине уже недоступна, обновите страницу' }, { status: 400 })
   }
+
+  const ipSlot = await claimWindowSlot(supabase, windowKey('shoporder-ip', quotaIp(clientIp(req.headers)), hourBucket()), ORDER_PER_IP_HOUR)
+  if (!ipSlot.ok && ipSlot.reason === 'limit') {
+    return NextResponse.json({ error: 'Слишком много заказов подряд, попробуйте позже' }, { status: 429 })
+  }
+  // reason 'error' (счётчик не читается): пропускаем, у витрины остаётся свой потолок ниже.
 
   const { count: recentOrders, error: rateError } = await supabase
     .from('kaspi_shop_orders')

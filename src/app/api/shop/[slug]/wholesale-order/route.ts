@@ -6,6 +6,8 @@ import { loadWholesaleModelByVariant, resolveWholesaleLine, type ResolvedWholesa
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { resolveInvoiceVatType } from '@/lib/invoiceTax'
 import { isUuid } from '@/lib/uuidFormat'
+import { clientIp, quotaIp } from '@/lib/toolQuota'
+import { claimWindowSlot, dayBucket, hourBucket, windowKey } from '@/lib/windowLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +18,15 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 const MAX_CART_LINES = 20
 const MAX_LINE_QTY = 999
 const BIN_PATTERN = /^\d{12}$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Анонимный POST создаёт настоящий счёт продавцу и шлёт письмо с mail@invoices.kz на
+// указанный адрес (аудит 14.11.2026): без потолков это фабрика счетов и почтовый
+// релей с нашего домена. Три независимых потолка: с одного IP, на один адрес
+// получателя, на одну витрину за сутки.
+const WHOLESALE_PER_IP_HOUR = 5
+const WHOLESALE_PER_EMAIL_DAY = 3
+const WHOLESALE_PER_SHOP_DAY = 30
 
 interface CartLineInput { modelId: string; size: string; color: string; qty: number }
 
@@ -43,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (!clientName) return NextResponse.json({ error: 'Укажите название компании' }, { status: 400 })
   if (!BIN_PATTERN.test(clientBin)) return NextResponse.json({ error: 'БИН должен состоять из 12 цифр' }, { status: 400 })
-  if (!clientEmail || !clientEmail.includes('@')) return NextResponse.json({ error: 'Укажите email' }, { status: 400 })
+  if (!clientEmail || clientEmail.length > 254 || !EMAIL_PATTERN.test(clientEmail)) return NextResponse.json({ error: 'Укажите email' }, { status: 400 })
 
   const items: CartLineInput[] = rawItems
     .filter((it: any) =>
@@ -57,6 +68,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   // Корзина отклоняется целиком, как и при недоступных товарах ниже.
   if (items.some(it => !isUuid(it.modelId))) {
     return NextResponse.json({ error: 'Часть товаров в корзине больше недоступна, обновите страницу' }, { status: 400 })
+  }
+
+  // Потолки занимаем атомарно ДО создания счёта и письма. Счётчик не читается: отказ
+  // (анонимный маршрут, который пишет в базу и шлёт почту, без лимита не работает).
+  const limits: Array<[string, number]> = [
+    [windowKey('wsorder-ip', quotaIp(clientIp(req.headers)), hourBucket()), WHOLESALE_PER_IP_HOUR],
+    [windowKey('wsorder-email', clientEmail.toLowerCase(), dayBucket()), WHOLESALE_PER_EMAIL_DAY],
+    [windowKey('wsorder-shop', storefront.connectionId, dayBucket()), WHOLESALE_PER_SHOP_DAY],
+  ]
+  for (const [key, limit] of limits) {
+    const claim = await claimWindowSlot(supabase, key, limit)
+    if (claim.ok) continue
+    if (claim.reason === 'limit') return NextResponse.json({ error: 'Слишком много заявок, попробуйте позже' }, { status: 429 })
+    return NextResponse.json({ error: 'Не удалось оформить заявку, попробуйте позже' }, { status: 503 })
   }
 
   let resolved: (ResolvedWholesaleLine | null)[]

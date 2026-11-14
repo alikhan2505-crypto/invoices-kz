@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({
   load: vi.fn(),
   numberError: null as { message: string } | null,
   insertError: null as { message: string } | null,
+  claim: vi.fn(),
+  sent: [] as unknown[],
 }))
 const MODEL = '3f2b8c1e-9a4d-4e6f-8b1a-0c2d3e4f5a6b'
 
@@ -26,7 +28,11 @@ vi.mock('@supabase/supabase-js', () => ({
     },
   }),
 }))
-vi.mock('resend', () => ({ Resend: class { emails = { send: async () => ({}) } } }))
+vi.mock('resend', () => ({ Resend: class { emails = { send: async (m: unknown) => { h.sent.push(m); return {} } } } }))
+vi.mock('@/lib/windowLimits', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/windowLimits')>()),
+  claimWindowSlot: h.claim,
+}))
 vi.mock('@/lib/kaspiShop/storefront', () => ({
   resolveStorefrontBySlug: async () => ({ connectionId: 'c1', userId: 'u1', companyName: 'Shop' }),
 }))
@@ -59,6 +65,9 @@ describe('POST /api/shop/[slug]/wholesale-order: налоговые поля с�
     h.profile = { data: { vat_type: 'vat_16' }, error: null }
     h.numberError = null
     h.insertError = null
+    h.sent = []
+    h.claim.mockReset()
+    h.claim.mockResolvedValue({ ok: true, used: 1 })
     h.load.mockReset()
     h.load.mockResolvedValue({ model: {}, variant: {} })
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -134,5 +143,63 @@ describe('POST /api/shop/[slug]/wholesale-order: кривой ввод и сбо
     const text = JSON.stringify(await res.json())
     expect(text).toBe('{"error":"Не удалось оформить заявку"}')
     expect(text).not.toContain('invoices')
+  })
+})
+
+describe('POST /api/shop/[slug]/wholesale-order: потолки против фабрики счетов и почтового релея (аудит 14.11)', () => {
+  beforeEach(() => {
+    h.inserted = null
+    h.numberError = null
+    h.insertError = null
+    h.sent = []
+    h.claim.mockReset()
+    h.claim.mockResolvedValue({ ok: true, used: 1 })
+    h.load.mockReset()
+    h.load.mockResolvedValue({ model: {}, variant: {} })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('занимает три потолка: IP, адрес получателя, витрина', async () => {
+    expect((await call()).status).toBe(200)
+    expect(h.claim).toHaveBeenCalledTimes(3)
+    const keys = h.claim.mock.calls.map(c => String(c[1]))
+    expect(keys.some(k => k.startsWith('wsorder-ip:'))).toBe(true)
+    expect(keys.some(k => k.startsWith('wsorder-email:'))).toBe(true)
+    expect(keys.some(k => k.startsWith('wsorder-shop:'))).toBe(true)
+  })
+
+  it('любой исчерпанный потолок: 429, счёт не создаётся и письмо не уходит', async () => {
+    for (let failAt = 0; failAt < 3; failAt++) {
+      h.claim.mockReset()
+      for (let i = 0; i < 3; i++) h.claim.mockResolvedValueOnce(i === failAt ? { ok: false, reason: 'limit' } : { ok: true, used: 1 })
+      h.inserted = null
+      h.sent = []
+      expect((await call()).status).toBe(429)
+      expect(h.inserted).toBeNull()
+      expect(h.sent).toHaveLength(0)
+    }
+  })
+
+  it('счётчик не читается: 503, а не обход (анонимный маршрут пишет в базу и шлёт почту)', async () => {
+    h.claim.mockResolvedValue({ ok: false, reason: 'error' })
+    expect((await call()).status).toBe(503)
+    expect(h.inserted).toBeNull()
+    expect(h.sent).toHaveLength(0)
+  })
+
+  it('кривой адрес не доходит ни до потолков, ни до счёта', async () => {
+    for (const email of ['x@', '@y.kz', 'a b@c.kz', 'no-at-sign', 'a@b', `${'a'.repeat(250)}@b.kz`]) {
+      expect((await call({ clientEmail: email })).status).toBe(400)
+    }
+    expect(h.claim).not.toHaveBeenCalled()
+    expect(h.inserted).toBeNull()
+  })
+
+  it('адрес получателя в ключе приводится к нижнему регистру: Foo@B.kz и foo@b.kz делят один потолок', async () => {
+    await call({ clientEmail: 'Foo@B.kz' })
+    await call({ clientEmail: 'foo@b.kz' })
+    const emailKeys = h.claim.mock.calls.map(c => String(c[1])).filter(k => k.startsWith('wsorder-email:'))
+    expect(emailKeys).toHaveLength(2)
+    expect(emailKeys[0]).toBe(emailKeys[1])
   })
 })

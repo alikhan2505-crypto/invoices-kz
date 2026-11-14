@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   insertError: null as { message: string } | null,
   inserted: [] as Record<string, unknown>[],
   mint: vi.fn(),
+  claim: vi.fn(),
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -47,6 +48,10 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('@/lib/kaspiShop/storefront', () => ({
   resolveStorefrontBySlug: async () => ({ connectionId: 'c1', userId: 'u1', companyName: 'Shop' }),
 }))
+vi.mock('@/lib/windowLimits', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/windowLimits')>()),
+  claimWindowSlot: h.claim,
+}))
 vi.mock('@/lib/kaspiPay/shopOrderPayment', () => ({ getOrCreateKaspiPaymentForShopOrder: h.mint }))
 
 import { POST } from './route'
@@ -65,6 +70,8 @@ beforeEach(() => {
   h.productError = null
   h.insertError = null
   h.inserted = []
+  h.claim.mockReset()
+  h.claim.mockResolvedValue({ ok: true, used: 1 })
   h.mint.mockReset()
   h.mint.mockResolvedValue({ qr_token: 'qr', payment_link: 'https://pay', status: 'pending' })
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -120,5 +127,19 @@ describe('POST /api/shop/[slug]/order', () => {
     const text = JSON.stringify(await res.json())
     expect(text).toBe('{"error":"Не удалось оформить заказ"}')
     expect(text).not.toContain('kaspi_shop_orders')
+  })
+
+  it('потолок на IP: за ним 429, заказ и Kaspi QR не создаются (аудит 14.11)', async () => {
+    h.claim.mockResolvedValue({ ok: false, reason: 'limit' })
+    const res = await call({ ...buyer, items: [{ id: PRODUCT, qty: 1 }] })
+    expect(res.status).toBe(429)
+    expect(h.inserted).toHaveLength(0)
+    expect(h.mint).not.toHaveBeenCalled()
+  })
+
+  it('счётчик IP не читается: заказ проходит, у витрины остаётся свой потолок', async () => {
+    h.claim.mockResolvedValue({ ok: false, reason: 'error' })
+    const res = await call({ ...buyer, items: [{ id: PRODUCT, qty: 1 }] })
+    expect(res.status).toBe(200)
   })
 })
