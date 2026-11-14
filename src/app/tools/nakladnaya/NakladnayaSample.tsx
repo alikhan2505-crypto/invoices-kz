@@ -23,7 +23,7 @@ export default function NakladnayaSample({ lang }: { lang: ToolLang }) {
         doc={buildNakladnayaSampleDoc()}
         guide={{ href: toolGuidePath(NAKLADNAYA_GUIDE_SLUG, lang), label: nakladnayaDict[lang].guideLink }}
       />
-      {/* Кнопка под образцом: возвращает к форме (14.11.2026). На kk её нет до вычитки текста. */}
+      {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="nakladnaya" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.nakladnaya} />}
     </>
   )

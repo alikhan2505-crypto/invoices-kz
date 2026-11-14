@@ -20,7 +20,7 @@ export default function KpSample({ lang }: { lang: ToolLang }) {
         docLang={lang}
         guide={{ href: kpGuidePath(lang), label: kpDict[lang].guideLink }}
       />
-      {/* Кнопка под образцом: возвращает к форме (14.11.2026). На kk её нет до вычитки текста. */}
+      {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="kp" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.kp} />}
     </>
   )

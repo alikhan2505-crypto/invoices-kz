@@ -19,7 +19,7 @@ export default function SchetSample({ lang }: { lang: ToolLang }) {
         doc={buildSchetSampleDoc()}
         guide={{ href: schetGuidePath(lang), label: schetDict[lang].guideLink }}
       />
-      {/* Кнопка под образцом: возвращает к форме (14.11.2026). На kk её нет до вычитки текста. */}
+      {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="schet" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.schet} />}
     </>
   )

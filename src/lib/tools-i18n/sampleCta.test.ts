@@ -21,9 +21,9 @@ const SAMPLES = { avr: AvrSample, kp: KpSample, schet: SchetSample, nakladnaya: 
 const FORM_FILES = { avr: 'avr/AvrTool.tsx', kp: 'kp/KpTool.tsx', schet: 'schet/SchetTool.tsx', nakladnaya: 'nakladnaya/NakladnayaTool.tsx' }
 
 describe('кнопка под образцом (14.11.2026)', () => {
-  it('тексты ru и en есть, без тире и эмодзи; kk пока нет (ждёт вычитки)', () => {
+  it('тексты ru, en и kk есть, без тире и эмодзи', () => {
     for (const tool of TOOLS) {
-      for (const lang of ['ru', 'en'] as const) {
+      for (const lang of ['ru', 'en', 'kk'] as const) {
         const c = sampleCtaCopy(tool, lang)
         expect(c, `${tool} ${lang}`).not.toBeNull()
         for (const s of [c!.title, c!.body, c!.button]) {
@@ -32,7 +32,6 @@ describe('кнопка под образцом (14.11.2026)', () => {
           expect(s).not.toMatch(/\p{Extended_Pictographic}/u)
         }
       }
-      expect(sampleCtaCopy(tool, 'kk')).toBeNull()
     }
   })
 
@@ -44,7 +43,7 @@ describe('кнопка под образцом (14.11.2026)', () => {
     }
   })
 
-  it('на ru и en блок стоит после образца, на kk его нет', () => {
+  it('на ru, en и kk блок стоит после образца', () => {
     for (const tool of TOOLS) {
       const S = SAMPLES[tool]
       const ru = renderToStaticMarkup(createElement(S, { lang: 'ru' }))
@@ -53,7 +52,8 @@ describe('кнопка под образцом (14.11.2026)', () => {
       expect(ru, tool).toContain('data-testid="tool-sample-cta"')
       expect(ru.indexOf('</section>'), tool).toBeLessThan(ru.indexOf('tool-sample-cta'))
       expect(en, tool).toContain('data-testid="tool-sample-cta"')
-      expect(kk, tool).not.toContain('tool-sample-cta')
+      expect(kk, tool).toContain('data-testid="tool-sample-cta"')
+      expect(kk.indexOf('</section>'), tool).toBeLessThan(kk.indexOf('tool-sample-cta'))
     }
   })
 

@@ -19,7 +19,7 @@ export default function AvrSample({ lang }: { lang: ToolLang }) {
         doc={buildAvrSampleDoc()}
         guide={{ href: avrGuidePath(lang), label: avrDict[lang].guideLink }}
       />
-      {/* Кнопка под образцом: возвращает к форме (макет согласован 14.11.2026). На kk её нет до вычитки текста. */}
+      {/* Кнопка под образцом: возвращает к форме (макет согласован 14.11.2026). */}
       {cta && <ToolSampleCta tool="avr" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.avr} />}
     </>
   )

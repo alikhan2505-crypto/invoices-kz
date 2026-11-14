@@ -5,10 +5,10 @@ import type { ToolLang } from './index'
 // данные Search Console (запросы «образец», «бланк», «скачать» на всех четырёх
 // страницах) легли в основу остальных трёх.
 //
-// Казахского текста нет намеренно: kk-строки нельзя выкладывать до вычитки
-// основателем (src/lib/kkReview.ts), поэтому на /tools/kk/<инструмент> блок не
-// показывается, пока текст не утверждён. Черновик kk лежит в файле «Тексты на
-// вычитку (казахский).md». Чтобы включить kk: заполнить поле kk и убрать null.
+// Казахский текст вычитан и принят основателем 14.11.2026 (файл «Тексты на
+// вычитку (казахский).md», раздел «14.11.2026: кнопка под образцом»), поэтому
+// плашка «текст проверяется» на /tools/kk/<инструмент> не нужна. Правки казахских
+// строк только после вычитки (src/lib/kkReview.ts).
 //
 // В тексте нет тире и эмодзи (правило новых строк интерфейса).
 
@@ -48,6 +48,26 @@ const RU: Record<SampleCtaTool, { title: string; body: string }> = {
   },
 }
 
+const KK: Record<SampleCtaTool, { title: string; body: string }> = {
+  avr: {
+    title: 'Осындай актіні өз деректеріңізбен жасағыңыз келе ме?',
+    body: 'БСН енгізіңіз, ұйым атауы өзі толады. Дайын акт PDF түрінде бір минутта, тіркелусіз.',
+  },
+  kp: {
+    title: 'Осындай коммерциялық ұсынысты өз деректеріңізбен жасағыңыз келе ме?',
+    body: 'БСН енгізіңіз, ұйым атауы өзі толады. Дайын коммерциялық ұсыныс PDF түрінде бір минутта, тіркелусіз.',
+  },
+  schet: {
+    title: 'Осындай төлем шотын өз деректеріңізбен жасағыңыз келе ме?',
+    body: 'БСН енгізіңіз, ұйым атауы өзі толады. Дайын төлем шоты PDF түрінде бір минутта, тіркелусіз.',
+  },
+  nakladnaya: {
+    title: 'Осындай жүкқұжатты өз деректеріңізбен жасағыңыз келе ме?',
+    body: 'БСН енгізіңіз, ұйым атауы өзі толады. Дайын жүкқұжат PDF түрінде бір минутта, тіркелусіз.',
+  },
+}
+const KK_BUTTON = 'Үлгіні өз деректеріммен толтыру ↑'
+
 const EN: Record<SampleCtaTool, string> = {
   avr: 'Need an act like this with your own details?',
   kp: 'Need a commercial offer like this with your own details?',
@@ -56,9 +76,10 @@ const EN: Record<SampleCtaTool, string> = {
 }
 const EN_BODY = 'Enter your BIN and the company name fills in by itself. A ready PDF in a minute, no sign-up.'
 
-/** Текст блока для инструмента и языка; null, если для языка текста ещё нет (kk до вычитки). */
+/** Текст блока для инструмента и языка; null, если для языка текста нет. */
 export function sampleCtaCopy(tool: SampleCtaTool, lang: ToolLang): SampleCtaCopy | null {
   if (lang === 'ru') return { ...RU[tool], button: BUTTON.ru }
   if (lang === 'en') return { title: EN[tool], body: EN_BODY, button: BUTTON.en }
+  if (lang === 'kk') return { ...KK[tool], button: KK_BUTTON }
   return null
 }
