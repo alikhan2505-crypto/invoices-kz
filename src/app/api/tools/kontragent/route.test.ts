@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // попытка из квартального лимита. Реестры и счётчик подменены.
 const h = vi.hoisted(() => ({
   lookup: vi.fn(),
-  readCounter: vi.fn(),
-  writeCounter: vi.fn(),
+  claimQuotaSlot: vi.fn(),
+  releaseCounterSlot: vi.fn(),
   registryLoadToday: vi.fn(),
 }))
 
@@ -13,8 +13,8 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({}) }))
 vi.mock('@/lib/binLookupServer', () => ({ performBinLookup: h.lookup }))
 vi.mock('@/lib/toolQuota', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/toolQuota')>()),
-  readCounter: h.readCounter,
-  writeCounter: h.writeCounter,
+  claimQuotaSlot: h.claimQuotaSlot,
+  releaseCounterSlot: h.releaseCounterSlot,
   registryLoadToday: h.registryLoadToday,
 }))
 
@@ -48,8 +48,9 @@ const company = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  h.readCounter.mockResolvedValue({ ok: true, used: 1 })
-  h.writeCounter.mockResolvedValue(true)
+  // Слот занят: до занятия в счётчике уже была 1 попытка (used = значение ДО).
+  h.claimQuotaSlot.mockResolvedValue({ ok: true, used: 1 })
+  h.releaseCounterSlot.mockResolvedValue(true)
   h.registryLoadToday.mockResolvedValue(0)
 })
 
@@ -65,8 +66,9 @@ describe('POST /api/tools/kontragent', () => {
     expect(body.company.hasFullCard).toBe(true)
     expect(body.company).not.toHaveProperty('address')
     expect(body.company).not.toHaveProperty('director')
-    expect(h.writeCounter).toHaveBeenCalledTimes(1)
-    expect(h.writeCounter.mock.calls[0][2]).toBe(2)
+    expect(h.claimQuotaSlot).toHaveBeenCalledTimes(1)
+    expect(h.claimQuotaSlot.mock.calls[0][2]).toBe(3)
+    expect(h.releaseCounterSlot).not.toHaveBeenCalled()
   })
 
   it('rehabilitation: only state/since/region reach the public response', async () => {
@@ -96,8 +98,8 @@ describe('POST /api/tools/kontragent', () => {
     const res = await POST(req('123456789012'))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ found: false, remaining: 1 })
-    expect(h.writeCounter).toHaveBeenCalledTimes(1)
-    expect(h.writeCounter.mock.calls[0][2]).toBe(2)
+    expect(h.claimQuotaSlot).toHaveBeenCalledTimes(1)
+    expect(h.releaseCounterSlot).not.toHaveBeenCalled()
   })
 
   it('unavailable: answers 503 with an explicit flag and does NOT charge the attempt', async () => {
@@ -109,21 +111,39 @@ describe('POST /api/tools/kontragent', () => {
     expect(body).not.toHaveProperty('found')
     // Попытка не списана: остаток прежний (3 минус уже потраченная 1).
     expect(body.remaining).toBe(2)
-    expect(h.writeCounter).not.toHaveBeenCalled()
+    // Слот был занят до похода в реестры, при отказе реестров он возвращается.
+    expect(h.releaseCounterSlot).toHaveBeenCalledTimes(1)
+    expect(h.releaseCounterSlot.mock.calls[0][2]).toBe(2)
   })
 
   it('does not touch the registries or the counter for an invalid BIN', async () => {
     const res = await POST(req('123'))
     expect(res.status).toBe(400)
     expect(h.lookup).not.toHaveBeenCalled()
-    expect(h.writeCounter).not.toHaveBeenCalled()
+    expect(h.claimQuotaSlot).not.toHaveBeenCalled()
   })
 
   it('answers 429 limit without calling the registries once the quarter is used up', async () => {
-    h.readCounter.mockResolvedValue({ ok: true, used: 3 })
+    h.claimQuotaSlot.mockResolvedValue({ ok: false, reason: 'limit' })
     const res = await POST(req('123456789012'))
     expect(res.status).toBe(429)
     expect((await res.json()).error).toBe('limit')
+    expect(h.lookup).not.toHaveBeenCalled()
+  })
+
+  it('the counter cannot be claimed: 503 and the registries are not asked (no free pass without a limit)', async () => {
+    h.claimQuotaSlot.mockResolvedValue({ ok: false, reason: 'error' })
+    const res = await POST(req('123456789012'))
+    expect(res.status).toBe(503)
+    expect(h.lookup).not.toHaveBeenCalled()
+  })
+
+  it('a busy day (global fuse) answers 429 busy BEFORE a slot is spent', async () => {
+    h.registryLoadToday.mockResolvedValue(10_000)
+    const res = await POST(req('123456789012'))
+    expect(res.status).toBe(429)
+    expect((await res.json()).error).toBe('busy')
+    expect(h.claimQuotaSlot).not.toHaveBeenCalled()
     expect(h.lookup).not.toHaveBeenCalled()
   })
 })

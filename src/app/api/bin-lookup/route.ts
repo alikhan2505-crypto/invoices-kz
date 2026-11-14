@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { performBinLookup } from '@/lib/binLookupServer'
 import { publicRehabilitation } from '@/lib/kgdRehabilitation'
+import { claimWindowSlot, dayBucket, hourBucket, windowKey } from '@/lib/windowLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +26,14 @@ const supabaseAuth = createClient(
 // public) but because an open proxy would spend our 40 requests a minute.
 // (Публичный собрат на /api/tools/kontragent открыт, но ограничен 3 проверками
 // на IP в день и общим дневным предохранителем.)
+//
+// Регистрация бесплатная, поэтому «только вошедшим» не защита от бота с временной
+// почтой (аудит 14.11.2026): у каждого аккаунта свой потолок. В обычной работе
+// счёт на один-два десятка БИН в час (реквизиты профиля, клиент, повторный запрос
+// ?extras=1) далеко от потолка.
+const BIN_LOOKUP_PER_HOUR = 60
+const BIN_LOOKUP_PER_DAY = 400
+
 export async function GET(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
@@ -35,6 +44,16 @@ export async function GET(req: NextRequest) {
   const bin = normalizeBin(req.nextUrl.searchParams.get('bin'))
   if (!isValidBin(bin)) {
     return NextResponse.json({ error: 'БИН должен состоять из 12 цифр' }, { status: 400 })
+  }
+
+  // Потолок на аккаунт, атомарно (compare-and-swap, пачка параллельных запросов не
+  // проскакивает). Счётчик не читается: пропускаем, чтобы авто-подстановка у платящих
+  // не ломалась из-за сбоя базы; брать с него больше нечего, реестры и так стоят
+  // за общим кэшем.
+  const hour = await claimWindowSlot(supabase, windowKey('binlookup-h', user.id, hourBucket()), BIN_LOOKUP_PER_HOUR)
+  const day = hour.ok ? await claimWindowSlot(supabase, windowKey('binlookup-d', user.id, dayBucket()), BIN_LOOKUP_PER_DAY) : hour
+  if ((!hour.ok && hour.reason === 'limit') || (!day.ok && day.reason === 'limit')) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
   // Риски, налоговый режим и реестр должников Минюста (до ~9 с на повторах)

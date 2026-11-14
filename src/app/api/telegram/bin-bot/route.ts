@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { performBinLookup } from '@/lib/binLookupServer'
-import { almatyQuarter, readCounter, registryLoadToday, REGISTRY_DAILY_GLOBAL, sha256Hex, writeCounter } from '@/lib/toolQuota'
+import { almatyQuarter, claimQuotaSlot, registryLoadToday, REGISTRY_DAILY_GLOBAL, releaseCounterSlot, sha256Hex } from '@/lib/toolQuota'
 import {
   BOT_FREE_PER_QUARTER, BOT_TOOL_LINK, BUSY_TEXT, HELP_TEXT, NOT_A_BIN_TEXT, NOT_FOUND_TEXT, START_TEXT,
   UNAVAILABLE_TEXT, formatCheckReply, limitText, parseBotInput,
@@ -80,19 +80,26 @@ async function handle(token: string, chatId: number, fromId: number, text: unkno
 
   // Ключ без двоеточия, как у проверки на сайте: такие проверки считает дневной предохранитель реестров.
   const key = sha256Hex(`tgbot|${fromId}|${almatyQuarter()}`)
-  const counter = await readCounter(supabase, key)
-  if (!counter.ok) return send(token, chatId, UNAVAILABLE_TEXT)
-  if (counter.used >= BOT_FREE_PER_QUARTER) return send(token, chatId, limitText())
+  // Дневной предохранитель смотрим ДО слота: на загруженный день попытка не тратится.
   if ((await registryLoadToday(supabase)) >= REGISTRY_DAILY_GLOBAL) return send(token, chatId, BUSY_TEXT)
 
-  const result = await performBinLookup(supabase, input.bin, { extras: true, rnu: true })
-  // Реестры не ответили: это не «не найдено», попытку не списываем.
-  if (!result.found && result.unavailable) return send(token, chatId, UNAVAILABLE_TEXT)
+  // Слот занимаем ДО похода в реестры и атомарно (compare-and-swap): ответы идут из
+  // after(), и человек, быстро шлющий БИН за БИНом, иначе проходит всей пачкой по
+  // одному и тому же used=0 и выжигает квоту реестров. Не читается счётчик — отказ.
+  const claim = await claimQuotaSlot(supabase, key, BOT_FREE_PER_QUARTER)
+  if (!claim.ok) return send(token, chatId, claim.reason === 'limit' ? limitText() : UNAVAILABLE_TEXT)
+  const used = claim.used
 
-  await writeCounter(supabase, key, counter.used + 1)
+  const result = await performBinLookup(supabase, input.bin, { extras: true, rnu: true })
+  // Реестры не ответили: это не «не найдено», попытку не списываем: слот возвращаем.
+  if (!result.found && result.unavailable) {
+    await releaseCounterSlot(supabase, key, used + 1)
+    return send(token, chatId, UNAVAILABLE_TEXT)
+  }
+
   await logCheck()
   if (!result.found) return send(token, chatId, NOT_FOUND_TEXT)
-  const remaining = Math.max(0, BOT_FREE_PER_QUARTER - counter.used - 1)
+  const remaining = Math.max(0, BOT_FREE_PER_QUARTER - used - 1)
   return send(token, chatId, formatCheckReply(result.company, remaining), true)
 }
 

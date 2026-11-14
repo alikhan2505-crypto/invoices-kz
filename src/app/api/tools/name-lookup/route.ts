@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { performBinLookup } from '@/lib/binLookupServer'
 import {
-  almatyQuarter, cleanCompanyName, clientIp, nameLookupKey, NAME_LOOKUP_QUARTER_LIMIT,
+  almatyQuarter, cleanCompanyName, clientIp, nameLookupKey, NAME_LOOKUP_QUARTER_LIMIT, quotaIp,
   claimCounterSlot, parseNameLookupTarget, readCounter, registryLoadToday, REGISTRY_DAILY_GLOBAL,
 } from '@/lib/toolQuota'
 
@@ -72,7 +72,8 @@ export async function POST(req: NextRequest) {
   const cachedName = cleanCompanyName(cached?.name)
   if (cachedName) return NextResponse.json({ found: true, name: cachedName, source: 'cache' }, { headers: NO_STORE })
 
-  const key = nameLookupKey(target.tool, target.role, ip, almatyQuarter())
+  // IPv6 по префиксу /64 (quotaIp): иначе перебором хвоста адреса берётся свежий лимит.
+  const key = nameLookupKey(target.tool, target.role, quotaIp(ip), almatyQuarter())
   const counter = await readCounter(supabase, key)
   if (!counter.ok) return miss('unavailable')
   if (counter.used >= NAME_LOOKUP_QUARTER_LIMIT) return miss('limit')

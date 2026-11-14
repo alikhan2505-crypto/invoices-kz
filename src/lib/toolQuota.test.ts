@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import {
   almatyDay, almatyQuarter, nextQuarterStart, kpClaimKey, nameLookupKey, parseNameLookupTarget, remainingOf,
   clientIp, cleanCompanyName, KP_CLAIM_PREFIX, NAME_LOOKUP_PREFIX, NAME_LOOKUP_ROLES, NAME_LOOKUP_TOOLS,
-  KP_QUARTER_LIMIT, NAME_LOOKUP_QUARTER_LIMIT, claimCounterSlot,
+  KP_QUARTER_LIMIT, NAME_LOOKUP_QUARTER_LIMIT, claimCounterSlot, claimQuotaSlot,
   almatyMonth, nextMonthStart, waybillsKey, WAYBILLS_PREFIX, WAYBILLS_MONTH_LIMIT, bearerUserId,
   quotaIp, releaseCounterSlot, waybillsUnlimited,
   docToolKey, DOC_QUOTA_TOOLS, DOC_TOOL_QUARTER_LIMIT, parseDocQuotaTool, registryLoadToday,
@@ -394,6 +394,31 @@ describe('claimCounterSlot (atomic name-lookup budget)', () => {
 
   it('reports a database error instead of claiming', async () => {
     expect(await claimCounterSlot(fakeCounters({}, { failUpdate: true }), 'lookup:d', 0)).toBe('error')
+  })
+})
+
+describe('claimQuotaSlot (atomic ceiling: a burst cannot outrun the limit)', () => {
+  it('200 parallel requests from one key: exactly LIMIT get a slot, the rest are refused', async () => {
+    const rows: Record<string, number> = {}
+    const db = fakeCounters(rows)
+    const results = await Promise.all(Array.from({ length: 200 }, () => claimQuotaSlot(db, 'k:burst', 3)))
+    expect(results.filter(r => r.ok)).toHaveLength(3)
+    expect(results.filter(r => !r.ok && r.reason === 'limit')).toHaveLength(197)
+    expect(rows['k:burst']).toBe(3)
+  })
+
+  it('reports used BEFORE the slot, so remaining = limit - used - 1', async () => {
+    const rows: Record<string, number> = { 'k:a': 1 }
+    const r = await claimQuotaSlot(fakeCounters(rows), 'k:a', 3)
+    expect(r).toEqual({ ok: true, used: 1 })
+    expect(rows['k:a']).toBe(2)
+  })
+
+  it('a used-up key is refused without writing; a database error is an error, not a free pass', async () => {
+    const rows: Record<string, number> = { 'k:b': 3 }
+    expect(await claimQuotaSlot(fakeCounters(rows), 'k:b', 3)).toEqual({ ok: false, reason: 'limit' })
+    expect(rows['k:b']).toBe(3)
+    expect(await claimQuotaSlot(fakeCounters({}, { failUpdate: true }), 'k:c', 3)).toEqual({ ok: false, reason: 'error' })
   })
 })
 

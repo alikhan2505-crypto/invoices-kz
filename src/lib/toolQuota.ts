@@ -286,6 +286,33 @@ export async function claimCounterSlot(supabase: SupabaseClient, key: string, us
   return 'error'
 }
 
+export type QuotaClaim = { ok: true; used: number } | { ok: false; reason: 'limit' | 'error' }
+
+/**
+ * Атомарно занять слот под счётчик с потолком: пока в базе used < limit, count
+ * used → used+1 (compare-and-swap, пачка параллельных запросов не проскакивает:
+ * проигравший перечитывает и либо берёт следующий слот, либо упирается в limit).
+ * ok.used — значение счётчика ДО занятия (остаток после слота = limit - used - 1).
+ * 'limit' — потолок исчерпан; 'error' — счётчик не читается/не пишется (роут
+ * отказывает: лимит — защита квоты реестров, а не только продуктовое решение).
+ */
+export async function claimQuotaSlot(supabase: SupabaseClient, key: string, limit: number, now = Date.now()): Promise<QuotaClaim> {
+  const first = await readCounter(supabase, key)
+  if (!first.ok) return { ok: false, reason: 'error' }
+  let used = first.used
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (used >= limit) return { ok: false, reason: 'limit' }
+    const claim = await claimCounterSlot(supabase, key, used, now)
+    if (claim === 'claimed') return { ok: true, used }
+    if (claim === 'error') return { ok: false, reason: 'error' }
+    const again = await readCounter(supabase, key)
+    if (!again.ok) return { ok: false, reason: 'error' }
+    used = again.used
+  }
+  // Четыре проигранные гонки подряд на одном ключе: это не человек.
+  return { ok: false, reason: 'limit' }
+}
+
 /**
  * Вернуть занятый слот: count used → used-1 (compare-and-swap). Для склейки
  * накладных: слот занимаем ДО склейки, а если она упала (битый PDF) — отдаём
