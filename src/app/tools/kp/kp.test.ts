@@ -57,7 +57,7 @@ describe('kp dictionary', () => {
 
   it('ru title names the searched wording: образец, Казахстан (24.10.2026 metadata audit)', () => {
     expect(toolMetadata('kp', 'ru', kpDict.ru.seo).title)
-      .toBe('Образец коммерческого предложения в Казахстане — PDF')
+      .toBe('Образец коммерческого предложения (КП) для РК — скачать PDF')
   })
 
   it('lets the visitor pick the document language and marks the Kazakh text as under review', () => {

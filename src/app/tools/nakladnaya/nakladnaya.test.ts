@@ -14,7 +14,7 @@ const err = nakladnayaDict.ru.errors
 describe('nakladnaya metadata', () => {
   it('ru title names the searched wording: образец, Казахстан, скачать (24.10.2026 metadata audit)', () => {
     const m = toolMetadata('nakladnaya', 'ru', nakladnayaDict.ru.seo)
-    expect(m.title).toBe('Образец накладной для Казахстана — скачать PDF | invoices.kz')
+    expect(m.title).toBe('Образец и бланк накладной для Казахстана — скачать PDF | invoices.kz')
   })
 
   it('canonicalises each language to itself with hreflang to all three', () => {

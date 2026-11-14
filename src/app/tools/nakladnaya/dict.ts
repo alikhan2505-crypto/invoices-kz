@@ -81,7 +81,7 @@ export interface NakladnayaDict {
 export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
   ru: {
     seo: {
-      title: 'Образец накладной для Казахстана — скачать PDF',
+      title: 'Образец и бланк накладной для Казахстана — скачать PDF',
       description:
         'Образец накладной на отпуск запасов (форма З-2) для ИП и ТОО в Казахстане: заполните данные и скачайте PDF за минуту. 3 накладные в квартал бесплатно.',
       keywords:

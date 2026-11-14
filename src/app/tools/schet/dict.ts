@@ -101,7 +101,7 @@ export interface SchetDict {
 export const schetDict: Record<ToolLang, SchetDict> = {
   ru: {
     seo: {
-      title: 'Образец счёта на оплату для Казахстана — скачать PDF',
+      title: 'Образец и бланк счёта на оплату для Казахстана — скачать PDF',
       description:
         'Образец счёта на оплату для ИП и ТОО в Казахстане: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
       keywords:

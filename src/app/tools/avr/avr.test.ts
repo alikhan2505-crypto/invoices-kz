@@ -23,7 +23,7 @@ const CYRILLIC = /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/
 describe('avr metadata', () => {
   it('ru head names the searched wording: образец, Казахстан, скачать (24.10.2026 metadata audit)', () => {
     const m = toolMetadata('avr', 'ru', avrDict.ru.seo)
-    expect(m.title).toBe('Образец акта выполненных работ для Казахстана — скачать PDF')
+    expect(m.title).toBe('Образец АВР (акт выполненных работ) для Казахстана — скачать')
     expect(m.description).toBe(
       'Образец акта выполненных работ (АВР) для ИП и ТОО в Казахстане: заполните стороны и договор, скачайте PDF. НДС, сумма прописью. 3 акта в квартал бесплатно.',
     )
