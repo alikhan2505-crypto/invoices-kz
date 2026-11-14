@@ -170,6 +170,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
     <html>
     <head>
       <meta charset="utf-8">
+      <title>Счёт на оплату${number ? ' № ' + number : ''} · invoices.kz</title>
       <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
       <style>

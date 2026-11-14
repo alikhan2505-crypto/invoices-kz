@@ -126,6 +126,7 @@ export function buildNakladnayaHtml(
 <html>
 <head>
 <meta charset="utf-8">
+<title>Накладная${number ? ' № ' + number : ''} · invoices.kz</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }

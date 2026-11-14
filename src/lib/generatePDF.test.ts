@@ -158,3 +158,11 @@ describe('generateInvoicePDF — автопечать', () => {
     expect(html).not.toContain('id="dlBtn"')
   })
 })
+
+describe('generateInvoicePDF — название вкладки документа (14.11.2026)', () => {
+  it('в окне документа есть title с номером счёта, чужой номер экранируется', async () => {
+    expect(await generateInvoicePDF({ ...base })).toContain('<title>Счёт на оплату № СЧ-42 · invoices.kz</title>')
+    const html = await generateInvoicePDF({ ...base, number: '</title><script>alert(1)</script>' })
+    expect(html).not.toContain('</title><script>alert(1)')
+  })
+})

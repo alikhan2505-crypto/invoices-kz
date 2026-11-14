@@ -163,3 +163,13 @@ describe('buildAVRHtml — сумма прописью', () => {
     expect(i).toBeLessThan(html.indexOf('Сдал (Исполнитель)'))
   })
 })
+
+describe('buildAVRHtml — название вкладки документа (14.11.2026)', () => {
+  it('в окне документа есть title с номером акта, чужой номер экранируется', () => {
+    expect(build({ number: '15' })).toContain('<title>Акт № 15 · invoices.kz</title>')
+    expect(build({ number: '' })).toContain('<title>Акт · invoices.kz</title>')
+    const html = build({ number: '</title><script>alert(1)</script>' })
+    expect(html).not.toContain('</title><script>alert(1)')
+    expect(html).toContain('<title>Акт № &lt;/title&gt;')
+  })
+})

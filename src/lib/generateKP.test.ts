@@ -165,3 +165,11 @@ describe('buildKPHtml — колонка «Код»', () => {
     expect(html).toMatch(/<td>2<\/td>\s*<td><\/td>\s*<td class="name">Печать<\/td>/)
   })
 })
+
+describe('buildKPHtml — название вкладки документа (14.11.2026)', () => {
+  it('в окне документа есть title с номером КП, чужой номер экранируется', () => {
+    expect(buildKPHtml(baseData({ number: 'КП-0012' }))).toContain('<title>Коммерческое предложение № КП-0012 · invoices.kz</title>')
+    const html = buildKPHtml(baseData({ number: '</title><script>alert(1)</script>' }))
+    expect(html).not.toContain('</title><script>alert(1)')
+  })
+})

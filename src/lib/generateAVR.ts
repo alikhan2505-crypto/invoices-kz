@@ -108,6 +108,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
     <html>
     <head>
       <meta charset="utf-8">
+      <title>Акт${data.number ? ' № ' + escapeHtml(String(data.number)) : ''} · invoices.kz</title>
       <meta name="viewport" content="width=1123, initial-scale=1.0">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
       <style>
