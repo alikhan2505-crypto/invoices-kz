@@ -64,3 +64,16 @@ describe('кнопка под образцом (14.11.2026)', () => {
     }
   })
 })
+
+describe('ссылка на казахское КП (14.11.2026)', () => {
+  it('над формой русского КП есть ссылка на /tools/kk/kp, на kk и en её нет', async () => {
+    const { KpSampleLink, KP_KK_PATH, KP_KK_LINK_LABEL } = await import('@/app/tools/kp/KpSample')
+    const ru = renderToStaticMarkup(createElement(KpSampleLink, { lang: 'ru' }))
+    expect(ru).toContain(`href="${KP_KK_PATH}"`)
+    expect(ru).toContain(KP_KK_LINK_LABEL)
+    expect(KP_KK_LINK_LABEL).not.toMatch(/[—–]/)
+    expect(renderToStaticMarkup(createElement(KpSampleLink, { lang: 'kk' }))).not.toContain(KP_KK_PATH)
+    expect(renderToStaticMarkup(createElement(KpSampleLink, { lang: 'en' }))).not.toContain(KP_KK_PATH)
+    expect(KP_KK_PATH).toBe('/tools/kk/kp')
+  })
+})
