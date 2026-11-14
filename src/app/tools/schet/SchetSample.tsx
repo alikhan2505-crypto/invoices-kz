@@ -1,4 +1,6 @@
 import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleCta from '@/components/tools/ToolSampleCta'
+import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { schetDict } from './dict'
 import { buildSchetSampleDoc, schetGuidePath, schetSampleAnchorLabel, schetSampleCopy, SAMPLE_ANCHOR_ID } from './sample'
@@ -7,14 +9,19 @@ import { buildSchetSampleDoc, schetGuidePath, schetSampleAnchorLabel, schetSampl
 // клиентский компонент: страница передаёт его в SchetTool как children, так что
 // образец попадает в серверный HTML и не утяжеляет браузерный бандл.
 export default function SchetSample({ lang }: { lang: ToolLang }) {
+  const cta = sampleCtaCopy('schet', lang)
   return (
-    <ToolSample
-      id={SAMPLE_ANCHOR_ID}
-      idPrefix="sc-sample"
-      copy={schetSampleCopy[lang]}
-      doc={buildSchetSampleDoc()}
-      guide={{ href: schetGuidePath(lang), label: schetDict[lang].guideLink }}
-    />
+    <>
+      <ToolSample
+        id={SAMPLE_ANCHOR_ID}
+        idPrefix="sc-sample"
+        copy={schetSampleCopy[lang]}
+        doc={buildSchetSampleDoc()}
+        guide={{ href: schetGuidePath(lang), label: schetDict[lang].guideLink }}
+      />
+      {/* Кнопка под образцом: возвращает к форме (14.11.2026). На kk её нет до вычитки текста. */}
+      {cta && <ToolSampleCta tool="schet" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.schet} />}
+    </>
   )
 }
 

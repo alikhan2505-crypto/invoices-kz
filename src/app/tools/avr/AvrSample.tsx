@@ -1,20 +1,27 @@
 import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleCta from '@/components/tools/ToolSampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { avrDict } from './dict'
+import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import { avrGuidePath, avrSampleAnchorLabel, avrSampleCopy, buildAvrSampleDoc, SAMPLE_ANCHOR_ID } from './sample'
 
 // Серверная обёртка блока «Образец» для /tools/avr на трёх языках. Не
 // клиентский компонент: страница передаёт его в AvrTool как children, так что
 // образец попадает в серверный HTML и не утяжеляет браузерный бандл.
 export default function AvrSample({ lang }: { lang: ToolLang }) {
+  const cta = sampleCtaCopy('avr', lang)
   return (
-    <ToolSample
-      id={SAMPLE_ANCHOR_ID}
-      idPrefix="avr-sample"
-      copy={avrSampleCopy[lang]}
-      doc={buildAvrSampleDoc()}
-      guide={{ href: avrGuidePath(lang), label: avrDict[lang].guideLink }}
-    />
+    <>
+      <ToolSample
+        id={SAMPLE_ANCHOR_ID}
+        idPrefix="avr-sample"
+        copy={avrSampleCopy[lang]}
+        doc={buildAvrSampleDoc()}
+        guide={{ href: avrGuidePath(lang), label: avrDict[lang].guideLink }}
+      />
+      {/* Кнопка под образцом: возвращает к форме (макет согласован 14.11.2026). На kk её нет до вычитки текста. */}
+      {cta && <ToolSampleCta tool="avr" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.avr} />}
+    </>
   )
 }
 

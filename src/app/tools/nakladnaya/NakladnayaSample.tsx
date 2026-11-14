@@ -1,4 +1,6 @@
 import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleCta from '@/components/tools/ToolSampleCta'
+import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import { toolGuidePath, type ToolLang } from '@/lib/tools-i18n'
 import { nakladnayaDict } from './dict'
 import { buildNakladnayaSampleDoc, nakladnayaSampleAnchorLabel, nakladnayaSampleCopy, SAMPLE_ANCHOR_ID } from './sample'
@@ -11,14 +13,19 @@ export const NAKLADNAYA_GUIDE_SLUG = 'dokumenty-ip-kazakhstan'
 // клиентский компонент: страница передаёт его в NakladnayaTool как children, так
 // что образец попадает в серверный HTML и не утяжеляет браузерный бандл.
 export default function NakladnayaSample({ lang }: { lang: ToolLang }) {
+  const cta = sampleCtaCopy('nakladnaya', lang)
   return (
-    <ToolSample
-      id={SAMPLE_ANCHOR_ID}
-      idPrefix="nk-sample"
-      copy={nakladnayaSampleCopy[lang]}
-      doc={buildNakladnayaSampleDoc()}
-      guide={{ href: toolGuidePath(NAKLADNAYA_GUIDE_SLUG, lang), label: nakladnayaDict[lang].guideLink }}
-    />
+    <>
+      <ToolSample
+        id={SAMPLE_ANCHOR_ID}
+        idPrefix="nk-sample"
+        copy={nakladnayaSampleCopy[lang]}
+        doc={buildNakladnayaSampleDoc()}
+        guide={{ href: toolGuidePath(NAKLADNAYA_GUIDE_SLUG, lang), label: nakladnayaDict[lang].guideLink }}
+      />
+      {/* Кнопка под образцом: возвращает к форме (14.11.2026). На kk её нет до вычитки текста. */}
+      {cta && <ToolSampleCta tool="nakladnaya" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.nakladnaya} />}
+    </>
   )
 }
 

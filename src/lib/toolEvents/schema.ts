@@ -35,8 +35,10 @@ export type ToolEventToolOrNone = ToolEventTool | 'none'
 // product — ссылки на лендинг/кабинет Kaspi Bot, upgrade — «Подключить
 // Kaspi Bot» в лимите склейки, export — выгрузка Excel в марже.
 // after_doc (13.11.2026) — приглашение сразу после созданного документа (ToolAfterDocCard).
+// sample_form (14.11.2026) — кнопка под образцом «Заполнить образец своими данными»
+// (ToolSampleCta): ведёт не в кабинет, а к форме на той же странице.
 // Колонка medium без CHECK в базе, миграция не нужна.
-export const TOOL_EVENT_MEDIUMS = ['cta', 'limit', 'fullcard', 'product', 'upgrade', 'export', 'after_doc'] as const
+export const TOOL_EVENT_MEDIUMS = ['cta', 'limit', 'fullcard', 'product', 'upgrade', 'export', 'after_doc', 'sample_form'] as const
 export type ToolEventMedium = (typeof TOOL_EVENT_MEDIUMS)[number]
 
 export const TOOL_EVENT_LANGS = ['ru', 'kk', 'en'] as const

@@ -41,6 +41,7 @@ const MEDIUM_LABELS: Record<string, string> = {
   upgrade: 'подключить',
   export: 'Excel',
   after_doc: 'после документа',
+  sample_form: 'образец к форме',
   other: 'прочее',
 }
 
