@@ -7,7 +7,9 @@ vi.hoisted(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test-key'
 })
 
-const h = vi.hoisted(() => ({ ctx: null as any }))
+const h = vi.hoisted(() => ({ ctx: null as any, conn: { accessToken: 'x' } as null | { accessToken: string } }))
+
+vi.mock('@/lib/aiAgent/whatsappWebhookHandler', () => ({ loadWhatsAppConnection: async () => h.conn }))
 
 vi.mock('@supabase/supabase-js', async () => {
   const { makeLoginDb, makeFakeAdmin } = await import('@/lib/whatsappLogin/fakeLoginDb.testkit')
@@ -29,6 +31,7 @@ const post = (url: string, body: unknown, ip = '1.2.3.4') => new NextRequest(url
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  h.conn = { accessToken: 'x' }
   delete process.env.WHATSAPP_LOGIN_PHONE_NUMBER_ID
   delete process.env.WHATSAPP_LOGIN_DISPLAY_NUMBER
 })
@@ -49,6 +52,17 @@ describe('POST /api/auth/whatsapp/start', () => {
     expect(body.code).toMatch(/^[A-Z0-9]{8}$/)
     expect(body.url).toContain('https://wa.me/77770000000?text=')
     expect(h.ctx.tables.whatsapp_login_codes.at(-1).meta).toEqual({ referral_code: 'r1' })
+  })
+
+  it('связь с номером потеряна (нет активного подключения): 503 unavailable, код не выдаётся', async () => {
+    process.env.WHATSAPP_LOGIN_PHONE_NUMBER_ID = 'pn1'
+    process.env.WHATSAPP_LOGIN_DISPLAY_NUMBER = '+7 777 000 00 00'
+    h.conn = null
+    const before = (h.ctx.tables.whatsapp_login_codes ?? []).length
+    const res = await start(post('http://localhost/api/auth/whatsapp/start', {}, '9.9.9.7'))
+    expect(res.status).toBe(503)
+    expect((await res.json()).error).toBe('unavailable')
+    expect((h.ctx.tables.whatsapp_login_codes ?? []).length).toBe(before)
   })
 
   it('больше 10 запросов в час с одного адреса: 429', async () => {

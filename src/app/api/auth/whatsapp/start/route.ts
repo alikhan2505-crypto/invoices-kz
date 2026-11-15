@@ -5,6 +5,7 @@ import { createLoginCode } from '@/lib/whatsappLogin/service'
 import { claimWindowSlot, hourBucket, windowKey } from '@/lib/windowLimits'
 import { clientIp, quotaIp } from '@/lib/toolQuota'
 import { serverError } from '@/lib/apiError'
+import { loadWhatsAppConnection } from '@/lib/aiAgent/whatsappWebhookHandler'
 
 // Кнопка «Войти через WhatsApp»: выдаёт код и ссылку на чат с готовым текстом «Вход <код>».
 // Без вошедшего пользователя (это вход), поэтому потолок по IP. Пока в Vercel не заданы
@@ -20,6 +21,10 @@ const STARTS_PER_IP_PER_HOUR = 10
 export async function POST(req: NextRequest) {
   const cfg = loginConfig()
   if (!cfg) return NextResponse.json({ error: 'disabled' }, { status: 503 })
+
+  // Связь с номером потеряна (подключение снято или токен истёк): код выдавать бесполезно, ответа не будет.
+  const conn = await loadWhatsAppConnection(cfg.phoneNumberId).catch(() => 'unknown' as const)
+  if (conn === null) return NextResponse.json({ error: 'unavailable' }, { status: 503 })
 
   const slot = await claimWindowSlot(supabase, windowKey('walogin-ip', quotaIp(clientIp(req.headers)), hourBucket()), STARTS_PER_IP_PER_HOUR)
   if (!slot.ok && slot.reason === 'limit') return NextResponse.json({ error: 'rate_limited' }, { status: 429 })

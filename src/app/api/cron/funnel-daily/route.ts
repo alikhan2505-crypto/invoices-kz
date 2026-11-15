@@ -6,6 +6,8 @@ import { almatyDay, formatAlmatyDay, ALMATY_OFFSET_MS } from '@/lib/visits/almat
 import { isMissingTableError } from '@/lib/visits/server'
 import { aggregateToolFunnel, type ToolEventDbRow } from '@/lib/toolEvents/funnel'
 import { buildDailyFunnelText } from '@/lib/funnelDaily/report'
+import { loadWhatsAppConnection } from '@/lib/aiAgent/whatsappWebhookHandler'
+import { checkWhatsAppLoginHealth } from '@/lib/whatsappLogin/health'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,7 +88,12 @@ async function run(request: Request) {
 
   const igDmChats = await count('ai_agent_conversations', target.startIso, target.endIso, q => q.eq('channel', 'instagram'))
 
-  const text = buildDailyFunnelText({ label: formatAlmatyDay(target.day), funnel, signups, signupsPrev, invoices, binWatch, igPosts, igDmChats })
+  let text = buildDailyFunnelText({ label: formatAlmatyDay(target.day), funnel, signups, signupsPrev, invoices, binWatch, igPosts, igDmChats })
+  // Вход через WhatsApp держится на связи номера с API: обрыв (например, приложение не открывали 13 дней) заметен только здесь.
+  const waHealth = await checkWhatsAppLoginHealth({ loadConnection: loadWhatsAppConnection }).catch(() => null)
+  if (waHealth?.state === 'down') text += `
+
+⚠ Вход через WhatsApp не работает: ${waHealth.reason}. Откройте WhatsApp Business на телефоне с номером входа.`
   if (dry) return NextResponse.json({ dry: true, day: target.day, text })
 
   const KIND = 'funnel'
