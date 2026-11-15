@@ -34,10 +34,10 @@ const FACEBOOK_LOGIN_ENABLED = true
 // Supabase (Magic link or OTP и Confirm sign up). Убираете код из шаблонов — сначала поставьте false.
 const LOGIN_CODE_ENABLED = true
 
-// Вход через WhatsApp (whatsapp_login.sql, 15.11.2026): человек отправляет готовое сообщение «Вход <код>» на наш номер,
+// Вход через WhatsApp (whatsapp_login.sql, 15.11.2026; включён 15.11, переменные в Vercel заданы): человек отправляет готовое сообщение «Вход <код>» на наш номер,
 // в ответ приходит ссылка. ВЫКЛЮЧЕНО: включать только после SQL-миграции, двух переменных в Vercel
 // (WHATSAPP_LOGIN_PHONE_NUMBER_ID, WHATSAPP_LOGIN_DISPLAY_NUMBER) и живой проверки с телефона.
-const WHATSAPP_LOGIN_ENABLED = false
+const WHATSAPP_LOGIN_ENABLED = true
 // Длина кода задаётся в Supabase: Sign In / Providers → Email → Email OTP length (сейчас 8). Поменяли там —
 // поменяйте здесь: кнопка включается и вход идёт сам ровно на этой длине.
 const OTP_LENGTH = 8
