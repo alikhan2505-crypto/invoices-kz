@@ -10,6 +10,7 @@ import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import { useAppDialog } from '@/components/AppDialog'
 import PageContainer, { TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
+import WhatsAppLinkCard from '@/components/WhatsAppLinkCard'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -164,6 +165,9 @@ export default function Security() {
                </div>
               </div>
             </motion.div>
+
+            {/* Вход через WhatsApp: привязать или отвязать номер (блока нет, пока вход через WhatsApp не настроен) */}
+            <WhatsAppLinkCard />
 
           </div>
         </PageContainer>

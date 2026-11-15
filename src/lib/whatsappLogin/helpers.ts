@@ -53,6 +53,36 @@ export function normalizeWaId(raw: unknown): string | null {
 
 export { placeholderEmailFor, isPlaceholderEmail } from './placeholderEmail'
 
+/** Привязка номера к существующему аккаунту: «Привязать ABCD2345». */
+export function parseLinkMessage(text: unknown): string | null {
+  if (typeof text !== 'string') return null
+  const m = text.trim().match(/^привязать\s+([a-z0-9]+)\s*$/iu)
+  if (!m) return null
+  const code = m[1].toUpperCase()
+  return CODE_SHAPE.test(code) ? code : null
+}
+
+/** 6-значный код подтверждения привязки: приходит человеку в WhatsApp, вводится в кабинете. */
+export function generateConfirmCode(): string {
+  let out = ''
+  for (let i = 0; i < 6; i++) out += String(randomInt(10))
+  return out
+}
+
+export const LINK_WORD = 'Привязать'
+
+export function buildLinkWaMeUrl(displayNumber: string, code: string): string {
+  const digits = displayNumber.replace(/\D/g, '')
+  return `https://wa.me/${digits}?text=${encodeURIComponent(`${LINK_WORD} ${code}`)}`
+}
+
+/** Признак нашего ответа с кодом привязки: эхо с телефона такое сообщение пропускает (как LOGIN_LINK_MARKER). */
+export const LINK_REPLY_MARKER = 'Код для привязки этого номера к аккаунту invoices.kz'
+
+export function linkReplyText(confirm: string): string {
+  return `${LINK_REPLY_MARKER}: ${confirm}\nВведите его в профиле, в разделе «Вход и Face ID». Код действует 10 минут. Никому его не сообщайте: с ним номер привяжется к чужому аккаунту.`
+}
+
 /** Ссылка на чат с готовым текстом. displayNumber любой: берём из него только цифры. */
 export function buildWaMeUrl(displayNumber: string, code: string): string {
   const digits = displayNumber.replace(/\D/g, '')

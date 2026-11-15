@@ -5,9 +5,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { claimWindowSlot, hourBucket, windowKey } from '@/lib/windowLimits'
 import {
-  EXPIRED_CODE_REPLY, loginConfig, loginReplyText, normalizeWaId, parseLoginMessage, type WhatsAppLoginConfig,
+  EXPIRED_CODE_REPLY, linkReplyText, loginConfig, loginReplyText, normalizeWaId, parseLinkMessage, parseLoginMessage,
+  type WhatsAppLoginConfig,
 } from './helpers'
 import { claimLoginCode } from './service'
+import { claimLinkCode } from './link'
 
 /** Ссылок входа на один номер WhatsApp в час: больше ни одному человеку не нужно. */
 export const LOGINS_PER_NUMBER_PER_HOUR = 6
@@ -35,8 +37,9 @@ export interface LoginMessageParams {
 export async function handleLoginMessage(p: LoginMessageParams): Promise<boolean> {
   const cfg = p.cfg === undefined ? loginConfig() : p.cfg
   if (!cfg || p.phoneNumberId !== cfg.phoneNumberId) return false
-  const code = parseLoginMessage(p.text)
-  if (!code) return false
+  const loginCode = parseLoginMessage(p.text)
+  const linkCode = loginCode ? null : parseLinkMessage(p.text)
+  if (!loginCode && !linkCode) return false
   const waId = normalizeWaId(p.from)
   if (!waId) return false
 
@@ -44,7 +47,12 @@ export async function handleLoginMessage(p: LoginMessageParams): Promise<boolean
     const slot = await claimWindowSlot(p.db, windowKey('walogin-wa', waId, hourBucket(p.now)), LOGINS_PER_NUMBER_PER_HOUR)
     if (!slot.ok && slot.reason === 'limit') return true // слишком часто: молчим
 
-    const claim = await claimLoginCode(p.db, code, waId, p.now)
+    if (linkCode) {
+      const linkClaim = await claimLinkCode(p.db, linkCode, waId, p.now)
+      await p.send(linkClaim ? linkReplyText(linkClaim.confirm) : EXPIRED_CODE_REPLY)
+      return true
+    }
+    const claim = await claimLoginCode(p.db, loginCode!, waId, p.now)
     if (!claim) {
       await p.send(EXPIRED_CODE_REPLY)
       return true

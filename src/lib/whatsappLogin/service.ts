@@ -37,6 +37,7 @@ export async function claimLoginCode(db: SupabaseClient, code: string, waId: str
     .from('whatsapp_login_codes')
     .update({ status: 'sent', wa_id: waId, token_hash: hashSecret(token), token_expires_at: iso(now + TOKEN_TTL_MS) })
     .eq('code_hash', hashSecret(code))
+    .eq('purpose', 'login')
     .eq('status', 'pending')
     .gt('expires_at', iso(now))
     .select('id')
