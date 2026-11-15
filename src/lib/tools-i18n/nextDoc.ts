@@ -3,9 +3,9 @@ import type { DocTool } from './docHandoff'
 
 // Тексты карточки «Нужен ещё документ для этого клиента?» (15.11.2026), которая
 // стоит после созданного документа и ведёт к следующему с теми же клиентом и
-// позициями (docHandoff.ts). Казахского текста пока нет: он выйдет только после
-// вычитки (src/lib/kkReview.ts), поэтому для kk возвращается null и карточки на
-// /tools/kk/* нет. В тексте нет тире и эмодзи (правило новых строк интерфейса).
+// позициями (docHandoff.ts). Казахский текст вычитан и принят основателем
+// 15.11.2026 (файл «Тексты на вычитку (казахский).md»), правки только после
+// вычитки (src/lib/kkReview.ts). В тексте нет тире и эмодзи (правило новых строк интерфейса).
 
 export interface NextDocCopy {
   title: string
@@ -36,8 +36,19 @@ const EN: NextDocCopy = {
   },
 }
 
-export function nextDocCopy(lang: ToolLang): NextDocCopy | null {
+const KK: NextDocCopy = {
+  title: 'Осы клиентке тағы бір құжат керек пе?',
+  body: 'Клиент, позициялар, ҚҚС және сіздің деректемелеріңіз өзі толады, тексеріп, жасау ғана қалады.',
+  buttons: {
+    avr: 'Орындалған жұмыстар актісін жасау',
+    kp: 'Коммерциялық ұсыныс жасау',
+    schet: 'Төлем шотын жасау',
+    nakladnaya: 'Жүкқұжат жасау',
+  },
+}
+
+export function nextDocCopy(lang: ToolLang): NextDocCopy {
   if (lang === 'ru') return RU
   if (lang === 'en') return EN
-  return null
+  return KK
 }

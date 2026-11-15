@@ -13,9 +13,10 @@ import { SAMPLE_DEFAULT_VAT, type SampleVat } from './sampleVat'
 // решает переключатель НДС над образцом (ToolSampleSwitch): файл всегда совпадает
 // с тем, что показано на странице. Ссылка над формой отдаёт вариант по умолчанию.
 //
-// Казахский текст кнопки появится только после вычитки (src/lib/kkReview.ts,
-// файл «Тексты на вычитку (казахский).md»): пока для kk возвращается null и
-// кнопки на /tools/kk/* нет. Сам PDF русский на всех языках, кроме КП на английском.
+// Казахский текст кнопки вычитан и принят основателем 15.11.2026 (файл «Тексты на
+// вычитку (казахский).md», раздел «15.11.2026: кнопка Скачать образец PDF»), правки
+// казахских строк только после вычитки (src/lib/kkReview.ts). Сам PDF русский на
+// всех языках, кроме КП: у него английский и казахский образцы печатаются на языке страницы.
 //
 // В тексте нет тире и эмодзи (правило новых строк интерфейса).
 
@@ -33,15 +34,16 @@ type ByVat = Record<SampleVat, SampleDownloadFile>
 /**
  * Готовые PDF по инструментам и режимам НДС. ru - основные файлы; en - только там,
  * где у образца есть английский документ (КП), иначе английская страница берёт
- * русские файлы, как и сам образец на странице. Файлов для kk нет до вычитки.
+ * русские файлы, как и сам образец на странице; kk - так же только у КП.
  */
-export const SAMPLE_DOWNLOADS: Record<SampleCtaTool, { ru: ByVat; en?: ByVat }> = {
+export const SAMPLE_DOWNLOADS: Record<SampleCtaTool, { ru: ByVat; en?: ByVat; kk?: ByVat }> = {
   avr: {
     ru: { no_vat: file('obrazec-akta-vypolnennyh-rabot'), vat_16: file('obrazec-akta-vypolnennyh-rabot-s-nds') },
   },
   kp: {
     ru: { vat_16: file('obrazec-kommercheskogo-predlozheniya'), no_vat: file('obrazec-kommercheskogo-predlozheniya-bez-nds') },
     en: { vat_16: file('sample-commercial-offer'), no_vat: file('sample-commercial-offer-no-vat') },
+    kk: { vat_16: file('kommerciyalyk-usynys-ulgisi'), no_vat: file('kommerciyalyk-usynys-ulgisi-kqqs-syz') },
   },
   schet: {
     ru: { vat_16: file('obrazec-scheta-na-oplatu'), no_vat: file('obrazec-scheta-na-oplatu-bez-nds') },
@@ -72,14 +74,22 @@ const EN: Record<SampleCtaTool, { button: string; link: string }> = {
   schet: { button: 'Download the sample invoice (PDF)', link: 'Download the sample invoice (PDF)' },
   nakladnaya: { button: 'Download the sample delivery note (PDF)', link: 'Download the sample delivery note (PDF)' },
 }
+const KK: Record<SampleCtaTool, { button: string; link: string }> = {
+  avr: { button: 'Акт үлгісін PDF түрінде жүктеу', link: 'Акт үлгісін жүктеу (PDF)' },
+  kp: { button: 'Коммерциялық ұсыныс үлгісін PDF түрінде жүктеу', link: 'Коммерциялық ұсыныс үлгісін жүктеу (PDF)' },
+  schet: { button: 'Төлем шотының үлгісін PDF түрінде жүктеу', link: 'Төлем шотының үлгісін жүктеу (PDF)' },
+  nakladnaya: { button: 'Жүкқұжат үлгісін PDF түрінде жүктеу', link: 'Жүкқұжат үлгісін жүктеу (PDF)' },
+}
 const HINT = {
   ru: 'PDF на русском, данные вымышленные, без регистрации.',
+  kkRussianForm: 'PDF орыс тілінде, деректер ойдан шығарылған, тіркелусіз.',
+  kkKazakhForm: 'PDF қазақ тілінде, деректер ойдан шығарылған, тіркелусіз.',
   enRussianForm: 'PDF in Russian, fictional data, no sign-up.',
   enEnglishForm: 'PDF in English, fictional data, no sign-up.',
 }
 
 /**
- * Файл и тексты для инструмента, языка и режима НДС; null, если текста на языке ещё нет.
+ * Файл и тексты для инструмента, языка и режима НДС; null, если текста на языке нет.
  * Без vat берётся режим по умолчанию для инструмента (для ссылки над формой).
  */
 export function sampleDownload(
@@ -93,5 +103,6 @@ export function sampleDownload(
     const files = entry.en ?? entry.ru
     return { file: files[vat], copy: { ...EN[tool], hint: entry.en ? HINT.enEnglishForm : HINT.enRussianForm } }
   }
-  return null
+  const files = entry.kk ?? entry.ru
+  return { file: files[vat], copy: { ...KK[tool], hint: entry.kk ? HINT.kkKazakhForm : HINT.kkRussianForm } }
 }

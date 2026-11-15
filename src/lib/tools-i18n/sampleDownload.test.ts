@@ -25,9 +25,9 @@ const allFiles = () =>
   ALL.flatMap(tool => Object.values(SAMPLE_DOWNLOADS[tool]).flatMap(byVat => Object.values(byVat).map(file => ({ tool, file: file as SampleDownloadFile }))))
 
 describe('скачать образец PDF (15.11.2026)', () => {
-  it('тексты ru и en без тире и эмодзи, для kk пока нет (ждёт вычитки)', () => {
+  it('тексты ru, en и kk без тире и эмодзи', () => {
     for (const tool of ALL) {
-      for (const lang of ['ru', 'en'] as const) {
+      for (const lang of ['ru', 'en', 'kk'] as const) {
         const d = sampleDownload(tool, lang)
         expect(d, `${tool} ${lang}`).not.toBeNull()
         for (const s of [d!.copy.button, d!.copy.link, d!.copy.hint]) {
@@ -36,8 +36,17 @@ describe('скачать образец PDF (15.11.2026)', () => {
           expect(s).not.toMatch(/\p{Extended_Pictographic}/u)
         }
       }
-      expect(sampleDownload(tool, 'kk'), `${tool} kk`).toBeNull()
     }
+  })
+
+  it('казахская страница: русский файл, а у КП свой казахский; подпись под кнопкой называет язык файла', () => {
+    for (const tool of ['avr', 'schet', 'nakladnaya'] as const) {
+      for (const vat of SAMPLE_VATS) expect(sampleDownload(tool, 'kk', vat)!.file).toBe(SAMPLE_DOWNLOADS[tool].ru[vat])
+      expect(sampleDownload(tool, 'kk')!.copy.hint).toBe('PDF орыс тілінде, деректер ойдан шығарылған, тіркелусіз.')
+    }
+    for (const vat of SAMPLE_VATS) expect(sampleDownload('kp', 'kk', vat)!.file).toBe(SAMPLE_DOWNLOADS.kp.kk![vat])
+    expect(sampleDownload('kp', 'kk')!.copy.hint).toBe('PDF қазақ тілінде, деректер ойдан шығарылған, тіркелусіз.')
+    expect(sampleDownload('avr', 'kk')!.copy.button).toBe('Акт үлгісін PDF түрінде жүктеу')
   })
 
   it('английская страница берёт русский файл, кроме КП, у которого есть английский документ', () => {
@@ -87,11 +96,11 @@ describe('скачать образец PDF (15.11.2026)', () => {
     }
   })
 
-  it('у образца каждого инструмента кнопка скачивания стоит перед бланком, над формой есть ссылка (ru, en), на kk их нет', () => {
+  it('у образца каждого инструмента кнопка скачивания стоит перед бланком, над формой есть ссылка (ru, en, kk)', () => {
     for (const tool of ALL) {
       const Sample = SAMPLES[tool]
       const Link = LINKS[tool]
-      for (const lang of ['ru', 'en'] as const) {
+      for (const lang of ['ru', 'en', 'kk'] as const) {
         const file = sampleDownload(tool, lang)!.file
         const sample = renderToStaticMarkup(createElement(Sample, { lang }))
         expect(sample, `${tool} ${lang}`).toContain(`href="${file.href}"`)
@@ -101,8 +110,6 @@ describe('скачать образец PDF (15.11.2026)', () => {
         expect(top, `${tool} ${lang}`).toContain(`href="${file.href}"`)
         expect(top, `${tool} ${lang}`).toContain('href="#obrazec"')
       }
-      expect(renderToStaticMarkup(createElement(Sample, { lang: 'kk' })), `${tool} kk`).not.toContain('/samples/')
-      expect(renderToStaticMarkup(createElement(Link, { lang: 'kk' })), `${tool} kk`).not.toContain('/samples/')
     }
   })
 })

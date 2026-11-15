@@ -79,9 +79,9 @@ describe('перенос клиента и позиций между докум�
     expect(toolPagePath('nakladnaya', 'en')).toBe('/tools/en/nakladnaya')
   })
 
-  it('тексты ru и en без тире и эмодзи, для kk пока нет (ждёт вычитки)', () => {
-    for (const lang of ['ru', 'en'] as const) {
-      const c = nextDocCopy(lang)!
+  it('тексты ru, en и kk без тире и эмодзи', () => {
+    for (const lang of ['ru', 'en', 'kk'] as const) {
+      const c = nextDocCopy(lang)
       for (const s of [c.title, c.body, ...Object.values(c.buttons)]) {
         expect(s.length).toBeGreaterThan(0)
         expect(s).not.toMatch(/[—–]/)
@@ -89,7 +89,7 @@ describe('перенос клиента и позиций между докум�
       }
       expect(Object.keys(c.buttons).sort()).toEqual([...ALL].sort())
     }
-    expect(nextDocCopy('kk')).toBeNull()
+    expect(nextDocCopy('kk').title).toBe('Осы клиентке тағы бір құжат керек пе?')
   })
 
   it('метка next_doc входит в словарь и принимается сервером', () => {
@@ -99,14 +99,17 @@ describe('перенос клиента и позиций между докум�
     }
   })
 
-  it('карточка: после документа ведёт к нужным страницам, до документа и на kk её нет', () => {
+  it('карточка: после документа ведёт к нужным страницам (ru, en, kk), до документа её нет', () => {
     const html = renderToStaticMarkup(createElement(ToolNextDocCard, { source: 'schet', lang: 'ru', show: true, getForm: () => form }))
     expect(html).toContain('data-testid="tool-next-doc"')
     expect(html).toContain('href="/tools/avr"')
     expect(html).toContain('href="/tools/nakladnaya"')
     expect(renderToStaticMarkup(createElement(ToolNextDocCard, { source: 'kp', lang: 'en', show: true, getForm: () => form }))).toContain('href="/tools/en/schet"')
     expect(renderToStaticMarkup(createElement(ToolNextDocCard, { source: 'schet', lang: 'ru', show: false, getForm: () => form }))).not.toContain('tool-next-doc"')
-    expect(renderToStaticMarkup(createElement(ToolNextDocCard, { source: 'schet', lang: 'kk', show: true, getForm: () => form }))).not.toContain('tool-next-doc"')
+    const kk = renderToStaticMarkup(createElement(ToolNextDocCard, { source: 'schet', lang: 'kk', show: true, getForm: () => form }))
+    expect(kk).toContain('tool-next-doc"')
+    expect(kk).toContain('href="/tools/kk/avr"')
+    expect(kk).toContain('Орындалған жұмыстар актісін жасау')
   })
 })
 

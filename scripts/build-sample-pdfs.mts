@@ -76,7 +76,7 @@ async function kp(): Promise<Built[]> {
   const { kpLines } = await import('../src/app/tools/kp/calc')
   const N = (await names()).kp
   const out: Built[] = []
-  for (const lang of ['ru', 'en'] as const) {
+  for (const lang of ['ru', 'en', 'kk'] as const) {
     for (const vat of VATS) {
       const d = s.SAMPLE_BY_LANG[lang]
       const html = buildKPHtml({
