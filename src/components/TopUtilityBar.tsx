@@ -227,7 +227,9 @@ export default function TopUtilityBar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setLoggedIn(true)
-      setEmail(realEmailOrNull(user.email) ?? '')
+      // Вошедший по WhatsApp: настоящей почты ещё нет, в меню показываем его номер (wa_phone кладёт вход через WhatsApp).
+      const waPhone = typeof user.user_metadata?.wa_phone === 'string' ? user.user_metadata.wa_phone : ''
+      setEmail(realEmailOrNull(user.email) ?? waPhone)
       setUserId(user.id)
       const { data: profileData } = await supabase
         .from('profiles')
