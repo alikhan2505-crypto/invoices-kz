@@ -16,6 +16,7 @@ import AvrSample, { AvrSampleLink } from '@/app/tools/avr/AvrSample'
 import KpSample, { KpSampleLink } from '@/app/tools/kp/KpSample'
 import SchetSample, { SchetSampleLink } from '@/app/tools/schet/SchetSample'
 import NakladnayaSample, { NakladnayaSampleLink } from '@/app/tools/nakladnaya/NakladnayaSample'
+import GuideSampleDownload from '@/components/tools/GuideSampleDownload'
 
 const ALL: SampleCtaTool[] = ['avr', 'kp', 'schet', 'nakladnaya']
 
@@ -110,6 +111,18 @@ describe('скачать образец PDF (15.11.2026)', () => {
         expect(top, `${tool} ${lang}`).toContain(`href="${file.href}"`)
         expect(top, `${tool} ${lang}`).toContain('href="#obrazec"')
       }
+    }
+  })
+
+  it('гайд про накладную З-2: кнопка со ссылкой на готовый образец на ru и kk, метка sample_guide', () => {
+    expect(TOOL_EVENT_MEDIUMS).toContain('sample_guide')
+    expect(parseToolEventPayload({ event: 'cta', tool: 'nakladnaya', visitor: 'a1b2c3d4-e5f6', medium: 'sample_guide' })).toMatchObject({ event: 'cta', tool: 'nakladnaya', medium: 'sample_guide' })
+    for (const lang of ['ru', 'kk'] as const) {
+      const html = renderToStaticMarkup(createElement(GuideSampleDownload, { lang }))
+      const file = sampleDownload('nakladnaya', lang)!.file
+      expect(html, lang).toContain('data-testid="guide-sample-download"')
+      expect(html, lang).toContain(`href="${file.href}"`)
+      expect(html, lang).toContain('data-testid="sample-download-guide"')
     }
   })
 })

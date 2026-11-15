@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import GuideSampleDownload from '@/components/tools/GuideSampleDownload'
 import GuideShell from '../GuideShell'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import {
@@ -70,6 +71,7 @@ export default function Page() {
         <Link href="/guides/dokumenty-ip-kazakhstan">счёт, АВР, накладная и КП</Link>. Про электронный счёт-фактуру
         читайте в <Link href="/guides/esf-kazakhstan-2026">гайде про ЭСФ</Link>.
       </p>
+      <GuideSampleDownload lang="ru" />
 
       <h2>Что это за документ и какая форма действует</h2>
       <ul>

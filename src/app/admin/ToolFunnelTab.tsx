@@ -44,6 +44,7 @@ const MEDIUM_LABELS: Record<string, string> = {
   sample_form: 'образец к форме',
   sample_download: 'скачали образец',
   next_doc: 'следующий документ',
+  sample_guide: 'образец из гайда',
   other: 'прочее',
 }
 

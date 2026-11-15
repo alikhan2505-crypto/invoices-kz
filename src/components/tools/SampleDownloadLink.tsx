@@ -7,7 +7,8 @@ import type { SampleDownloadFile } from '@/lib/tools-i18n/sampleDownload'
 
 // Ссылка на готовый PDF-образец (15.11.2026). Обычный <a href download>: файл
 // скачивается и без JavaScript. Клиентский компонент нужен только для счётчика:
-// нажатие пишется в tool_events как cta / sample_download.
+// нажатие пишется в tool_events как cta / sample_download (со страниц инструментов)
+// или cta / sample_guide (из гайда).
 //
 // variant 'button' - заметная кнопка рядом с образцом, 'link' - строка над формой.
 
@@ -18,13 +19,13 @@ interface Props {
   label: string
   variant: 'button' | 'link'
   /** Откуда нажали: для счётчика Vercel (в tool_events пишется один medium). */
-  place: 'top' | 'sample'
+  place: 'top' | 'sample' | 'guide'
 }
 
 export default function SampleDownloadLink({ tool, lang, file, label, variant, place }: Props) {
   const onClick = () => {
     track('tool_sample_download_click', { source: tool, lang, place })
-    if (isToolEventTool(tool)) logToolEvent('cta', tool, { lang, medium: 'sample_download' })
+    if (isToolEventTool(tool)) logToolEvent('cta', tool, { lang, medium: place === 'guide' ? 'sample_guide' : 'sample_download' })
   }
   if (variant === 'link') {
     return (

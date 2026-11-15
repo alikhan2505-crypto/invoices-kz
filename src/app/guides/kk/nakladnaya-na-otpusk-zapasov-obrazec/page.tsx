@@ -1,6 +1,7 @@
 // kk: вычитка носителем ждёт основателя
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import GuideSampleDownload from '@/components/tools/GuideSampleDownload'
 import GuideShell from '../../GuideShell'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import {
@@ -69,6 +70,7 @@ export default function Page() {
         <Link href="/guides/kk/dokumenty-ip-kazakhstan">шот, ОЖА, жүкқұжат және КҰ</Link> мақаласында талданған.
         Электрондық шот-фактура туралы <Link href="/guides/kk/esf-kazakhstan-2026">ЭШФ нұсқаулығында</Link> оқыңыз.
       </p>
+      <GuideSampleDownload lang="kk" />
 
       <h2>Бұл қандай құжат және қандай нысан қолданылады</h2>
       <ul>
