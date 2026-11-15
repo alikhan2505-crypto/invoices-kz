@@ -10,16 +10,21 @@ const UNIQUE: Record<string, string[]> = {
 }
 
 // Значения по умолчанию колонок, как в whatsapp_login.sql.
-const DEFAULTS: Record<string, Row> = { whatsapp_login_codes: { status: 'pending' } }
+const DEFAULTS: Record<string, Row> = { whatsapp_login_codes: { status: 'pending' }, email_claim_codes: { attempts: 0 } }
 
-export function makeLoginDb(initial: Record<string, Row[]> = {}) {
+export function makeLoginDb(initial: Record<string, Row[]> = {}, rpcs: Record<string, (args: any) => any> = {}) {
   const tables: Record<string, Row[]> = initial
   const client = {
+    rpc(name: string, args: any) {
+      const fn = rpcs[name]
+      return Promise.resolve(fn ? { data: fn(args), error: null } : { data: null, error: { message: `no rpc ${name}` } })
+    },
     from(table: string) {
       const rows = (tables[table] ||= [])
       let op: 'select' | 'update' | 'insert' = 'select'
       let payload: Row = {}
       const filters: Array<(r: Row) => boolean> = []
+      let countOnly = false
       const run = (mode: 'many' | 'one') => {
         if (op === 'insert') {
           for (const col of UNIQUE[table] || []) {
@@ -29,12 +34,16 @@ export function makeLoginDb(initial: Record<string, Row[]> = {}) {
           return { data: null, error: null }
         }
         const hit = rows.filter(r => filters.every(f => f(r)))
+        if (countOnly) return { data: null, count: hit.length, error: null }
         if (op === 'update') for (const r of hit) Object.assign(r, payload)
         const out = hit.map(r => ({ ...r }))
         return { data: mode === 'many' ? out : (out[0] ?? null), error: null }
       }
       const b: any = {
-        select() { return b },
+        select(_cols?: string, opts?: { head?: boolean; count?: string }) { if (opts?.head) countOnly = true; return b },
+        is(c: string, v: any) { filters.push(r => (r[c] ?? null) === v); return b },
+        order() { return b },
+        limit() { return b },
         update(p: Row) { op = 'update'; payload = p; return b },
         insert(p: Row) { op = 'insert'; payload = p; return b },
         eq(c: string, v: any) { filters.push(r => r[c] === v); return b },
@@ -66,7 +75,12 @@ export function makeFakeAdmin(tables: Record<string, Row[]>) {
       const u = users.find(x => x.id === id)
       return { data: { user: u ? { email: u.email } : null }, error: null }
     },
-    async deleteUser(id: string) { log.deleted.push(id); return { error: null } },
+    async updateUserById(id: string, attrs: Row) {
+      const u = users.find(x => x.id === id)
+      if (u && attrs.email) u.email = attrs.email
+      return { error: null }
+    },
+    async deleteUser(id: string) { log.deleted.push(id); const i = users.findIndex(x => x.id === id); if (i >= 0) users.splice(i, 1); return { error: null } },
     async generateLink(params: Row) {
       const url = `https://supabase.test/auth/v1/verify?type=${params.type}&email=${encodeURIComponent(params.email)}&redirect_to=${encodeURIComponent(params.options?.redirectTo)}`
       log.links.push(url)

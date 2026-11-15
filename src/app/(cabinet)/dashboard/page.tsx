@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DashboardTour from '@/components/DashboardTour'
+import AddEmailCard from '@/components/AddEmailCard'
 import GettingStarted from '@/components/GettingStarted'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { formatDateTime } from '@/lib/date'
@@ -758,6 +759,8 @@ export default function DashboardPage() {
             </div>
           )}
           <LapsedPlanNotice profile={planProfile} className="mb-5" />
+          {/* Вошедшему по WhatsApp: добавить почту (для остальных не рисуется) */}
+          <AddEmailCard />
           {!plan?.isTrial && plan?.daysLeft !== null && plan?.daysLeft !== undefined && plan.daysLeft <= 3 && (
             <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-5">
               <div>
