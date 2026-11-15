@@ -38,8 +38,9 @@ export type ToolEventToolOrNone = ToolEventTool | 'none'
 // sample_form (14.11.2026) — кнопка под образцом «Заполнить образец своими данными»
 // (ToolSampleCta): ведёт не в кабинет, а к форме на той же странице.
 // sample_download (15.11.2026) - скачивание готового PDF-образца (SampleDownloadLink).
+// next_doc (15.11.2026) - «Составить ...» после документа: следующий документ с теми же клиентом и позициями (ToolNextDocCard).
 // Колонка medium без CHECK в базе, миграция не нужна.
-export const TOOL_EVENT_MEDIUMS = ['cta', 'limit', 'fullcard', 'product', 'upgrade', 'export', 'after_doc', 'sample_form', 'sample_download'] as const
+export const TOOL_EVENT_MEDIUMS = ['cta', 'limit', 'fullcard', 'product', 'upgrade', 'export', 'after_doc', 'sample_form', 'sample_download', 'next_doc'] as const
 export type ToolEventMedium = (typeof TOOL_EVENT_MEDIUMS)[number]
 
 export const TOOL_EVENT_LANGS = ['ru', 'kk', 'en'] as const

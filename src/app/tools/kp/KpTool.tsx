@@ -11,6 +11,8 @@ import { formatTenge, isToolLocalized, toolGuidePath, toolLinkPath, toolsIndexPa
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import ToolAfterDocCard from '@/lib/tools-i18n/ToolAfterDocCard'
+import ToolNextDocCard from '@/lib/tools-i18n/ToolNextDocCard'
+import { consumeHandoff, mergeHandoff } from '@/lib/tools-i18n/docHandoff'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
@@ -131,7 +133,8 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
     // Запомненные реквизиты ложатся только в ПУСТЫЕ поля (черновик главнее).
     const withSaved = applyRequisites(next, loadRequisites(), REQ_KEYS)
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setF(withSaved.form)
+    // Перенос из другого документа («Составить ...» после документа, docHandoff.ts) главнее черновика.
+    setF(mergeHandoff(withSaved.form, consumeHandoff('kp')).form)
     noteApplied(withSaved.applied.length)
     setReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -479,6 +482,7 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
         )}
 
         <ToolAfterDocCard source="kp" lang={lang} show={docMade && !signedIn && !limitReached} />
+        <ToolNextDocCard source="kp" lang={lang} show={docMade} getForm={() => f} />
 
         {children}
 

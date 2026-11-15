@@ -10,6 +10,8 @@ import { formatTenge, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/t
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import ToolAfterDocCard from '@/lib/tools-i18n/ToolAfterDocCard'
+import ToolNextDocCard from '@/lib/tools-i18n/ToolNextDocCard'
+import { consumeHandoff, mergeHandoff } from '@/lib/tools-i18n/docHandoff'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
@@ -106,7 +108,8 @@ export default function AvrTool({ lang, children }: { lang: ToolLang; children?:
     if (next.rows.length === 0) next.rows = EMPTY.rows
     // Запомненные реквизиты ложатся только в ПУСТЫЕ поля (черновик главнее).
     const withSaved = applyRequisites(next, loadRequisites(), REQ_KEYS)
-    setF(withSaved.form)
+    // Перенос из другого документа («Составить ...» после документа, docHandoff.ts) главнее черновика.
+    setF(mergeHandoff(withSaved.form, consumeHandoff('avr')).form)
     noteApplied(withSaved.applied.length)
     setReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -436,6 +439,7 @@ export default function AvrTool({ lang, children }: { lang: ToolLang; children?:
         )}
 
         <ToolAfterDocCard source="avr" lang={lang} show={docMade && !signedIn && !limitReached} />
+        <ToolNextDocCard source="avr" lang={lang} show={docMade} getForm={() => f} />
 
         {children}
 
