@@ -1,3 +1,4 @@
+import { realEmailOrNull } from '@/lib/whatsappLogin/placeholderEmail'
 import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
       // who the buyer meant to write to anyway. Берём адрес из auth.users, а
       // не из profiles.email: тот пользователь пишет сам, и Reply-To можно
       // было бы направить на любой чужой ящик.
-      const authEmail = validateRecipientEmail(user.email)
+      const authEmail = validateRecipientEmail(realEmailOrNull(user.email) ?? '')
       const replyTo = authEmail.ok ? authEmail.email : undefined
 
       let kaspiPaymentLink: string | null = null

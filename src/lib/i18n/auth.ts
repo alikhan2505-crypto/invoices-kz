@@ -13,6 +13,14 @@ export interface AuthContent {
   /** Встроенный браузер (Instagram, Facebook): Google такой вход не принимает, ведём на почту. */
   inAppBrowserNotice: string
   facebookSignInButton: string
+  /** Вход через WhatsApp (whatsapp_login.sql): кнопка, подсказка после нажатия, страница /auth/wa. kk и en ждут вычитки. */
+  whatsappSignInButton: string
+  whatsappWaitingHint: string
+  whatsappOpenAgain: string
+  whatsappStartError: string
+  whatsappLinkLoading: string
+  whatsappLinkInvalid: string
+  whatsappBackToLogin: string
   orEmailDivider: string
   emailLabel: string
   emailPlaceholder: string
@@ -104,6 +112,13 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     googleSignInButton: 'Войти через Google',
     inAppBrowserNotice: 'В браузере Instagram вход через Google не работает. Введите почту ниже: мы пришлём ссылку и код.',
     facebookSignInButton: 'Войти через Facebook',
+    whatsappSignInButton: 'Войти через WhatsApp',
+    whatsappWaitingHint: 'Откройте WhatsApp и отправьте готовое сообщение: в ответ придёт ссылка для входа.',
+    whatsappOpenAgain: 'Открыть WhatsApp снова',
+    whatsappStartError: 'Не удалось начать вход через WhatsApp. Попробуйте ещё раз или войдите по почте.',
+    whatsappLinkLoading: 'Входим…',
+    whatsappLinkInvalid: 'Ссылка устарела или уже использована. Вернитесь на страницу входа и начните заново.',
+    whatsappBackToLogin: 'На страницу входа',
     orEmailDivider: 'или через email',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',
@@ -189,6 +204,13 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     googleSignInButton: 'Google арқылы кіру',
     inAppBrowserNotice: 'Instagram браузерінде Google арқылы кіру жұмыс істемейді. Төменге поштаңызды енгізіңіз: біз сілтеме мен код жібереміз.',
     facebookSignInButton: 'Facebook арқылы кіру',
+    whatsappSignInButton: 'WhatsApp арқылы кіру',
+    whatsappWaitingHint: 'WhatsApp-ты ашып, дайын хабарламаны жіберіңіз: жауап ретінде кіру сілтемесі келеді.',
+    whatsappOpenAgain: 'WhatsApp-ты қайта ашу',
+    whatsappStartError: 'WhatsApp арқылы кіруді бастау мүмкін болмады. Қайталап көріңіз немесе пошта арқылы кіріңіз.',
+    whatsappLinkLoading: 'Кіріп жатырмыз…',
+    whatsappLinkInvalid: 'Сілтеменің мерзімі өтті немесе ол бұрын қолданылған. Кіру бетіне оралып, қайта бастаңыз.',
+    whatsappBackToLogin: 'Кіру бетіне',
     orEmailDivider: 'немесе email арқылы',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',
@@ -275,6 +297,13 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     googleSignInButton: 'Sign in with Google',
     inAppBrowserNotice: 'Google sign-in does not work inside the Instagram browser. Enter your email below: we will send a link and a code.',
     facebookSignInButton: 'Sign in with Facebook',
+    whatsappSignInButton: 'Sign in with WhatsApp',
+    whatsappWaitingHint: 'Open WhatsApp and send the prepared message. We will reply with a sign-in link.',
+    whatsappOpenAgain: 'Open WhatsApp again',
+    whatsappStartError: 'Could not start WhatsApp sign-in. Try again or use email.',
+    whatsappLinkLoading: 'Signing you in…',
+    whatsappLinkInvalid: 'This link has expired or was already used. Go back to the sign-in page and start again.',
+    whatsappBackToLogin: 'Back to sign-in',
     orEmailDivider: 'or with email',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',

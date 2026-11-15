@@ -33,6 +33,11 @@ const FACEBOOK_LOGIN_ENABLED = true
 // той же вкладке. Включено 04.11.2026: шаблоны с кодом (supabase/email-templates/*-with-code.html) вставлены в
 // Supabase (Magic link or OTP и Confirm sign up). Убираете код из шаблонов — сначала поставьте false.
 const LOGIN_CODE_ENABLED = true
+
+// Вход через WhatsApp (whatsapp_login.sql, 15.11.2026): человек отправляет готовое сообщение «Вход <код>» на наш номер,
+// в ответ приходит ссылка. ВЫКЛЮЧЕНО: включать только после SQL-миграции, двух переменных в Vercel
+// (WHATSAPP_LOGIN_PHONE_NUMBER_ID, WHATSAPP_LOGIN_DISPLAY_NUMBER) и живой проверки с телефона.
+const WHATSAPP_LOGIN_ENABLED = false
 // Длина кода задаётся в Supabase: Sign In / Providers → Email → Email OTP length (сейчас 8). Поменяли там —
 // поменяйте здесь: кнопка включается и вход идёт сам ровно на этой длине.
 const OTP_LENGTH = 8
@@ -58,6 +63,8 @@ export default function Login() {
   // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
   const [email, setEmail] = useState('')
+  const [waBusy, setWaBusy] = useState(false)
+  const [waLink, setWaLink] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   // Shown after a manual resend, so pressing the button visibly does
   // something -- otherwise the screen is identical and the user cannot tell
@@ -283,6 +290,38 @@ export default function Login() {
     })
   }
 
+  // Вход через WhatsApp: код выдаёт сервер, а то, что письмо везёт в метаданных (реферал, источник, БИН на слежение,
+  // куда вести после входа), едет в запросе: сообщение человек отправит с телефона, а ссылку может открыть в другом браузере.
+  async function signInWithWhatsApp() {
+    if (waBusy) return
+    setWaBusy(true)
+    try {
+      let refCode = ''
+      try { refCode = localStorage.getItem('referral_code') || '' } catch {}
+      const meta: Record<string, string> = {}
+      if (refCode) meta.referral_code = refCode
+      const firstSource = rawFreshFirstSource()
+      if (firstSource) meta.first_source = firstSource
+      const pendingBin = peekPendingBinWatch()
+      if (pendingBin) meta.pending_bin_watch = pendingBin
+      const nextPath = postLoginRedirectFromSearch(window.location.search)
+      if (nextPath) meta.post_login_next = nextPath
+      const res = await fetch('/api/auth/whatsapp/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meta }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || typeof body.url !== 'string') { alert(t.whatsappStartError); return }
+      setWaLink(body.url)
+      window.location.href = body.url
+    } catch {
+      alert(t.whatsappStartError)
+    } finally {
+      setWaBusy(false)
+    }
+  }
+
   async function signInWithFacebook() {
     logToolEvent('login_facebook', 'none', { lang })
     await supabase.auth.signInWithOAuth({
@@ -390,6 +429,18 @@ export default function Login() {
               </svg>
               {t.facebookSignInButton}
             </button>}
+            {WHATSAPP_LOGIN_ENABLED && <button onClick={signInWithWhatsApp} disabled={waBusy} className={`${socialButton} mb-3 disabled:opacity-60`} style={socialStyle}>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#25D366" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.84 9.84 0 0 0 12.04 2zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.23-8.22 8.23zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.57.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.23-.16-.48-.29z"/>
+              </svg>
+              {t.whatsappSignInButton}
+            </button>}
+            {WHATSAPP_LOGIN_ENABLED && waLink && (
+              <p role="status" className="text-xs rounded-lg px-3 py-2 mb-3 leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }}>
+                {t.whatsappWaitingHint}{' '}
+                <a href={waLink} className="font-semibold underline">{t.whatsappOpenAgain}</a>
+              </p>
+            )}
 
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 h-px" style={{ background: 'var(--nav-border)' }} />

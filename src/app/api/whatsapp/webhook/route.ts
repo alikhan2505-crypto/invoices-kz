@@ -8,6 +8,12 @@ import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
 import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
 import { entryMatchesWabaId } from '@/lib/aiAgent/whatsappWabaMatch'
 import { secretEquals } from '@/lib/secretEquals'
+import { createClient } from '@supabase/supabase-js'
+import { handleLoginMessage } from '@/lib/whatsappLogin/webhook'
+import { LOGIN_LINK_MARKER } from '@/lib/whatsappLogin/helpers'
+
+// Вход через WhatsApp (whatsapp_login.sql): сообщения «Вход <код>» забираются до агента.
+const loginDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Inbound WhatsApp Cloud API webhook for every connected customer number --
 // mirrors src/app/api/instagram/webhook/route.ts's exact shape (GET verify
@@ -127,6 +133,8 @@ export async function POST(req: NextRequest) {
           // place to live yet, and inventing an empty message for it would
           // make the thread read as if they sent nothing.
           if (!msg?.id || !msg?.to || typeof text !== 'string' || !text) continue
+          // Наш автоответ со ссылкой входа: не переписка клиента, диалога и паузы агента из него не делаем.
+          if (text.includes(LOGIN_LINK_MARKER)) continue
           await handleWhatsAppEcho(conn, { externalId: msg.id, to: String(msg.to), text })
         }
         continue
@@ -156,6 +164,20 @@ export async function POST(req: NextRequest) {
         // Can't reply without knowing who to reply to -- defensive skip,
         // same as before this change.
         if (!msg.from || !msg.id) continue
+
+        // Вход через WhatsApp: «Вход <код>» на номер входа забирает вход, агент его не видит (даже на паузе).
+        if (msg.type === 'text' && msg.text?.body) {
+          const text = msg.text.body
+          const from = msg.from
+          const handled = await handleLoginMessage({
+            db: loginDb,
+            phoneNumberId: conn.phoneNumberId,
+            from,
+            text,
+            send: (reply) => sendWhatsAppMessage(conn.phoneNumberId, from, reply, { accessToken: conn.accessToken }),
+          })
+          if (handled) continue
+        }
 
         const contact = value.contacts?.find(c => c.wa_id === msg.from)
         const customerHandle = contact?.profile?.name || msg.from

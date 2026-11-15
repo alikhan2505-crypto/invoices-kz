@@ -1,3 +1,4 @@
+import { isPlaceholderEmail } from '@/lib/whatsappLogin/placeholderEmail'
 import { createHmac } from 'crypto'
 import type { Resend } from 'resend'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -332,7 +333,7 @@ export async function getAuthIdentity(
   try {
     const { data, error } = await supabase.auth.admin.getUserById(userId)
     if (error || !data?.user) return { confirmed: false, email: null }
-    return { confirmed: !!data.user.email_confirmed_at, email: data.user.email || null }
+    return { confirmed: !!data.user.email_confirmed_at, email: isPlaceholderEmail(data.user.email) ? null : (data.user.email || null) }
   } catch {
     return { confirmed: false, email: null }
   }

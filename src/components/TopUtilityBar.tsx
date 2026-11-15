@@ -1,4 +1,5 @@
 'use client'
+import { realEmailOrNull } from '@/lib/whatsappLogin/placeholderEmail'
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -226,7 +227,7 @@ export default function TopUtilityBar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setLoggedIn(true)
-      setEmail(user.email || '')
+      setEmail(realEmailOrNull(user.email) ?? '')
       setUserId(user.id)
       const { data: profileData } = await supabase
         .from('profiles')

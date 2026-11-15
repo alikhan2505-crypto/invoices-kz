@@ -1,4 +1,5 @@
 'use client'
+import { realEmailOrNull } from '@/lib/whatsappLogin/placeholderEmail'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -166,7 +167,7 @@ export default function AuthCallback() {
           // trial_expires_at on a non-service-role INSERT.
           const { error: profileError } = await supabase.from('profiles').upsert({
             id: session.user.id,
-            email: session.user.email,
+            email: realEmailOrNull(session.user.email),
           })
           if (profileError) {
             // Everything below needs this row to exist: /api/onboarding/grant writes
