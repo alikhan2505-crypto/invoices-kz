@@ -1,6 +1,7 @@
 import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-i18n/toolSample'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { documentRows, documentTotal, vatIncluded, type Row, type VatType } from './calc'
+import type { SampleVat } from '@/lib/tools-i18n/sampleVat'
 
 // Образец для блока «Образец» под формой /tools/nakladnaya (ToolSample). Все
 // данные ВЫМЫШЛЕННЫЕ: БИН из нулей, «ИП Пример», «ТОО Образец» — реальных БИН
@@ -64,7 +65,7 @@ export const SAMPLE_BUYER = { name: 'ТОО «Образец»', bin: '000000000
 export const lineVat = (amount: number) => Math.round(amount - amount / 1.16)
 
 /** Содержимое бланка — русское на всех языках страницы (генератор печатает русский бланк). */
-export function buildNakladnayaSampleDoc(): SampleDoc {
+export function buildNakladnayaSampleDoc(vat: SampleVat = 'vat_16'): SampleDoc {
   const s = SAMPLE_SUPPLIER
   const rows = documentRows(SAMPLE_ROWS)
   return {
@@ -94,10 +95,10 @@ export function buildNakladnayaSampleDoc(): SampleDoc {
       ...rows.map((r, i) => ({
         cells: [
           String(i + 1), r.name, String(i + 1), r.unit, String(r.qty), String(r.qty),
-          formatSampleMoney(r.price), formatSampleMoney(r.qty * r.price), formatSampleMoney(lineVat(r.qty * r.price)),
+          formatSampleMoney(r.price), formatSampleMoney(r.qty * r.price), formatSampleMoney(vat === 'vat_16' ? lineVat(r.qty * r.price) : 0),
         ],
       })),
-      { cells: ['', 'Итого', '', '', 'x', 'x', 'x', formatSampleMoney(SAMPLE_TOTAL), formatSampleMoney(SAMPLE_VAT)] },
+      { cells: ['', 'Итого', '', '', 'x', 'x', 'x', formatSampleMoney(SAMPLE_TOTAL), formatSampleMoney(vat === 'vat_16' ? SAMPLE_VAT : 0)] },
     ],
     totals: [],
     summaryLines: [

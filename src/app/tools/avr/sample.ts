@@ -2,6 +2,7 @@ import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-
 import type { ToolLang } from '@/lib/tools-i18n'
 import { amountInWordsKzt } from '@/lib/amountWords'
 import { documentRows, documentTotal, vatIncluded, type Row, type VatType } from './calc'
+import type { SampleVat } from '@/lib/tools-i18n/sampleVat'
 
 // Образец для блока «Образец» под формой /tools/avr (ToolSample). Все данные
 // ВЫМЫШЛЕННЫЕ: БИН из нулей, «ИП Пример», «ТОО Образец» — реальных БИН, имён и
@@ -74,7 +75,7 @@ export const SAMPLE_APPENDIX_LINE =
 export const SAMPLE_ACCEPT_LINE = 'Принял (Заказчик): должность, подпись, расшифровка подписи. М.П. Дата подписания (принятия) работ (услуг): ____________________'
 
 /** Содержимое бланка — русское на всех языках страницы (генератор печатает русский бланк). */
-export function buildAvrSampleDoc(): SampleDoc {
+export function buildAvrSampleDoc(vat: SampleVat = 'no_vat'): SampleDoc {
   const e = SAMPLE_EXECUTOR
   const c = SAMPLE_CUSTOMER
   const rows = documentRows(SAMPLE_ROWS)
@@ -107,7 +108,11 @@ export function buildAvrSampleDoc(): SampleDoc {
     rows: rows.map((r, i) => ({
       cells: [String(i + 1), r.name, SAMPLE_DATE, '—', r.unit, String(r.qty), formatSampleMoney(r.price), formatSampleMoney(r.qty * r.price)],
     })),
-    totals: [{ label: 'Итого', value: formatSampleMoney(SAMPLE_TOTAL) }],
+    // НДС 16% у плательщика: строка «В том числе НДС 16%:» под итогом, как её печатает buildAVRHtml.
+    totals: [
+      { label: 'Итого', value: formatSampleMoney(SAMPLE_TOTAL) },
+      ...(vat === 'vat_16' ? [{ label: 'В том числе НДС 16%:', value: formatSampleMoney(SAMPLE_VAT_IF_PAYER) }] : []),
+    ],
     summaryLines: [`Всего оказано услуг на сумму: ${SAMPLE_TOTAL_WORDS}`, SAMPLE_STOCK_LINE, SAMPLE_APPENDIX_LINE, SAMPLE_ACCEPT_LINE],
     signatureLabel: 'Сдал (Исполнитель)',
     signatureName: e.director,

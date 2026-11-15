@@ -1,6 +1,6 @@
-import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleSwitch from '@/components/tools/ToolSampleSwitch'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
-import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
+import { SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { kpDict } from './dict'
@@ -17,14 +17,16 @@ export default function KpSample({ lang }: { lang: ToolLang }) {
   const cta = sampleCtaCopy('kp', lang)
   return (
     <>
-      <ToolSample
+      <ToolSampleSwitch
+        tool="kp"
+        lang={lang}
         id={SAMPLE_ANCHOR_ID}
         idPrefix="kp-sample"
         copy={kpSampleCopy[lang]}
-        doc={buildKpSampleDoc(lang)}
+        docs={{ no_vat: buildKpSampleDoc(lang, 'no_vat'), vat_16: buildKpSampleDoc(lang, 'vat_16') }}
         docLang={lang}
         guide={{ href: kpGuidePath(lang), label: kpDict[lang].guideLink }}
-        download={<SampleDownloadButton tool="kp" lang={lang} />}
+        labels={{ no_vat: kpDict[lang].vatNo, vat_16: kpDict[lang].vat16 }}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="kp" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.kp} />}

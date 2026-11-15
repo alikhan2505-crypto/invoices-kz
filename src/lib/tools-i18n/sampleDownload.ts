@@ -1,5 +1,6 @@
 import type { ToolLang } from './index'
 import type { SampleCtaTool } from './sampleCta'
+import { SAMPLE_DEFAULT_VAT, type SampleVat } from './sampleVat'
 
 // «Скачать образец PDF» на страницах бесплатных инструментов (15.11.2026).
 // В Search Console основные запросы на этих страницах: «образец», «бланк», «скачать».
@@ -8,9 +9,13 @@ import type { SampleCtaTool } from './sampleCta'
 // данными и тем же генератором, что показан на странице), скачивается одним
 // нажатием, без окна, без регистрации и без траты лимита документов.
 //
+// Для каждого документа два файла: без НДС и с НДС 16%. Какой из них скачается,
+// решает переключатель НДС над образцом (ToolSampleSwitch): файл всегда совпадает
+// с тем, что показано на странице. Ссылка над формой отдаёт вариант по умолчанию.
+//
 // Казахский текст кнопки появится только после вычитки (src/lib/kkReview.ts,
 // файл «Тексты на вычитку (казахский).md»): пока для kk возвращается null и
-// кнопки на /tools/kk/* нет. Сам PDF русский на всех языках, как и образец.
+// кнопки на /tools/kk/* нет. Сам PDF русский на всех языках, кроме КП на английском.
 //
 // В тексте нет тире и эмодзи (правило новых строк интерфейса).
 
@@ -21,19 +26,29 @@ export interface SampleDownloadFile {
   fileName: string
 }
 
+const file = (name: string): SampleDownloadFile => ({ href: `/samples/${name}.pdf`, fileName: `${name}.pdf` })
+
+type ByVat = Record<SampleVat, SampleDownloadFile>
+
 /**
- * Готовые PDF по инструментам. ru - основной файл; en - только там, где у образца
- * есть английский документ (КП), иначе английская страница берёт русский файл,
- * как и сам образец на странице. Файла для kk нет до вычитки казахского текста.
+ * Готовые PDF по инструментам и режимам НДС. ru - основные файлы; en - только там,
+ * где у образца есть английский документ (КП), иначе английская страница берёт
+ * русские файлы, как и сам образец на странице. Файлов для kk нет до вычитки.
  */
-export const SAMPLE_DOWNLOADS: Record<SampleCtaTool, { ru: SampleDownloadFile; en?: SampleDownloadFile }> = {
-  avr: { ru: { href: '/samples/obrazec-akta-vypolnennyh-rabot.pdf', fileName: 'obrazec-akta-vypolnennyh-rabot.pdf' } },
-  kp: {
-    ru: { href: '/samples/obrazec-kommercheskogo-predlozheniya.pdf', fileName: 'obrazec-kommercheskogo-predlozheniya.pdf' },
-    en: { href: '/samples/sample-commercial-offer.pdf', fileName: 'sample-commercial-offer.pdf' },
+export const SAMPLE_DOWNLOADS: Record<SampleCtaTool, { ru: ByVat; en?: ByVat }> = {
+  avr: {
+    ru: { no_vat: file('obrazec-akta-vypolnennyh-rabot'), vat_16: file('obrazec-akta-vypolnennyh-rabot-s-nds') },
   },
-  schet: { ru: { href: '/samples/obrazec-scheta-na-oplatu.pdf', fileName: 'obrazec-scheta-na-oplatu.pdf' } },
-  nakladnaya: { ru: { href: '/samples/obrazec-nakladnoy.pdf', fileName: 'obrazec-nakladnoy.pdf' } },
+  kp: {
+    ru: { vat_16: file('obrazec-kommercheskogo-predlozheniya'), no_vat: file('obrazec-kommercheskogo-predlozheniya-bez-nds') },
+    en: { vat_16: file('sample-commercial-offer'), no_vat: file('sample-commercial-offer-no-vat') },
+  },
+  schet: {
+    ru: { vat_16: file('obrazec-scheta-na-oplatu'), no_vat: file('obrazec-scheta-na-oplatu-bez-nds') },
+  },
+  nakladnaya: {
+    ru: { vat_16: file('obrazec-nakladnoy'), no_vat: file('obrazec-nakladnoy-bez-nds') },
+  },
 }
 
 export interface SampleDownloadCopy {
@@ -57,15 +72,26 @@ const EN: Record<SampleCtaTool, { button: string; link: string }> = {
   schet: { button: 'Download the sample invoice (PDF)', link: 'Download the sample invoice (PDF)' },
   nakladnaya: { button: 'Download the sample delivery note (PDF)', link: 'Download the sample delivery note (PDF)' },
 }
-const HINT: Record<'ru' | 'en', string> = {
+const HINT = {
   ru: 'PDF на русском, данные вымышленные, без регистрации.',
-  en: 'PDF in Russian, fictional data, no sign-up.',
+  enRussianForm: 'PDF in Russian, fictional data, no sign-up.',
+  enEnglishForm: 'PDF in English, fictional data, no sign-up.',
 }
 
-/** Файл и тексты для инструмента и языка; null, если текста на языке ещё нет. */
-export function sampleDownload(tool: SampleCtaTool, lang: ToolLang): { file: SampleDownloadFile; copy: SampleDownloadCopy } | null {
+/**
+ * Файл и тексты для инструмента, языка и режима НДС; null, если текста на языке ещё нет.
+ * Без vat берётся режим по умолчанию для инструмента (для ссылки над формой).
+ */
+export function sampleDownload(
+  tool: SampleCtaTool,
+  lang: ToolLang,
+  vat: SampleVat = SAMPLE_DEFAULT_VAT[tool],
+): { file: SampleDownloadFile; copy: SampleDownloadCopy } | null {
   const entry = SAMPLE_DOWNLOADS[tool]
-  if (lang === 'ru') return { file: entry.ru, copy: { ...RU[tool], hint: HINT.ru } }
-  if (lang === 'en') return { file: entry.en ?? entry.ru, copy: { ...EN[tool], hint: HINT.en } }
+  if (lang === 'ru') return { file: entry.ru[vat], copy: { ...RU[tool], hint: HINT.ru } }
+  if (lang === 'en') {
+    const files = entry.en ?? entry.ru
+    return { file: files[vat], copy: { ...EN[tool], hint: entry.en ? HINT.enEnglishForm : HINT.enRussianForm } }
+  }
   return null
 }

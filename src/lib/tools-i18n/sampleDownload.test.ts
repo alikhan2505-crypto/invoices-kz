@@ -11,6 +11,7 @@ import { TOOL_EVENT_MEDIUMS } from '@/lib/toolEvents/schema'
 import { parseToolEventPayload } from '@/lib/toolEvents/validate'
 import { sampleDownload, SAMPLE_DOWNLOADS, type SampleDownloadFile } from './sampleDownload'
 import type { SampleCtaTool } from './sampleCta'
+import { SAMPLE_DEFAULT_VAT, SAMPLE_VATS } from './sampleVat'
 import AvrSample, { AvrSampleLink } from '@/app/tools/avr/AvrSample'
 import KpSample, { KpSampleLink } from '@/app/tools/kp/KpSample'
 import SchetSample, { SchetSampleLink } from '@/app/tools/schet/SchetSample'
@@ -20,7 +21,8 @@ const ALL: SampleCtaTool[] = ['avr', 'kp', 'schet', 'nakladnaya']
 
 const SAMPLES = { avr: AvrSample, kp: KpSample, schet: SchetSample, nakladnaya: NakladnayaSample }
 const LINKS = { avr: AvrSampleLink, kp: KpSampleLink, schet: SchetSampleLink, nakladnaya: NakladnayaSampleLink }
-const allFiles = () => ALL.flatMap(tool => Object.values(SAMPLE_DOWNLOADS[tool]).map(file => ({ tool, file: file as SampleDownloadFile })))
+const allFiles = () =>
+  ALL.flatMap(tool => Object.values(SAMPLE_DOWNLOADS[tool]).flatMap(byVat => Object.values(byVat).map(file => ({ tool, file: file as SampleDownloadFile }))))
 
 describe('скачать образец PDF (15.11.2026)', () => {
   it('тексты ru и en без тире и эмодзи, для kk пока нет (ждёт вычитки)', () => {
@@ -39,11 +41,23 @@ describe('скачать образец PDF (15.11.2026)', () => {
   })
 
   it('английская страница берёт русский файл, кроме КП, у которого есть английский документ', () => {
-    expect(sampleDownload('avr', 'en')!.file).toBe(SAMPLE_DOWNLOADS.avr.ru)
-    expect(sampleDownload('schet', 'en')!.file).toBe(SAMPLE_DOWNLOADS.schet.ru)
-    expect(sampleDownload('nakladnaya', 'en')!.file).toBe(SAMPLE_DOWNLOADS.nakladnaya.ru)
-    expect(sampleDownload('kp', 'en')!.file).toBe(SAMPLE_DOWNLOADS.kp.en)
-    expect(sampleDownload('kp', 'ru')!.file).toBe(SAMPLE_DOWNLOADS.kp.ru)
+    for (const tool of ['avr', 'schet', 'nakladnaya'] as const) {
+      for (const vat of SAMPLE_VATS) expect(sampleDownload(tool, 'en', vat)!.file).toBe(SAMPLE_DOWNLOADS[tool].ru[vat])
+    }
+    for (const vat of SAMPLE_VATS) {
+      expect(sampleDownload('kp', 'en', vat)!.file).toBe(SAMPLE_DOWNLOADS.kp.en![vat])
+      expect(sampleDownload('kp', 'ru', vat)!.file).toBe(SAMPLE_DOWNLOADS.kp.ru[vat])
+    }
+    // Без режима НДС отдаётся тот, что показан по умолчанию.
+    for (const tool of ALL) expect(sampleDownload(tool, 'ru')!.file).toBe(SAMPLE_DOWNLOADS[tool].ru[SAMPLE_DEFAULT_VAT[tool]])
+  })
+
+  it('у каждого документа два разных файла: без НДС и с НДС 16%', () => {
+    for (const tool of ALL) {
+      for (const byVat of Object.values(SAMPLE_DOWNLOADS[tool])) {
+        expect(byVat.no_vat.href, tool).not.toBe(byVat.vat_16.href)
+      }
+    }
   })
 
   it('каждый файл из списка лежит в public, это настоящий PDF на одну страницу, пути не повторяются', () => {

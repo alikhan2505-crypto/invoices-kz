@@ -1,6 +1,6 @@
-import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleSwitch from '@/components/tools/ToolSampleSwitch'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
-import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
+import { SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import { toolGuidePath, type ToolLang } from '@/lib/tools-i18n'
 import { nakladnayaDict } from './dict'
@@ -17,13 +17,15 @@ export default function NakladnayaSample({ lang }: { lang: ToolLang }) {
   const cta = sampleCtaCopy('nakladnaya', lang)
   return (
     <>
-      <ToolSample
+      <ToolSampleSwitch
+        tool="nakladnaya"
+        lang={lang}
         id={SAMPLE_ANCHOR_ID}
         idPrefix="nk-sample"
         copy={nakladnayaSampleCopy[lang]}
-        doc={buildNakladnayaSampleDoc()}
+        docs={{ no_vat: buildNakladnayaSampleDoc('no_vat'), vat_16: buildNakladnayaSampleDoc('vat_16') }}
         guide={{ href: toolGuidePath(NAKLADNAYA_GUIDE_SLUG, lang), label: nakladnayaDict[lang].guideLink }}
-        download={<SampleDownloadButton tool="nakladnaya" lang={lang} />}
+        labels={nakladnayaDict[lang].vatOptions}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="nakladnaya" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.nakladnaya} />}

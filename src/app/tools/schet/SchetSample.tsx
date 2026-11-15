@@ -1,6 +1,6 @@
-import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleSwitch from '@/components/tools/ToolSampleSwitch'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
-import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
+import { SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { schetDict } from './dict'
@@ -13,13 +13,15 @@ export default function SchetSample({ lang }: { lang: ToolLang }) {
   const cta = sampleCtaCopy('schet', lang)
   return (
     <>
-      <ToolSample
+      <ToolSampleSwitch
+        tool="schet"
+        lang={lang}
         id={SAMPLE_ANCHOR_ID}
         idPrefix="sc-sample"
         copy={schetSampleCopy[lang]}
-        doc={buildSchetSampleDoc()}
+        docs={{ no_vat: buildSchetSampleDoc('no_vat'), vat_16: buildSchetSampleDoc('vat_16') }}
         guide={{ href: schetGuidePath(lang), label: schetDict[lang].guideLink }}
-        download={<SampleDownloadButton tool="schet" lang={lang} />}
+        labels={schetDict[lang].vatOptions}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="schet" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.schet} />}

@@ -1,6 +1,6 @@
-import ToolSample from '@/components/tools/ToolSample'
+import ToolSampleSwitch from '@/components/tools/ToolSampleSwitch'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
-import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
+import { SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { avrDict } from './dict'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
@@ -13,13 +13,15 @@ export default function AvrSample({ lang }: { lang: ToolLang }) {
   const cta = sampleCtaCopy('avr', lang)
   return (
     <>
-      <ToolSample
+      <ToolSampleSwitch
+        tool="avr"
+        lang={lang}
         id={SAMPLE_ANCHOR_ID}
         idPrefix="avr-sample"
         copy={avrSampleCopy[lang]}
-        doc={buildAvrSampleDoc()}
+        docs={{ no_vat: buildAvrSampleDoc('no_vat'), vat_16: buildAvrSampleDoc('vat_16') }}
         guide={{ href: avrGuidePath(lang), label: avrDict[lang].guideLink }}
-        download={<SampleDownloadButton tool="avr" lang={lang} />}
+        labels={avrDict[lang].vatOptions}
       />
       {/* Кнопка под образцом: возвращает к форме (макет согласован 14.11.2026). */}
       {cta && <ToolSampleCta tool="avr" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.avr} />}

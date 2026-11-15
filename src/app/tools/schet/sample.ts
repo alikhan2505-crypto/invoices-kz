@@ -1,6 +1,7 @@
 import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-i18n/toolSample'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { documentRows, documentTotal, vatIncluded, type Row, type VatType } from './calc'
+import type { SampleVat } from '@/lib/tools-i18n/sampleVat'
 
 // Образец для блока «Образец» под формой /tools/schet (ToolSample). Все данные
 // ВЫМЫШЛЕННЫЕ: БИН из нулей, «Банк Образец», БИК SAMPLEKZ — реальных БИН/ИИК
@@ -61,7 +62,7 @@ export const SAMPLE_SUPPLIER = {
 export const SAMPLE_BUYER = { name: 'ТОО «Образец»', bin: '000000000001' }
 
 /** Содержимое бланка — русское на всех языках страницы (генератор печатает русский бланк). */
-export function buildSchetSampleDoc(): SampleDoc {
+export function buildSchetSampleDoc(vat: SampleVat = 'vat_16'): SampleDoc {
   const s = SAMPLE_SUPPLIER
   const rows = documentRows(SAMPLE_ROWS)
   return {
@@ -89,9 +90,10 @@ export function buildSchetSampleDoc(): SampleDoc {
     rows: rows.map((r, i) => ({
       cells: [String(i + 1), r.name, String(r.qty), r.unit, formatSampleMoney(r.price), formatSampleMoney(r.qty * r.price)],
     })),
+    // Без НДС строки налога под итогом нет, как в generateInvoicePDF.
     totals: [
       { label: 'Итого:', value: formatSampleMoney(SAMPLE_TOTAL) },
-      { label: `В том числе НДС ${SAMPLE_VAT_RATE}%:`, value: formatSampleMoney(SAMPLE_VAT) },
+      ...(vat === 'vat_16' ? [{ label: `В том числе НДС ${SAMPLE_VAT_RATE}%:`, value: formatSampleMoney(SAMPLE_VAT) }] : []),
     ],
     summaryLines: [
       `Всего наименований ${rows.length}, на сумму ${formatSampleMoney(SAMPLE_TOTAL)} KZT`,

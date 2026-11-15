@@ -2,6 +2,7 @@ import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-
 import { toolGuidePath, type ToolLang } from '@/lib/tools-i18n'
 import { kpLines, kpTotal, kpVatIncluded, type KpRow } from './calc'
 import { kpStrings, kpUnitLabel, type KpLang } from '@/lib/kpI18n'
+import type { SampleVat } from '@/lib/tools-i18n/sampleVat'
 
 // Образец для блока «Образец» под формой /tools/kp (ToolSample). Все данные
 // ВЫМЫШЛЕННЫЕ: БИН из нулей, телефон из нулей, почта на example.com — реальных
@@ -101,7 +102,7 @@ const SAMPLE_CAPTIONS: Record<KpLang, { header: string; contacts: string }> = {
 }
 
 /** Содержимое бланка на языке документа (по умолчанию русский, как печатает generateKP). */
-export function buildKpSampleDoc(lang: KpLang = 'ru'): SampleDoc {
+export function buildKpSampleDoc(lang: KpLang = 'ru', vat: SampleVat = 'vat_16'): SampleDoc {
   const S = kpStrings(lang)
   const d = SAMPLE_BY_LANG[lang]
   const s = d.supplier
@@ -128,11 +129,18 @@ export function buildKpSampleDoc(lang: KpLang = 'ru'): SampleDoc {
     rows: lines.map((l, i) => ({
       cells: [String(i + 1), l.name, String(l.qty), kpUnitLabel(l.unit, lang), tenge(l.price), tenge(l.qty * l.price)],
     })),
-    totals: [
-      { label: S.subtotalNoVat, value: tenge(SAMPLE_NET) },
-      { label: S.vat16, value: tenge(SAMPLE_VAT) },
-      { label: S.totalDue, value: tenge(SAMPLE_TOTAL) },
-    ],
+    // Без НДС генератор печатает «Итого», «НДС: Без НДС» и «ИТОГО К ОПЛАТЕ»; с НДС 16% налог выделен из итога.
+    totals: vat === 'vat_16'
+      ? [
+        { label: S.subtotalNoVat, value: tenge(SAMPLE_NET) },
+        { label: S.vat16, value: tenge(SAMPLE_VAT) },
+        { label: S.totalDue, value: tenge(SAMPLE_TOTAL) },
+      ]
+      : [
+        { label: S.total, value: tenge(SAMPLE_TOTAL) },
+        { label: S.vatLabel, value: S.noVat },
+        { label: S.totalDue, value: tenge(SAMPLE_TOTAL) },
+      ],
     summaryLines: [
       `${S.note}: ${d.note}`,
       `${S.dateIssued}: ${SAMPLE_DATE}`,
