@@ -1,5 +1,6 @@
 import ToolSample from '@/components/tools/ToolSample'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
+import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { schetDict } from './dict'
@@ -18,6 +19,7 @@ export default function SchetSample({ lang }: { lang: ToolLang }) {
         copy={schetSampleCopy[lang]}
         doc={buildSchetSampleDoc()}
         guide={{ href: schetGuidePath(lang), label: schetDict[lang].guideLink }}
+        download={<SampleDownloadButton tool="schet" lang={lang} />}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="schet" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.schet} />}
@@ -32,10 +34,11 @@ export default function SchetSample({ lang }: { lang: ToolLang }) {
 export function SchetSampleLink({ lang }: { lang: ToolLang }) {
   return (
     <div style={{ background: 'var(--nav-bg)' }}>
-      <div className="max-w-3xl mx-auto px-4 lg:px-6 pt-4">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 pt-4 flex flex-wrap gap-x-5 gap-y-1">
         <a href={`#${SAMPLE_ANCHOR_ID}`} className="text-sm font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
           {schetSampleAnchorLabel[lang]}
         </a>
+        <SampleDownloadTopLink tool="schet" lang={lang} />
       </div>
     </div>
   )

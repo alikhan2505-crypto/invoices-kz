@@ -1,5 +1,6 @@
 import ToolSample from '@/components/tools/ToolSample'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
+import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import { toolGuidePath, type ToolLang } from '@/lib/tools-i18n'
 import { nakladnayaDict } from './dict'
@@ -22,6 +23,7 @@ export default function NakladnayaSample({ lang }: { lang: ToolLang }) {
         copy={nakladnayaSampleCopy[lang]}
         doc={buildNakladnayaSampleDoc()}
         guide={{ href: toolGuidePath(NAKLADNAYA_GUIDE_SLUG, lang), label: nakladnayaDict[lang].guideLink }}
+        download={<SampleDownloadButton tool="nakladnaya" lang={lang} />}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="nakladnaya" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.nakladnaya} />}
@@ -36,10 +38,11 @@ export default function NakladnayaSample({ lang }: { lang: ToolLang }) {
 export function NakladnayaSampleLink({ lang }: { lang: ToolLang }) {
   return (
     <div style={{ background: 'var(--nav-bg)' }}>
-      <div className="max-w-3xl mx-auto px-4 lg:px-6 pt-4">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 pt-4 flex flex-wrap gap-x-5 gap-y-1">
         <a href={`#${SAMPLE_ANCHOR_ID}`} className="text-sm font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
           {nakladnayaSampleAnchorLabel[lang]}
         </a>
+        <SampleDownloadTopLink tool="nakladnaya" lang={lang} />
       </div>
     </div>
   )

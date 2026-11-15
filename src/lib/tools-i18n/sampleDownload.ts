@@ -21,9 +21,19 @@ export interface SampleDownloadFile {
   fileName: string
 }
 
-/** Готовые PDF. Инструмент без записи кнопку не получает. */
-export const SAMPLE_DOWNLOADS: Partial<Record<SampleCtaTool, SampleDownloadFile>> = {
-  avr: { href: '/samples/obrazec-akta-vypolnennyh-rabot.pdf', fileName: 'obrazec-akta-vypolnennyh-rabot.pdf' },
+/**
+ * Готовые PDF по инструментам. ru - основной файл; en - только там, где у образца
+ * есть английский документ (КП), иначе английская страница берёт русский файл,
+ * как и сам образец на странице. Файла для kk нет до вычитки казахского текста.
+ */
+export const SAMPLE_DOWNLOADS: Record<SampleCtaTool, { ru: SampleDownloadFile; en?: SampleDownloadFile }> = {
+  avr: { ru: { href: '/samples/obrazec-akta-vypolnennyh-rabot.pdf', fileName: 'obrazec-akta-vypolnennyh-rabot.pdf' } },
+  kp: {
+    ru: { href: '/samples/obrazec-kommercheskogo-predlozheniya.pdf', fileName: 'obrazec-kommercheskogo-predlozheniya.pdf' },
+    en: { href: '/samples/sample-commercial-offer.pdf', fileName: 'sample-commercial-offer.pdf' },
+  },
+  schet: { ru: { href: '/samples/obrazec-scheta-na-oplatu.pdf', fileName: 'obrazec-scheta-na-oplatu.pdf' } },
+  nakladnaya: { ru: { href: '/samples/obrazec-nakladnoy.pdf', fileName: 'obrazec-nakladnoy.pdf' } },
 }
 
 export interface SampleDownloadCopy {
@@ -42,21 +52,20 @@ const RU: Record<SampleCtaTool, { button: string; link: string }> = {
   nakladnaya: { button: 'Скачать образец накладной в PDF', link: 'Скачать образец накладной (PDF)' },
 }
 const EN: Record<SampleCtaTool, { button: string; link: string }> = {
-  avr: { button: 'Download the sample act (PDF)', link: 'Download the sample act (PDF)' },
-  kp: { button: 'Download the sample offer (PDF)', link: 'Download the sample offer (PDF)' },
+  avr: { button: 'Download the sample AVR (PDF)', link: 'Download the sample AVR (PDF)' },
+  kp: { button: 'Download the sample commercial proposal (PDF)', link: 'Download the sample proposal (PDF)' },
   schet: { button: 'Download the sample invoice (PDF)', link: 'Download the sample invoice (PDF)' },
-  nakladnaya: { button: 'Download the sample waybill (PDF)', link: 'Download the sample waybill (PDF)' },
+  nakladnaya: { button: 'Download the sample delivery note (PDF)', link: 'Download the sample delivery note (PDF)' },
 }
 const HINT: Record<'ru' | 'en', string> = {
   ru: 'PDF на русском, данные вымышленные, без регистрации.',
   en: 'PDF in Russian, fictional data, no sign-up.',
 }
 
-/** Файл и тексты для инструмента и языка; null, если файла нет или текста на языке ещё нет. */
+/** Файл и тексты для инструмента и языка; null, если текста на языке ещё нет. */
 export function sampleDownload(tool: SampleCtaTool, lang: ToolLang): { file: SampleDownloadFile; copy: SampleDownloadCopy } | null {
-  const file = SAMPLE_DOWNLOADS[tool]
-  if (!file) return null
-  if (lang === 'ru') return { file, copy: { ...RU[tool], hint: HINT.ru } }
-  if (lang === 'en') return { file, copy: { ...EN[tool], hint: HINT.en } }
+  const entry = SAMPLE_DOWNLOADS[tool]
+  if (lang === 'ru') return { file: entry.ru, copy: { ...RU[tool], hint: HINT.ru } }
+  if (lang === 'en') return { file: entry.en ?? entry.ru, copy: { ...EN[tool], hint: HINT.en } }
   return null
 }

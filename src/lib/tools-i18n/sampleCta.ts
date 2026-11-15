@@ -69,10 +69,10 @@ const KK: Record<SampleCtaTool, { title: string; body: string }> = {
 const KK_BUTTON = 'Үлгіні өз деректеріммен толтыру ↑'
 
 const EN: Record<SampleCtaTool, string> = {
-  avr: 'Need an act like this with your own details?',
-  kp: 'Need a commercial offer like this with your own details?',
+  avr: 'Need an AVR like this with your own details?',
+  kp: 'Need a commercial proposal like this with your own details?',
   schet: 'Need an invoice like this with your own details?',
-  nakladnaya: 'Need a waybill like this with your own details?',
+  nakladnaya: 'Need a delivery note like this with your own details?',
 }
 const EN_BODY = 'Enter your BIN and the company name fills in by itself. A ready PDF in a minute, no sign-up.'
 

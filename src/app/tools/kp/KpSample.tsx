@@ -1,5 +1,6 @@
 import ToolSample from '@/components/tools/ToolSample'
 import ToolSampleCta from '@/components/tools/ToolSampleCta'
+import { SampleDownloadButton, SampleDownloadTopLink } from '@/components/tools/ToolSampleDownload'
 import { sampleCtaCopy, SAMPLE_CTA_TARGET_ID } from '@/lib/tools-i18n/sampleCta'
 import type { ToolLang } from '@/lib/tools-i18n'
 import { kpDict } from './dict'
@@ -23,6 +24,7 @@ export default function KpSample({ lang }: { lang: ToolLang }) {
         doc={buildKpSampleDoc(lang)}
         docLang={lang}
         guide={{ href: kpGuidePath(lang), label: kpDict[lang].guideLink }}
+        download={<SampleDownloadButton tool="kp" lang={lang} />}
       />
       {/* Кнопка под образцом: возвращает к форме (14.11.2026). */}
       {cta && <ToolSampleCta tool="kp" lang={lang} copy={cta} targetId={SAMPLE_CTA_TARGET_ID.kp} />}
@@ -41,6 +43,7 @@ export function KpSampleLink({ lang }: { lang: ToolLang }) {
         <a href={`#${SAMPLE_ANCHOR_ID}`} className="text-sm font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
           {kpSampleAnchorLabel[lang]}
         </a>
+        <SampleDownloadTopLink tool="kp" lang={lang} />
         {/* 14.11.2026: в Search Console есть запрос «коммерческое предложение на казахском» (12 показов, 0 кликов).
             Русская страница ведёт на казахскую версию; текст ссылки русский, вычитка не нужна. */}
         {lang === 'ru' && (
