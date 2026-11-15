@@ -8,6 +8,7 @@ import {
 import { listMerchants, getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
 import { listConnections } from '@/lib/kaspiShop/connection'
+import { openConnectToken, sealConnectToken } from '@/lib/kaspiShop/connectTokens'
 
 // Время на фоновое обновление каталога после ответа (after() в finalizeConnection).
 export const maxDuration = 300
@@ -44,7 +45,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { otpToken, code, isReconnect } = body
+  const { otpToken: sealedOtpToken, code, isReconnect } = body
+  // Токен приходит зашифрованным (см. connectTokens.ts): чужой, просроченный и подделанный отклоняем, не обращаясь к Kaspi.
+  const otpToken = openConnectToken(user.id, 'otp', sealedOtpToken)
+  if (typeof sealedOtpToken === 'string' && sealedOtpToken && otpToken === null) {
+    return NextResponse.json({ error: 'Время на ввод кода вышло. Запросите новый код.', code: 'invalid_token' }, { status: 400 })
+  }
   // A normal otpToken needs the SMS code. A resume token (issued in a previous
   // error response after Kaspi already ACCEPTED the code, see
   // cabinetAuth.submitOtp) must be sent back WITHOUT a code: the spent code is
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
       code: loginResult.code,
       detail: loginResult.detail,
       resumable: !!loginResult.resumeToken,
-      resumeToken: loginResult.resumeToken,
+      resumeToken: loginResult.resumeToken ? sealConnectToken(user.id, 'otp', loginResult.resumeToken) : undefined,
     }, { status: loginResult.code === 'kaspi_unreachable' ? 502 : 400 })
   }
   const sessionCookies = loginResult.sessionCookies
@@ -89,7 +95,7 @@ export async function POST(req: NextRequest) {
         code: failed.code,
         detail: failed.detail,
         resumable: !!failed.resumeToken,
-        resumeToken: failed.resumeToken,
+        resumeToken: failed.resumeToken ? sealConnectToken(user.id, 'otp', failed.resumeToken) : undefined,
       }, { status: 502 })
     }
     throw err
@@ -139,7 +145,7 @@ async function finishConnect(userId: string, sessionCookies: string, isReconnect
     }
     return NextResponse.json({
       status: 'merchant_required',
-      sessionToken: Buffer.from(sessionCookies, 'utf8').toString('base64'),
+      sessionToken: sealConnectToken(userId, 'session', sessionCookies),
       merchants: named,
     })
   }

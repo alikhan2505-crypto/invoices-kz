@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
-import { getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
+import { getMerchantInfo, listMerchants } from '@/lib/kaspiShop/cabinetApi'
+import { openConnectToken } from '@/lib/kaspiShop/connectTokens'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
 
 // Время на фоновое обновление каталога после ответа (after() в finalizeConnection).
@@ -41,11 +42,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'sessionToken и merchantId обязательны' }, { status: 400 })
   }
 
-  let sessionCookies: string
-  try {
-    sessionCookies = Buffer.from(sessionToken, 'base64').toString('utf8')
-  } catch {
-    return NextResponse.json({ error: 'sessionToken недействителен' }, { status: 400 })
+  // Токен зашифрован, привязан к этому человеку и живёт 30 минут (connectTokens.ts).
+  const sessionCookies = openConnectToken(user.id, 'session', sessionToken)
+  if (!sessionCookies) {
+    return NextResponse.json({ error: 'sessionToken недействителен или устарел. Войдите в кабинет Kaspi заново.' }, { status: 400 })
+  }
+
+  // Выбранный магазин обязан быть среди магазинов этого входа: подмена merchantId не даёт подключить чужой.
+  const reachable = await listMerchants(sessionCookies)
+  if (!reachable.some(m => m.uid === merchantId)) {
+    return NextResponse.json({ error: 'Этот магазин недоступен для вашего входа в Kaspi' }, { status: 400 })
   }
 
   const merchant = await getMerchantInfo(sessionCookies, merchantId)

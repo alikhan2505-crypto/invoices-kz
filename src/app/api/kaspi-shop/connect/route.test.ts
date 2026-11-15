@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.hoisted(() => { process.env.KASPI_SHOP_ENCRYPTION_KEY = '11'.repeat(32) })
 import { makeSecDb } from '@/lib/kaspiShop/secDb.testkit'
 
 const { getUser, startPhoneLogin, state } = vi.hoisted(() => ({
@@ -13,6 +15,7 @@ vi.mock('@/lib/kaspiShop/planGate', () => ({ kaspiShopPlanGate: vi.fn(async () =
 vi.mock('@/lib/kaspiShop/cabinetAuth', () => ({ startPhoneLogin: (...a: unknown[]) => startPhoneLogin(...a) }))
 
 import { POST } from './route'
+import { openConnectToken } from '@/lib/kaspiShop/connectTokens'
 import { COUNTER_TABLE } from '@/lib/toolQuota'
 import { USER_HOURLY_LIMIT, PHONE_HOURLY_LIMIT, IP_HOURLY_LIMIT } from '@/lib/kaspiShop/connectSmsLimits'
 
@@ -53,7 +56,12 @@ describe('POST /api/kaspi-shop/connect', () => {
 
   it('returns the otpToken on success', async () => {
     const res = await POST(req({ phone: '7000000000' }))
-    expect(await res.json()).toEqual({ status: 'otp_required', otpToken: 'tok' })
+    // Токен приходит зашифрованным и привязанным к человеку; внутри исходный токен Kaspi.
+    const body = await res.json()
+    expect(body.status).toBe('otp_required')
+    expect(body.otpToken).not.toBe('tok')
+    expect(openConnectToken('u1', 'otp', body.otpToken)).toBe('tok')
+    expect(openConnectToken('u2', 'otp', body.otpToken)).toBeNull()
   })
 
   describe('K48: phone validation (nothing reaches Kaspi, no slot is spent)', () => {

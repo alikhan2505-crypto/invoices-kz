@@ -246,10 +246,13 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 
 // Шаг подключения магазина: кнопка никогда не остаётся навсегда на
 // «Проверяем...». Сеть упала, сервер вернул не-JSON или ответ не пришёл за
-// 2 минуты -- показываем понятную ошибку вместо вечного ожидания.
+// 290 секунд -- показываем понятную ошибку вместо вечного ожидания. Предел на 10 секунд меньше
+// maxDuration маршрутов connect/otp и select-merchant (300 с): раньше клиент сдавался на 120-й
+// секунде, пока сервер ещё импортировал каталог большого магазина, и человек видел «не отвечает»
+// при уже потраченном SMS-коде.
 async function postConnectStep(url: string, headers: HeadersInit, body: unknown): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   try {
-    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120_000) })
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(290_000) })
     const data = await res.json().catch(() => ({}))
     // 401 приходит с английским «Unauthorized»: человеку нужна понятная фраза и путь (обновить страницу).
     const error = res.ok ? undefined : res.status === 401 ? 'Вход устарел. Обновите страницу и войдите заново.' : data.error
@@ -261,7 +264,7 @@ async function postConnectStep(url: string, headers: HeadersInit, body: unknown)
       status: 0,
       data: {},
       error: timedOut
-        ? 'Kaspi долго не отвечает. Обновите страницу -- если магазин уже подключился, он появится сам.'
+        ? 'Kaspi долго не отвечает. Магазин мог уже подключиться: обновите страницу, и он появится в списке. Если его нет, запросите новый код.'
         : 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.',
     }
   }

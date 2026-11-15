@@ -5,6 +5,7 @@ import { startPhoneLogin } from '@/lib/kaspiShop/cabinetAuth'
 import { normalizeKzPhone, formatKzPhone } from '@/lib/kzPhone'
 import { connectErrorMessage } from '@/lib/kaspiShop/connectMessages'
 import { claimConnectSmsSlots, releaseConnectSmsSlots, isConnectionRefusal } from '@/lib/kaspiShop/connectSmsLimits'
+import { sealConnectToken } from '@/lib/kaspiShop/connectTokens'
 
 // Счётчики лимитов лежат в базе: нужен сервисный ключ (как в остальных маршрутах).
 const supabase = createClient(
@@ -103,5 +104,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: 'Неожиданный ответ Kaspi' }, { status: 400 })
   }
-  return NextResponse.json({ status: 'otp_required', otpToken: result.otpToken })
+  // Токен зашифрован, привязан к этому человеку и живёт 15 минут: чужой или подделанный не подойдёт (аудит 14.11).
+  return NextResponse.json({ status: 'otp_required', otpToken: sealConnectToken(user.id, 'otp', result.otpToken) })
 }
