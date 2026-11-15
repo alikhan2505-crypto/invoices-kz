@@ -47,7 +47,7 @@ export default function SampleDownloadLink({ tool, lang, file, label, variant, p
       download={file.fileName}
       onClick={onClick}
       data-testid={`sample-download-${place}`}
-      className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold"
+      className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-2 text-center text-sm font-semibold"
       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', touchAction: 'manipulation' }}
     >
       {label}
