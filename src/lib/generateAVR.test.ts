@@ -173,3 +173,12 @@ describe('buildAVRHtml — название вкладки документа (1
     expect(html).toContain('<title>Акт № &lt;/title&gt;')
   })
 })
+
+describe('buildAVRHtml — дата составления в шапке (15.11.2026)', () => {
+  it('в ячейке «Дата составления» дата из данных, а не сегодняшняя', () => {
+    const html = build({ date: '15.01.2026' })
+    const headerDateCell = html.match(/text-align:center;">15\.01\.2026<\/td>/g) || []
+    // ровно две ячейки: шапка документа и строка таблицы работ
+    expect(headerDateCell.length).toBe(2)
+  })
+})

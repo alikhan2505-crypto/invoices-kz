@@ -215,7 +215,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
           <td style="border:none;"></td>
           <td style="border:none;"></td>
           <td style="border:1px solid #000; text-align:center;">${number}</td>
-          <td style="border:1px solid #000; text-align:center;">${new Date().toLocaleDateString('ru-KZ')}</td>
+          <td style="border:1px solid #000; text-align:center;">${date || escapeHtml(new Date().toLocaleDateString('ru-KZ'))}</td>
         </tr>
       </table>
 

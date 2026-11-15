@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type { SampleCopy, SampleDoc } from '@/lib/tools-i18n/toolSample'
 
@@ -23,6 +24,8 @@ interface Props {
   guide?: { href: string; label: string }
   /** id у секции — цель якорной ссылки «Смотреть образец» (#id); по умолчанию без id. */
   id?: string
+  /** Кнопка «Скачать образец PDF» над бланком (15.11.2026); без неё блок прежний. */
+  download?: ReactNode
 }
 
 const cellBorder = '1px solid var(--nav-border)'
@@ -39,7 +42,7 @@ const SCROLL_SHADOW_BG = [
   'var(--nav-surface-chrome)',
 ].join(', ')
 
-export default function ToolSample({ idPrefix, copy, doc, docLang = 'ru', guide, id }: Props) {
+export default function ToolSample({ idPrefix, copy, doc, docLang = 'ru', guide, id, download }: Props) {
   const headingId = `${idPrefix}-heading`
   const right = new Set(doc.rightAlignedColumns)
 
@@ -59,6 +62,8 @@ export default function ToolSample({ idPrefix, copy, doc, docLang = 'ru', guide,
           {guide.label}
         </Link>
       )}
+
+      {download}
 
       <figure className="relative mt-6 mb-0 mx-0">
         <span
