@@ -82,7 +82,7 @@ export interface FunnelDay {
 // В общую воронку по инструментам не входят, считаются отдельным блоком «Вход».
 export const LOGIN_STEP_EVENTS = [
   'login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent',
-  'login_send_error', 'login_google', 'login_facebook', 'login_passkey', 'tool_watch_click',
+  'login_send_error', 'login_google', 'login_facebook', 'login_passkey', 'login_whatsapp', 'tool_watch_click',
 ] as const
 export type LoginStepEvent = (typeof LOGIN_STEP_EVENTS)[number]
 

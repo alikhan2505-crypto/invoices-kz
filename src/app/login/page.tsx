@@ -294,6 +294,7 @@ export default function Login() {
   // куда вести после входа), едет в запросе: сообщение человек отправит с телефона, а ссылку может открыть в другом браузере.
   async function signInWithWhatsApp() {
     if (waBusy) return
+    logToolEvent('login_whatsapp', 'none', { lang })
     setWaBusy(true)
     try {
       let refCode = ''

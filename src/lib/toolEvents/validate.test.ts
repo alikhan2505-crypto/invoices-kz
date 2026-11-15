@@ -39,7 +39,7 @@ describe('parseToolEventPayload', () => {
     expect(parseToolEventPayload({ event: 'signup', tool: 'none' })?.tool).toBe('none')
     expect(parseToolEventPayload({ event: 'view', tool: 'none' })).toBeNull()
     expect(parseToolEventPayload({ event: 'tool_watch_click', tool: 'none' })).toBeNull()
-    for (const e of ['login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent', 'login_send_error', 'login_google', 'login_facebook', 'login_passkey']) {
+    for (const e of ['login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent', 'login_send_error', 'login_google', 'login_facebook', 'login_passkey', 'login_whatsapp']) {
       expect(parseToolEventPayload({ event: e, tool: 'none' })?.event).toBe(e)
     }
     expect(parseToolEventPayload({ event: 'login_unknown', tool: 'none' })).toBeNull()

@@ -310,6 +310,7 @@ const LOGIN_STEP_LABELS: Record<string, string> = {
   login_send_error: 'Ошибка отправки письма',
   login_google: 'Нажали Google',
   login_facebook: 'Нажали Facebook',
+  login_whatsapp: 'Нажали WhatsApp',
   login_passkey: 'Нажали Face ID / Touch ID',
   tool_watch_click: 'Нажали «Следить за БИН» (невошедшие)',
 }

@@ -21,7 +21,7 @@ export const TOOL_EVENT_NAMES = [
   'tool_form_autofill_bin', 'tool_form_more_open', 'tool_form_saved_applied',
   'tool_watch_click',
   'login_open', 'login_email_press', 'login_captcha_missing', 'login_link_sent',
-  'login_send_error', 'login_google', 'login_facebook', 'login_passkey',
+  'login_send_error', 'login_google', 'login_facebook', 'login_passkey', 'login_whatsapp',
 ] as const
 export type ToolEventName = (typeof TOOL_EVENT_NAMES)[number]
 

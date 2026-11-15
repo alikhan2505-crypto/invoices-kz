@@ -46,7 +46,7 @@ export function buildDailyFunnelText(d: DailyFunnelInput): string {
   if (open === 0 && repeat.browsers === 0) {
     lines.push('Страница входа: никто не открывал.')
   } else {
-    lines.push(`Страница входа: открыли ${open}, «получить ссылку» ${step('login_email_press')}, письмо ушло ${step('login_link_sent')}, Google ${step('login_google')}, Facebook ${step('login_facebook')}.`)
+    lines.push(`Страница входа: открыли ${open}, «получить ссылку» ${step('login_email_press')}, письмо ушло ${step('login_link_sent')}, Google ${step('login_google')}, Facebook ${step('login_facebook')}, WhatsApp ${step('login_whatsapp')}.`)
     if (repeat.browsers > 0) lines.push(`Не посчитано как людей: ${repeat.browsers} браузеров с 3+ открытиями за день (похоже на автоматику).`)
   }
   lines.push('')
