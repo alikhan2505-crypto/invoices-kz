@@ -1179,7 +1179,7 @@ export default function Upgrade() {
             ) : (
               <>
                 {s.upgradeFooterEmailPrefix}
-                <a href="mailto:support@invoices.kz" className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
+                <a href="mailto:support@invoices.kz" className="underline font-medium inline-block py-3 -my-3" style={{ color: 'var(--nav-accent)' }}>
                   support@invoices.kz
                 </a>
               </>

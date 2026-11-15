@@ -207,6 +207,13 @@ export default function Login() {
     }
   }
 
+  // «Отправить ещё раз» снова доступна через 45 секунд: раньше срабатывала один раз, дальше только через «Изменить email».
+  useEffect(() => {
+    if (!resent) return
+    const timer = setTimeout(() => setResent(false), 45_000)
+    return () => clearTimeout(timer)
+  }, [resent])
+
   async function sendLink({ again = false, to }: { again?: boolean; to?: string } = {}) {
     const address = (to ?? email).trim()
     if (!address) { alert(t.emailRequiredError); return }
@@ -279,7 +286,11 @@ export default function Login() {
       if (to) setEmail(address)
       setDir(1)
       setSent(true)
-      if (again) setResent(true)
+      if (again) {
+        setResent(true)
+        // Новое письмо — новый код: прежний ввод и красная ошибка про старый код больше не нужны.
+        setCode(''); setCodeError(false)
+      }
     }
     setLoading(false)
   }

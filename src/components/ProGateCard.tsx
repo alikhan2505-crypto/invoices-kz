@@ -17,7 +17,7 @@ export default function ProGateCard({
   // собственных отступов (их даёт контейнер). По умолчанию -- по центру экрана.
   align?: 'center' | 'start'
 }) {
-  const btnClass = 'inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0'
+  const btnClass = 'inline-flex items-center justify-center rounded-lg px-4 py-2.5 min-h-[44px] text-sm font-semibold transition-transform hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0'
   const btnStyle = { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }
   const external = /^https?:\/\//.test(href)
   return (

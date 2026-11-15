@@ -60,7 +60,7 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel; soon?: boolean }[] 
   { href: '/kaspi-shop/margin', label: { ru: 'Калькулятор маржи', kk: 'Маржа калькуляторы', en: 'Margin calculator' } },
   { href: '/kaspi-shop/reviews', label: { ru: 'Отзывы', kk: 'Пікірлер', en: 'Reviews' } },
   { href: '/kaspi-shop/quality', label: { ru: 'Качество', kk: 'Сапа', en: 'Quality' } },
-  { href: '/kaspi-shop/nkt', label: { ru: 'Каталог НКТ', kk: 'ҰТК каталогы', en: 'NKT catalog' } },
+  { href: '/kaspi-shop/nkt', label: { ru: 'Нац. каталог (НКТ)', kk: 'ҰТК каталогы', en: 'National catalog (NKT)' } },
   { href: '/kaspi-shop/storefront', label: { ru: 'Витрина', kk: 'Витрина', en: 'Storefront' }, soon: true },
   { href: '/kaspi-shop/storefront-orders', label: { ru: 'Заказы витрины', kk: 'Витрина тапсырыстары', en: 'Storefront orders' }, soon: true },
 ]

@@ -219,7 +219,7 @@ function PriceLadder({ own, competitor, floor, maxPrice, enabled }: { own: numbe
         />
       </div>
       <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-        <span>Пол {floor.toLocaleString('ru-KZ')} ₸</span>
+        <span>Минимум {floor.toLocaleString('ru-KZ')} ₸</span>
         {atFloor && (enabled
           ? <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Упёрлись в минимум</span>
           // Товар ещё не включён: минимум просто равен цене с момента импорта. Это не тревога, а «не настроено».
@@ -1026,7 +1026,10 @@ export default function KaspiShop() {
         if (catalogSyncShouldReload(false, data)) load()
         return
       }
-      setApplyNowMessage(`Каталог обновлён: ${data.imported} товар(ов)`)
+      const importedCount = Number(data.imported)
+      setApplyNowMessage(importedCount === 0
+        ? 'В Kaspi не нашли товаров в продаже. Проверьте магазин или повторите позже.'
+        : `Каталог обновлён: ${importedCount} ${pluralProducts(importedCount)}`)
       load()
     } catch {
       setApplyNowMessage('Нет связи с сервером. Каталог не обновлён, попробуйте ещё раз.')
@@ -1169,9 +1172,9 @@ export default function KaspiShop() {
   ) : (
     <button onClick={togglePause}
       className="text-xs font-bold rounded-full px-3 min-h-[44px] flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
-      style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
+      style={{ background: paused || balanceWarning ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused || balanceWarning ? '#fff' : 'var(--nav-success-ink)' }}>
       {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />}
-      {paused ? 'На паузе. Возобновить' : 'Работает'}
+      {paused ? 'На паузе. Возобновить' : balanceWarning ? 'Не работает: нет денег' : 'Работает'}
     </button>
   )
   const headerControls = (
@@ -1243,12 +1246,12 @@ export default function KaspiShop() {
               {switchError && <div className="text-xs mb-3" role="alert" style={{ color: 'var(--nav-critical)' }}>{switchError}</div>}
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => setReconnectDismissed(false)}
-                  className="rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                  className="rounded-xl px-4 py-2.5 min-h-[44px] text-sm font-semibold" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
                   Переподключить
                 </button>
                 {otherStores.map(s => (
                   <button key={s.id} onClick={() => switchStore(s.id)}
-                    className="nav-glass rounded-xl px-4 py-2.5 text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                    className="nav-glass rounded-xl px-4 py-2.5 min-h-[44px] text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
                     {`Открыть «${s.companyName}»`}
                   </button>
                 ))}
@@ -1466,9 +1469,9 @@ export default function KaspiShop() {
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>упёрлись в минимум</div>
                 </div>
                 <div>
-                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{balance}</div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{balance.toLocaleString('ru-KZ')}</div>
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
-                    ₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>пополнить</button>
+                    ₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2 inline-block py-3 -my-3" style={{ color: 'var(--nav-accent)' }}>пополнить</button>
                   </div>
                   {spentToday !== null && (
                     <div data-testid="spent-today" className="text-xs mt-1 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
@@ -1539,22 +1542,22 @@ export default function KaspiShop() {
             </div>
 
             {companyName && products.length > 0 && products.every(p => !p.enabled) && (
-              <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
+              <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} {pluralProducts(products.length)} {products.length === 1 ? 'импортирован' : 'импортировано'} и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
             )}
 
             <div data-tour="kaspi-rules" className="flex items-center justify-between gap-3 mb-3 flex-wrap">
               <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Правила демпинга</div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={syncCatalog} disabled={syncingCatalog}
-                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5 disabled:opacity-60" style={{ color: 'var(--nav-text-secondary)' }}>
+                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 min-h-[44px] transition-transform hover:-translate-y-0.5 disabled:opacity-60" style={{ color: 'var(--nav-text-secondary)' }}>
                   {syncingCatalog ? 'Обновляем…' : 'Обновить каталог'}
                 </button>
                 <button onClick={openBulkAdd}
-                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
+                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 min-h-[44px] transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
                   Добавить несколько
                 </button>
                 <button onClick={applyNow} disabled={applyingNow || !stats || applyBlockReason !== null}
-                  className="text-xs font-semibold rounded-full px-4 py-2 flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
+                  className="text-xs font-semibold rounded-full px-4 py-2 min-h-[44px] flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {applyingNow ? 'Проверяем...' : 'Применить сейчас'}
                 </button>
@@ -1696,7 +1699,7 @@ export default function KaspiShop() {
                           {p.kaspi_master_sku && (
                             <a href={`https://kaspi.kz/shop/p/-${p.kaspi_master_sku}/`} target="_blank" rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
-                              className="text-[11px] font-semibold flex-shrink-0" style={{ color: 'var(--nav-accent)' }}>
+                              className="text-[11px] font-semibold flex-shrink-0 inline-block py-3 -my-3" style={{ color: 'var(--nav-accent)' }}>
                               Открыть на Kaspi ↗
                             </a>
                           )}
@@ -1712,8 +1715,8 @@ export default function KaspiShop() {
                   «Повторить» уже показаны плашкой выше. */}
               {products.length === 0 && productsLoaded && (
                 <div className="nav-glass rounded-2xl p-8 text-center col-span-full">
-                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
+                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог пуст или ещё загружается.</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Если через минуту товаров нет, нажмите «Обновить каталог» выше.</div>
                 </div>
               )}
             </div>
@@ -1752,7 +1755,7 @@ export default function KaspiShop() {
                             <div className="text-[11px] font-semibold tracking-wider uppercase mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>Настройки демпинга</div>
                             <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
                           </div>
-                          <button onClick={() => setExpandedId(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+                          <button onClick={() => setExpandedId(null)} aria-label="Закрыть" className="text-lg leading-none flex-shrink-0 min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
                         </div>
                               <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
                                 Сейчас на Kaspi: <b className="tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</b>
@@ -1979,7 +1982,7 @@ export default function KaspiShop() {
                 <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
                   {bulkStep === 'select' ? 'Добавить несколько' : 'Общие настройки'}
                 </div>
-                <button onClick={() => setBulkOpen(false)} style={{ color: 'var(--nav-text-muted)' }}><XIcon size={16} /></button>
+                <button onClick={() => setBulkOpen(false)} aria-label="Закрыть" className="min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center" style={{ color: 'var(--nav-text-muted)' }}><XIcon size={16} /></button>
               </div>
 
               {bulkStep === 'select' ? (

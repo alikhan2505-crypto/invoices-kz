@@ -149,6 +149,9 @@ export default function KaspiShopOverview() {
 
   // Нули при мёртвой сессии или ошибке Kaspi - не данные: показываем «—» и причину.
   const ordersUnavailable = sessionExpired || ordersFailed
+  // Сбой загрузки заказов, товаров или прибыли (не мёртвая сессия): «Обновить» запускает загрузку заново.
+  const hasLoadFailure = !sessionExpired && (ordersFailed || ordersListFailed || productsFailed || profitFailed)
+  const retryLoad = () => { setOrdersFailed(false); setOrdersListFailed(false); setProductsFailed(false); setProfitFailed(false); setAccessTry(n => n + 1) }
   const inWork = counts && !ordersUnavailable ? WORKING_STATUSES.reduce((s, k) => s + (counts[k] ?? 0), 0) : null
   const winning = products && !productsFailed ? products.filter((p) => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length : null
   const atFloor = products && !productsFailed ? products.filter((p) => p.own_current_price <= p.floor_price + 0.01).length : null
@@ -187,7 +190,7 @@ export default function KaspiShopOverview() {
           <div className="nav-glass rounded-2xl flex flex-wrap overflow-hidden">
             {kpi('Заказов в работе', ordersUnavailable ? '—' : inWork === null ? null : String(inWork),
               sessionExpired ? 'сессия Kaspi истекла' : ordersFailed ? 'не удалось получить из Kaspi' : counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
-            {kpi('Дешевле конкурентов', productsFailed ? '—' : winning === null || products === null ? null : `${winning} из ${products.length}`, productsFailed ? 'не удалось загрузить товары' : atFloor === null ? '' : `упёрлись в минимум: ${atFloor}`)}
+            {kpi('Дешевле конкурентов', productsFailed ? '—' : winning === null || products === null ? null : `${winning} из ${products.length}`, productsFailed ? 'не удалось загрузить товары' : atFloor === null ? '' : `упёрлись в минимум: ${atFloor}${sessionExpired ? ' (данные на момент обрыва)' : ''}`)}
             {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : profitFailed ? 'не удалось получить заказы из Kaspi' : 'после комиссии и расходов')}
           </div>
 
@@ -197,7 +200,12 @@ export default function KaspiShopOverview() {
           <section className="min-w-0 xl:flex xl:flex-col">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заказы в работе</h2>
-              <a href="/kaspi-shop/orders" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Все заказы →</a>
+              <div className="flex items-center gap-4">
+                {hasLoadFailure && (
+                  <button onClick={retryLoad} className="text-xs font-semibold min-h-[44px]" style={{ color: 'var(--nav-accent)' }}>Обновить</button>
+                )}
+                <a href="/kaspi-shop/orders" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Все заказы →</a>
+              </div>
             </div>
             <div className="nav-glass rounded-2xl overflow-x-auto xl:flex-1">
               <table className="w-full text-sm">
@@ -214,7 +222,7 @@ export default function KaspiShopOverview() {
                   )}
                   {orders !== null && orders.length === 0 && (
                     <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>
-                      {ordersUnavailable || ordersListFailed ? 'Заказы сейчас недоступны: нет связи с Kaspi' : 'Сейчас нет заказов в работе'}
+                      {sessionExpired ? 'Сессия Kaspi истекла: переподключите магазин, и заказы снова появятся' : ordersUnavailable || ordersListFailed ? 'Заказы сейчас недоступны: нет связи с Kaspi' : 'Сейчас нет заказов в работе'}
                     </td></tr>
                   )}
                   {orders?.map((o) => (

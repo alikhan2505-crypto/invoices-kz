@@ -194,7 +194,7 @@ function sleep(ms: number) {
         const r = pollJson.refresh as ReviewsResponse['refresh']
         if (r && r.expected > 0) {
           if (r.updated >= r.expected) { setRefreshNote(''); return true }
-          setRefreshNote(`Обновлено ${r.updated} из ${r.expected} товаров. Раннер проверяет их по очереди, это может занять несколько минут...`)
+          setRefreshNote(`Обновлено ${r.updated} из ${r.expected} товаров. Мы проверяем товары по очереди, это может занять несколько минут...`)
         }
       }
     }
@@ -302,11 +302,11 @@ function sleep(ms: number) {
               </div>
             </div>
             <div className="min-w-0">
-              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: (stats?.negative ?? 0) > 0 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>{stats?.negative ?? 0}</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: (stats?.negative ?? 0) > 0 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>{stats ? stats.negative : '—'}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>негативных (≤3★) среди загруженных</div>
             </div>
             <div className="min-w-0">
-              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{stats?.fiveStar ?? 0}</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{stats ? stats.fiveStar : '—'}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>5★ среди загруженных</div>
             </div>
           </div>

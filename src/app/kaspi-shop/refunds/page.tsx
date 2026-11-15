@@ -274,7 +274,7 @@ export default function KaspiShopRefundsPage() {
             const active = tab === t.value
             return (
               <button key={t.value} onClick={() => setTab(t.value)}
-                className="relative overflow-hidden flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors"
+                className="relative overflow-hidden flex-shrink-0 rounded-full px-3 py-1.5 min-h-[44px] text-xs font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'transparent' : 'var(--nav-surface-glass)' }}>
                 {active && (
                   <motion.span layoutId="refundTabPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)' }}
@@ -360,7 +360,7 @@ export default function KaspiShopRefundsPage() {
             <div className="p-5 lg:p-6">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Заявка на возврат</div>
-                <button onClick={() => { setDetail(null); setDetailError('') }} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+                <button onClick={() => { setDetail(null); setDetailError('') }} aria-label="Закрыть" className="text-lg leading-none flex-shrink-0 min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
               </div>
 
               {detailLoading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем заявку…</div>}
@@ -424,7 +424,8 @@ export default function KaspiShopRefundsPage() {
                       surface it as a visible signal, not a guessed button. */}
                   {detail.actions.length > 0 && (
                     <div className="text-xs rounded-xl p-3" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
-                      По этой заявке нужно ответить — пока только в кабинете Kaspi.
+                      По этой заявке нужно ответить — пока только в{' '}
+                      <a href="https://kaspi.kz/mc/" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: 'var(--nav-accent)' }}>кабинете Kaspi</a>.
                     </div>
                   )}
                 </>

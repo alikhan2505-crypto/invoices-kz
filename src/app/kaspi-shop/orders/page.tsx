@@ -233,7 +233,11 @@ function KaspiShopOrdersInner() {
       setOrders(outcome.orders)
       setTotal(outcome.total)
       if (outcome.capped) setLoadError(`Показаны первые ${LOAD_ALL_CAP} заказов из ${outcome.total} — сузьте фильтром по городу или поиском по номеру`)
-      else if (!outcome.complete) setLoadError(partialLoadMessage(outcome.orders.length, outcome.total, false) + ', повторите')
+      else if (!outcome.complete) {
+        // Kaspi ответил пусто при ненулевом total: это не «заказов нет», пустой список не подписываем как итог.
+        setListFailed(outcome.orders.length === 0)
+        setLoadError(partialLoadMessage(outcome.orders.length, outcome.total, false) + ', повторите')
+      }
     } catch (e: any) {
       if (isStale()) return
       setLoadedKey(key)
@@ -680,7 +684,7 @@ function KaspiShopOrdersInner() {
           )
         })()}
 
-        {listIsCurrent && !listPending && orders.length < total && (
+        {listIsCurrent && !listPending && orders.length > 0 && orders.length < total && (
           <div className="mt-4 text-xs" style={{ color: 'var(--nav-text-muted)' }}>Показаны первые {orders.length} из {total}</div>
         )}
       </PageContainer>

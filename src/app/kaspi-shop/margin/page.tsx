@@ -14,6 +14,9 @@ import {
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
+import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
+import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { useAppDialog } from '@/components/AppDialog'
 import { readMarginPrefill } from '@/lib/kaspiShop/source1688'
 import TopSellersPicker from '@/components/kaspiShop/TopSellersPicker'
 import Source1688Panel from '@/components/kaspiShop/Source1688Panel'
@@ -63,6 +66,10 @@ export default function KaspiShopMargin() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  // Сбой проверки подключения: «Повторить» вместо ухода на окно подключения и вечного спиннера (K12).
+  const [accessError, setAccessError] = useState('')
+  const [accessTry, setAccessTry] = useState(0)
+  const { confirm, dialogElement } = useAppDialog()
 
   // Form state -- all controlled as strings so an empty field reads as ''
   // rather than a coerced 0 that's hard to tell apart from "seller typed 0".
@@ -93,7 +100,7 @@ export default function KaspiShopMargin() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [accessTry])
 
   // Ссылка из «Ниш» (кнопка «Найти на 1688» -> «Посчитать маржу») несёт название, цену Kaspi и оценку веса.
   useEffect(() => {
@@ -136,9 +143,10 @@ export default function KaspiShopMargin() {
     // state when there's no active connection (2026-09-03 founder: check for a
     // connected store before opening any page or sub-page).
     const { data: { session } } = await supabase.auth.getSession()
-    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-    const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
+    const access = await checkKaspiConnection(session?.access_token)
+    if (access.kind === 'error') { setAccessError(access.message); setLoading(false); return }
+    if (access.kind === 'redirect') { router.push('/kaspi-shop'); return }
+    setAccessError('')
 
     setLoadError('')
     try {
@@ -254,6 +262,7 @@ export default function KaspiShopMargin() {
   }
 
   async function deleteEvaluation(id: string) {
+    if (!(await confirm('Удалить сохранённый расчёт?'))) return
     setDeletingId(id)
     const headers = await authHeader()
     const res = await fetch('/api/kaspi-shop/margin', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
@@ -261,6 +270,7 @@ export default function KaspiShopMargin() {
     setDeletingId(null)
   }
 
+  if (accessError) return <KaspiAccessRetry message={accessError} onRetry={() => { setAccessError(''); setLoading(true); setAccessTry(n => n + 1) }} />
   if (loading) return <LoadingSpinner />
 
   return (
@@ -571,6 +581,7 @@ export default function KaspiShopMargin() {
         </div>
         </div>
       </PageContainer>
+      {dialogElement}
     </main>
     </DesktopShell>
   )
