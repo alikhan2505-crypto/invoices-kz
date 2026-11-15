@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   try {
     aggregation = await loadAggregatedReviews(user.id, sinceIso)
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Не удалось загрузить отзывы' }, { status: 500 })
+    return serverError('kaspi-shop/reviews', err)
   }
 
   // Stats always reflect the FULL set regardless of the ?stars filter --
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
     .from('kaspi_shop_tracked_products')
     .select('id, kaspi_master_sku')
     .eq('connection_id', connection.id)
-  if (productsError) return NextResponse.json({ error: productsError.message }, { status: 500 })
+  if (productsError) return serverError('kaspi-shop/reviews', productsError)
 
   // По одному запросу в Kaspi на master SKU: после переподключения у SKU бывает
   // несколько строк, и раньше раннер ходил за одним и тем же дважды.

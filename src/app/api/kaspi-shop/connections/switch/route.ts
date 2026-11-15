@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     await switchActiveConnection(user.id, connectionId)
   } catch (err: any) {
     if (err.message === 'connection_not_found') return NextResponse.json({ error: 'Магазин не найден' }, { status: 404 })
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return serverError('kaspi-shop/connections/switch', err)
   }
   return NextResponse.json({ ok: true })
 }

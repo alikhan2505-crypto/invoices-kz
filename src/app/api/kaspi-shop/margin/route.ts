@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .maybeSingle(),
   ])
-  if (evalRes.error) return NextResponse.json({ error: evalRes.error.message }, { status: 500 })
+  if (evalRes.error) return serverError('kaspi-shop/margin', evalRes.error)
 
   return NextResponse.json({
     evaluations: evalRes.data || [],
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
     profit_amount: profitAmount,
     verdict,
   }).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/margin', error)
   return NextResponse.json({ evaluation: data })
 }
 
@@ -156,6 +157,6 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
   const { error } = await supabase.from('kaspi_shop_margin_evaluations').delete().eq('id', id).eq('user_id', user.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/margin', error)
   return NextResponse.json({ ok: true })
 }

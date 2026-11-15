@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     .select('id, kaspi_sku, product_name, brand, kaspi_category, kaspi_shop_nkt_status(*)')
     .eq('connection_id', connection.id)
     .order('created_at', { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/nkt', error)
 
   const products = (data || []).map((p: any) => {
     // PostgREST embeds a to-many array even though tracked_product_id is
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
     .eq('id', trackedProductId)
     .eq('user_id', user.id)
     .maybeSingle()
-  if (productError) return NextResponse.json({ error: productError.message }, { status: 500 })
+  if (productError) return serverError('kaspi-shop/nkt', productError)
   if (!product) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
 
   if (action === 'suggest') {
@@ -116,7 +117,8 @@ export async function POST(req: NextRequest) {
         kaspiCategory: product.kaspi_category,
       })
     } catch (err: any) {
-      return NextResponse.json({ error: `Не удалось получить предложение от ИИ: ${err.message}` }, { status: 502 })
+      console.error('kaspi-shop/nkt: AI suggestion failed:', err?.message)
+      return NextResponse.json({ error: 'Не удалось получить предложение от ИИ, попробуйте ещё раз' }, { status: 502 })
     }
 
     const { data: saved, error: upsertError } = await supabase
@@ -134,7 +136,7 @@ export async function POST(req: NextRequest) {
       }, { onConflict: 'tracked_product_id' })
       .select()
       .single()
-    if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 })
+    if (upsertError) return serverError('kaspi-shop/nkt', upsertError)
 
     return NextResponse.json({
       ntinStatus: saved.ntin_status,
@@ -157,7 +159,7 @@ export async function POST(req: NextRequest) {
       .eq('tracked_product_id', trackedProductId)
       .eq('user_id', user.id)
       .maybeSingle()
-    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 })
+    if (existingError) return serverError('kaspi-shop/nkt', existingError)
     if (!existing) return NextResponse.json({ error: 'Сначала получите предложение категории' }, { status: 400 })
 
     const { data: updated, error: updateError } = await supabase
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
       .eq('id', existing.id)
       .select()
       .single()
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (updateError) return serverError('kaspi-shop/nkt', updateError)
 
     return NextResponse.json({
       ntinStatus: updated.ntin_status,

@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
     .select('*')
     .eq('connection_id', connectionId)
     .order('created_at', { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products', error)
   const products = data || []
 
   // Stats for the summary cards row on /kaspi-shop. readyToApply reuses
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
     undercut_step: checked.value.undercutStep,
     check_frequency_minutes: checked.value.checkFrequencyMinutes,
   }).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products', error)
   return NextResponse.json({ product: data })
 }
 
@@ -181,7 +182,7 @@ export async function PATCH(req: NextRequest) {
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
-  if (rowError) return NextResponse.json({ error: rowError.message }, { status: 500 })
+  if (rowError) return serverError('kaspi-shop/products', rowError)
   if (!row) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
 
   const checked = validateProductPatch(updates, row)
@@ -198,7 +199,7 @@ export async function PATCH(req: NextRequest) {
     .update(patch)
     .eq('id', id)
     .eq('user_id', user.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products', error)
 
   // Остаток is OUR bookkeeping only -- it is deliberately NOT pushed to
   // Kaspi. Confirmed live twice (2026-08-21): every upload that carried a
@@ -232,6 +233,6 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
   const { error } = await supabase.from('kaspi_shop_tracked_products').delete().eq('id', id).eq('user_id', user.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products', error)
   return NextResponse.json({ ok: true })
 }

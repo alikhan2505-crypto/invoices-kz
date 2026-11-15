@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { hasAiAgentPlan, AI_AGENT_PROFILE_COLUMNS } from '@/lib/aiAgent/planGate'
@@ -74,7 +75,7 @@ export async function POST(
     .from('ai_agent_channel_connections')
     .select('channel, status')
     .eq('agent_id', agent.id)
-  if (connError) return NextResponse.json({ error: connError.message }, { status: 500 })
+  if (connError) return serverError('ai-agent/agents/[id]/launch', connError)
   if (!canLaunch(connections || [])) return NextResponse.json({ error: 'no_channel' }, { status: 400 })
 
   const base = { is_enabled: true, status: mode }
@@ -94,7 +95,7 @@ export async function POST(
       .select('id, is_enabled, status')
       .maybeSingle()
   }
-  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 })
+  if (result.error) return serverError('ai-agent/agents/[id]/launch', result.error)
   if (!result.data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   return NextResponse.json({ agent: { id: result.data.id, isEnabled: !!result.data.is_enabled, status: result.data.status } })

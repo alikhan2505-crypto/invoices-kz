@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
@@ -134,6 +135,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ payment_id: invoice.operationId, status: 'pending' })
   } catch (e: any) {
     console.error('Phone payment error:', e)
-    return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })
+    return serverError('payment/create-phone', e)
   }
 }

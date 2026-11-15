@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -47,14 +48,14 @@ export async function POST(req: NextRequest) {
     .eq('id', productId)
     .eq('user_id', user.id)
     .maybeSingle()
-  if (productError) return NextResponse.json({ error: productError.message }, { status: 500 })
+  if (productError) return serverError('kaspi-shop/products/suggest-pricing', productError)
   if (!product) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
 
   const { data: cityPrices, error: cityPricesError } = await supabase
     .from('kaspi_shop_product_city_prices')
     .select('last_competitor_price')
     .eq('tracked_product_id', productId)
-  if (cityPricesError) return NextResponse.json({ error: cityPricesError.message }, { status: 500 })
+  if (cityPricesError) return serverError('kaspi-shop/products/suggest-pricing', cityPricesError)
 
   // Цены конкурентов: по городам плюс общая цена с карточки товара (у свежего
   // товара до первой проверки городских строк ещё нет).

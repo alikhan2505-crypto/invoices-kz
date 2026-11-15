@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
     .select('session_status')
     .eq('id', connection.id)
     .maybeSingle()
-  if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 })
+  if (sessionError) return serverError('kaspi-shop/apply-now', sessionError)
   if (!isSessionActive(sessionRow?.session_status)) {
     return NextResponse.json({ error: 'Сессия Kaspi истекла -- переподключите магазин, цены не обновляются' }, { status: 400 })
   }
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
     .eq('enabled', true)
   if (productId) query = query.eq('id', productId)
   const { data: found, error: selectError } = await query
-  if (selectError) return NextResponse.json({ error: selectError.message }, { status: 500 })
+  if (selectError) return serverError('kaspi-shop/apply-now', selectError)
   const targets = (found || []).filter((t: any) => t.available_for_sale !== false)
   if (targets.length === 0) {
     return NextResponse.json({ error: 'Нет активных товаров для проверки' }, { status: 400 })
@@ -211,7 +212,7 @@ export async function POST(req: NextRequest) {
   if (resetError) {
     await releaseWindowSlot(supabase, slotKey)
     await releaseWindowSlot(supabase, userHourKey)
-    return NextResponse.json({ error: resetError.message }, { status: 500 })
+    return serverError('kaspi-shop/apply-now', resetError)
   }
 
   return NextResponse.json({ ok: true, count: ids.length, queued: ids.length }, { status: 202 })

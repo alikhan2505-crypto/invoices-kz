@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
     .in('type', ['ai_agent_reply'])
     .order('created_at', { ascending: false })
     .limit(20)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/wallet/history', error)
 
   const entries = (data || []).map(row => ({
     label: row.note || TYPE_LABELS[row.type] || row.type,

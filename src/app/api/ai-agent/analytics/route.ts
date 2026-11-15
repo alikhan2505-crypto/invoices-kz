@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
       .from('ai_agents')
       .select('id')
       .eq('user_id', user.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/analytics', error)
     agentIds = (agents || []).map(a => a.id)
   }
 
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
       .in('ai_agent_conversations.agent_id', agentIds)
       .gte('created_at', sinceIso)
       .limit(20000)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/analytics', error)
 
     for (const row of rows || []) {
       const key = kzDayKey(row.created_at)
@@ -134,7 +135,7 @@ export async function GET(req: NextRequest) {
     .eq('type', 'ai_agent_reply')
     .gte('created_at', sinceIso)
     .limit(20000)
-  if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 })
+  if (ledgerError) return serverError('ai-agent/analytics', ledgerError)
   // Debits are stored negative; spend reads as a positive ₸ figure.
   const spendTenge = Math.round((ledgerRows || []).reduce((sum, r) => sum + Math.max(0, -Number(r.amount)), 0))
 

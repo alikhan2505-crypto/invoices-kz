@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { hasAiAgentPlan, aiAgentAccessLevel, AI_AGENT_PROFILE_COLUMNS, type AiAgentAccess } from '@/lib/aiAgent/planGate'
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
     .or(VISIBLE_IN_DIALOG_FILTER)
     .order('created_at', { ascending: false })
     .limit(MESSAGES_LIMIT)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/dialogs/messages', error)
   const messages = (newestFirst || []).slice().reverse()
 
   return NextResponse.json({

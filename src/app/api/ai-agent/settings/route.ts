@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
       agent = data
     } else {
       const { data: ownedAgents, error: ownedAgentsError } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
-      if (ownedAgentsError) return NextResponse.json({ error: ownedAgentsError.message }, { status: 500 })
+      if (ownedAgentsError) return serverError('ai-agent/settings', ownedAgentsError)
       if (ownedAgents.length > 1) {
         return NextResponse.json({ error: 'ambiguous_agent' }, { status: 400 })
       }
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
       .insert({ user_id: user.id, name: draftName.slice(0, 120), is_enabled: false })
       .select('id, name, status, is_enabled')
       .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/settings', error)
     return NextResponse.json({ agent: data })
   }
 
@@ -354,7 +355,7 @@ export async function POST(req: NextRequest) {
     const { kaspi_catalog_off: _omit, ...withoutColumn } = payload
     result = await writeAgent(withoutColumn)
   }
-  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 })
+  if (result.error) return serverError('ai-agent/settings', result.error)
   if (!result.data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
   const agent = result.data
 

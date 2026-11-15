@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { resolveSignedDocumentPath } from '@/lib/signedDocumentsServer'
@@ -52,6 +53,6 @@ export async function POST(req: NextRequest) {
     .update({ display_pdf_url: displayPath, updated_at: new Date().toISOString() })
     .eq('id', signatureId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('signatures/set-display-pdf', error)
   return NextResponse.json({ ok: true })
 }

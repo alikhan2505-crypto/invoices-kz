@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     .from('kaspi_shop_connections')
     .select('id')
     .eq('user_id', user.id)
-  if (connError) return NextResponse.json({ error: connError.message }, { status: 500 })
+  if (connError) return serverError('kaspi-shop/storefront-orders', connError)
   const connectionIds = (connections || []).map(c => c.id)
   if (connectionIds.length === 0) return NextResponse.json({ orders: [] })
 
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     .select('id, product_name, price, cart_items, buyer_name, buyer_phone, buyer_address, status, created_at')
     .in('connection_id', connectionIds)
     .order('created_at', { ascending: false })
-  if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 })
+  if (ordersError) return serverError('kaspi-shop/storefront-orders', ordersError)
 
   const orders = (rows || []).map(r => ({
     id: r.id,

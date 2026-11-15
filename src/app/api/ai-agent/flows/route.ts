@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseFlowDefinition, type FlowDefinition } from '@/lib/aiAgent/flow'
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
     .select('id, name, trigger_words, is_start, definition, created_at')
     .eq('agent_id', agentId)
     .order('created_at', { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/flows', error)
 
   return NextResponse.json({ flows: (rows || []).map(toClientShape) })
 }
@@ -158,7 +159,7 @@ export async function POST(req: NextRequest) {
     )
     .select('id, name, trigger_words, is_start, definition, created_at')
     .single()
-  if (error || !row) return NextResponse.json({ error: error?.message || 'save_failed' }, { status: 500 })
+  if (error || !row) return serverError('ai-agent/flows', error ?? 'save_failed')
 
   return NextResponse.json({ flow: toClientShape(row) })
 }
@@ -181,7 +182,7 @@ export async function DELETE(req: NextRequest) {
   await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('active_flow_id', flow.id)
 
   const { error } = await supabase.from('ai_agent_flows').delete().eq('id', flow.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/flows', error)
 
   return NextResponse.json({ deleted: true })
 }

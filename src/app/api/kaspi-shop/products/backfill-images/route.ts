@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     .eq('connection_id', connection.id)
     .is('image_url', null)
     .limit(BATCH)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products/backfill-images', error)
 
   const { count: remainingBefore } = await supabase
     .from('kaspi_shop_tracked_products')

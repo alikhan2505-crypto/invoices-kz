@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { mapReviewsResponse } from '@/lib/kaspiShop/reviews'
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     .select('id, user_id, kaspi_shop_connections(user_id)')
     .eq('id', trackedProductId)
     .maybeSingle()
-  if (productError) return NextResponse.json({ error: productError.message }, { status: 500 })
+  if (productError) return serverError('kaspi-shop/reviews/ingest', productError)
   if (!product) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
 
   let ownerHasAccess: boolean
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
       fetch_error: `HTTP ${upstreamStatus}`,
       fetched_at: fetchedAt,
     }, { onConflict: 'tracked_product_id' })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('kaspi-shop/reviews/ingest', error)
     return NextResponse.json({ ok: true })
   }
 
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     fetch_error: null,
     fetched_at: fetchedAt,
   }, { onConflict: 'tracked_product_id' })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/reviews/ingest', error)
 
   return NextResponse.json({ ok: true })
 }

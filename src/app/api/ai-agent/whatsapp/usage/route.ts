@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { WA_FREE_SERVICE_PER_MONTH } from '@/lib/whatsapp'
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   let agentsQuery = supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
   if (agentIdParam) agentsQuery = agentsQuery.eq('id', agentIdParam)
   const { data: agents, error: agentsError } = await agentsQuery
-  if (agentsError) return NextResponse.json({ error: agentsError.message }, { status: 500 })
+  if (agentsError) return serverError('ai-agent/whatsapp/usage', agentsError)
   if (agentIdParam && (!agents || agents.length === 0)) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const window = waUsageMonthWindow(Date.now())
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
     .in('agent_id', agentIds)
     .eq('channel', 'whatsapp')
     .eq('status', 'active')
-  if (connError) return NextResponse.json({ error: connError.message }, { status: 500 })
+  if (connError) return serverError('ai-agent/whatsapp/usage', connError)
 
   const nameById = new Map((agents || []).map(a => [a.id, a.name as string]))
   try {
@@ -112,6 +113,6 @@ export async function GET(req: NextRequest) {
     }))
     return NextResponse.json({ ...base, numbers })
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'usage_failed' }, { status: 500 })
+    return serverError('ai-agent/whatsapp/usage', e)
   }
 }

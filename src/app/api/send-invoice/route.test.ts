@@ -205,7 +205,10 @@ describe('POST /api/send-invoice', () => {
     sendMock.mockResolvedValue({ data: null, error: { message: 'domain not verified' } })
     const res = await POST(req({ invoiceId: 'inv-1' }))
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toBe('domain not verified')
+    // Причина провайдера не уходит клиенту (аудит 14.11.2026), только в лог сервера.
+    const body = await res.json()
+    expect(body.error).not.toContain('domain not verified')
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('domain not verified'))
     expect([...state.counters.values()].every(c => c === 0)).toBe(true)
     expect(state.invoiceUpdates).toHaveLength(0)
   })

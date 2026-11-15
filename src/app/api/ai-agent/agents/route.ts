@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
     listed = await listAgents('id, name, tone, goal, status, created_at, is_enabled')
   }
   const { data: agents, error } = listed
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/agents', error)
 
   const agentIds = (agents || []).map((a: any) => a.id)
   const { data: connections } = agentIds.length > 0

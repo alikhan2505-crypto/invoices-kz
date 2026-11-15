@@ -43,15 +43,26 @@ export async function getNicheCheck(id: string): Promise<NicheCheck | null> {
 // Returns the check's own user_id (whoever requested it) so the caller can
 // debit the right wallet for a completed, billable check -- older rows
 // (before this column existed) have no owner and are never charged.
-export async function completeNicheCheck(id: string, result: NicheSummary): Promise<{ userId: string | null; query: string }> {
+//
+// Идемпотентность (аудит 14.11.2026): строка переводится в 'done' одним условным UPDATE
+// (status <> 'done'). Повторная доставка того же результата (ретрай воркера, дубль
+// вебхука, параллельные доставки) не находит строку и возвращает firstCompletion=false:
+// вызывающий не списывает деньги второй раз. Списывает только тот вызов, который
+// действительно закрыл проверку.
+export async function completeNicheCheck(
+  id: string,
+  result: NicheSummary,
+): Promise<{ userId: string | null; query: string; firstCompletion: boolean }> {
   const { data, error } = await supabase
     .from('kaspi_niche_checks')
     .update({ status: 'done', result })
     .eq('id', id)
+    .neq('status', 'done')
     .select('user_id, query')
-    .single()
+    .maybeSingle()
   if (error) throw new Error(`kaspi_niche_checks complete failed for ${id}: ${error.message}`)
-  return { userId: data?.user_id ?? null, query: data?.query ?? '' }
+  if (!data) return { userId: null, query: '', firstCompletion: false }
+  return { userId: data.user_id ?? null, query: data.query ?? '', firstCompletion: true }
 }
 
 export async function failNicheCheck(id: string, message: string): Promise<void> {
@@ -59,5 +70,6 @@ export async function failNicheCheck(id: string, message: string): Promise<void>
     .from('kaspi_niche_checks')
     .update({ status: 'error', error: message })
     .eq('id', id)
+    .neq('status', 'done') // поздняя доставка ошибки не затирает уже сохранённый результат
   if (error) throw new Error(`kaspi_niche_checks fail-update failed for ${id}: ${message}`)
 }

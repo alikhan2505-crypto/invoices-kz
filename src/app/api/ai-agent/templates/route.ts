@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -104,7 +105,7 @@ export async function GET(req: NextRequest) {
     .select('id, trigger_words, reply_text, channel, created_at')
     .eq('agent_id', agentId)
     .order('created_at', { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/templates', error)
 
   return NextResponse.json({ templates: (rows || []).map(toClientShape) })
 }
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
     .insert({ agent_id: agentId, trigger_words: triggerWords, reply_text: replyText, channel: channel ?? null })
     .select('id, trigger_words, reply_text, channel, created_at')
     .single()
-  if (error || !row) return NextResponse.json({ error: error?.message || 'insert_failed' }, { status: 500 })
+  if (error || !row) return serverError('ai-agent/templates', error ?? 'insert_failed')
 
   return NextResponse.json({ template: toClientShape(row) })
 }
@@ -189,7 +190,7 @@ export async function PATCH(req: NextRequest) {
     .eq('id', template.id)
     .select('id, trigger_words, reply_text, channel, created_at')
     .single()
-  if (error || !row) return NextResponse.json({ error: error?.message || 'update_failed' }, { status: 500 })
+  if (error || !row) return serverError('ai-agent/templates', error ?? 'update_failed')
 
   return NextResponse.json({ template: toClientShape(row) })
 }
@@ -206,7 +207,7 @@ export async function DELETE(req: NextRequest) {
   if (!template) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const { error } = await supabase.from('ai_agent_reply_templates').delete().eq('id', template.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/templates', error)
 
   return NextResponse.json({ deleted: true })
 }

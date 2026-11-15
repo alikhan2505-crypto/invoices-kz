@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -99,7 +100,7 @@ export async function DELETE(
     .from('ai_agent_conversations')
     .select('id')
     .eq('agent_id', agent.id)
-  if (convListError) return NextResponse.json({ error: convListError.message }, { status: 500 })
+  if (convListError) return serverError('ai-agent/agents/[id]', convListError)
   const conversationIds = (conversations || []).map(c => c.id)
 
   // Неразобранные заявки на запись -- отказ ДО любых изменений. Проверка и
@@ -109,7 +110,7 @@ export async function DELETE(
     .select('id', { count: 'exact', head: true })
     .eq('agent_id', agent.id)
     .in('status', UNRESOLVED_BOOKING_DRAFT_STATUSES)
-  if (pendingError) return NextResponse.json({ error: pendingError.message }, { status: 500 })
+  if (pendingError) return serverError('ai-agent/agents/[id]', pendingError)
   let pendingDrafts = byAgent ?? 0
   if (pendingDrafts === 0) {
     for (let i = 0; i < conversationIds.length; i += IN_CHUNK) {
@@ -118,7 +119,7 @@ export async function DELETE(
         .select('id', { count: 'exact', head: true })
         .in('conversation_id', conversationIds.slice(i, i + IN_CHUNK))
         .in('status', UNRESOLVED_BOOKING_DRAFT_STATUSES)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) return serverError('ai-agent/agents/[id]', error)
       pendingDrafts += count ?? 0
     }
   }
@@ -135,7 +136,7 @@ export async function DELETE(
       .from('salon_bookings')
       .update({ conversation_id: null })
       .in('conversation_id', conversationIds.slice(i, i + IN_CHUNK))
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/agents/[id]', error)
   }
 
   // Черновики записи (здесь уже только разобранные -- см. проверку выше):
@@ -143,22 +144,22 @@ export async function DELETE(
   // черновика agent_id и conversation_id всегда одного агента, но ссылка по
   // диалогу тоже без каскада, и её пропуск снова уронил бы удаление).
   const { error: draftError } = await supabase.from('ai_agent_booking_drafts').delete().eq('agent_id', agent.id)
-  if (draftError) return NextResponse.json({ error: draftError.message }, { status: 500 })
+  if (draftError) return serverError('ai-agent/agents/[id]', draftError)
   for (let i = 0; i < conversationIds.length; i += IN_CHUNK) {
     const { error } = await supabase
       .from('ai_agent_booking_drafts')
       .delete()
       .in('conversation_id', conversationIds.slice(i, i + IN_CHUNK))
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/agents/[id]', error)
   }
 
   const { error: broadcastError } = await supabase.from('ai_agent_broadcasts').delete().eq('agent_id', agent.id)
-  if (broadcastError) return NextResponse.json({ error: broadcastError.message }, { status: 500 })
+  if (broadcastError) return serverError('ai-agent/agents/[id]', broadcastError)
 
   // Один запрос: каскад удаляет диалоги, сообщения, подключения каналов,
   // шаблоны, сценарии и черновики счетов вместе с агентом -- или ничего.
   const { error: agentError } = await supabase.from('ai_agents').delete().eq('id', agent.id).eq('user_id', user.id)
-  if (agentError) return NextResponse.json({ error: agentError.message }, { status: 500 })
+  if (agentError) return serverError('ai-agent/agents/[id]', agentError)
 
   return NextResponse.json({ deleted: true })
 }
@@ -191,7 +192,7 @@ export async function PATCH(
     .eq('user_id', user.id)
     .select('id, is_enabled')
     .maybeSingle()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/agents/[id]', error)
   if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   // Включили агента-черновик мастера тумблером в настройках, мимо

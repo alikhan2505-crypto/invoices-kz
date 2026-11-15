@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -18,6 +19,6 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { error } = await supabase.from('app_notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('notifications/read-all', error)
   return NextResponse.json({ ok: true })
 }

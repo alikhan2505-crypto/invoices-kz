@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { hasAiAgentPlan, aiAgentAccessLevel, AI_AGENT_PROFILE_COLUMNS, type AiAgentAccess } from '@/lib/aiAgent/planGate'
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
     .or(VISIBLE_IN_DIALOG_FILTER, { referencedTable: 'ai_agent_messages' })
     .order('created_at', { referencedTable: 'ai_agent_messages', ascending: false })
     .limit(1, { referencedTable: 'ai_agent_messages' })
-  if (convError) return NextResponse.json({ error: convError.message }, { status: 500 })
+  if (convError) return serverError('ai-agent/dialogs', convError)
   if (!conversations || conversations.length === 0) return NextResponse.json({ items: [], readOnly })
 
   const previewByConversation: Record<string, { text: string; createdAt: string }> = {}

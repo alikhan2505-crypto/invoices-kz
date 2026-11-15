@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     .update({ paused })
     .eq('user_id', user.id)
     .eq('is_active', true)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/settings', error)
   return NextResponse.json({ ok: true })
 }
 
@@ -80,7 +81,7 @@ export async function DELETE(req: NextRequest) {
     await supabase.from('kaspi_shop_tracked_products').delete().eq('connection_id', connection.id)
   }
   const { error } = await supabase.from('kaspi_shop_connections').delete().eq('id', connection.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/settings', error)
 
   // Disconnecting the active store must not leave the user with zero active
   // stores while another one of theirs still exists -- fall back to their

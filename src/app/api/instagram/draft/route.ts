@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { secretEquals } from '@/lib/secretEquals'
@@ -93,7 +94,7 @@ async function createReelDraft(body: Record<string, unknown>) {
     if (isMissingVideoColumnsError(insertError)) {
       return NextResponse.json({ error: MIGRATION_REQUIRED_MESSAGE, code: 'migration_pending' }, { status: 409 })
     }
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return serverError('instagram/draft', insertError)
   }
 
   let telegramSent = false
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
       .from('instagram-drafts')
       .upload(path, imageBlob, { contentType, upsert: false })
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      return serverError('instagram/draft', uploadError)
     }
     publicUrls.push(supabase.storage.from('instagram-drafts').getPublicUrl(path).data.publicUrl)
   }
@@ -204,7 +205,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return serverError('instagram/draft', insertError)
   }
 
   const token = process.env.TELEGRAM_BOT_TOKEN

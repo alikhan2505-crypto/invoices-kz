@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     agents = [agent]
   } else {
     const { data, error } = await supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError('ai-agent/leads', error)
     agents = data || []
   }
   if (agents.length === 0) return NextResponse.json({ items: [] })
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
     .from('ai_agent_conversations')
     .select('id, agent_id, channel, customer_handle, collected_data, lead_status, created_at')
     .in('agent_id', agents.map(a => a.id))
-  if (convError) return NextResponse.json({ error: convError.message }, { status: 500 })
+  if (convError) return serverError('ai-agent/leads', convError)
   if (!conversations || conversations.length === 0) return NextResponse.json({ items: [] })
 
   // "Last-updated": ai_agent_conversations has no updated_at column, so the

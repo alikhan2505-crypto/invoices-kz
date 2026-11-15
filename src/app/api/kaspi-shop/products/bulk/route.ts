@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     .select('id, product_name, own_current_price')
     .in('id', productIds)
     .eq('user_id', user.id)
-  if (rowsError) return NextResponse.json({ error: rowsError.message }, { status: 500 })
+  if (rowsError) return serverError('kaspi-shop/products/bulk', rowsError)
   const { eligible, skipped } = partitionBulkRows(rows || [], floorPrice, maxPrice)
   if (eligible.length === 0) {
     return NextResponse.json({
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
     .in('id', eligible.map(r => r.id))
     .eq('user_id', user.id)
     .select('id')
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('kaspi-shop/products/bulk', error)
 
   return NextResponse.json({ ok: true, updated: (data || []).length, skipped })
 }

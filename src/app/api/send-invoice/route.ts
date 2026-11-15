@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
@@ -156,6 +157,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverError('send-invoice', e)
   }
 }

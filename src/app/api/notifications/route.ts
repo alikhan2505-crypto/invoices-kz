@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(30)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('notifications', error)
 
   const items = (data || []).map(n => ({
     id: n.id, title: n.title, body: n.body, link: n.link, read: n.read, createdAt: n.created_at,

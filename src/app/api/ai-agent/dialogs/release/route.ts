@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (!conversation) return NextResponse.json({ error: 'Диалог не найден' }, { status: 404 })
 
   const { error } = await supabase.from('ai_agent_conversations').update({ paused_for_human: false }).eq('id', conversationId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/dialogs/release', error)
 
   return NextResponse.json({ ok: true })
 }

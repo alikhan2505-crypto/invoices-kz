@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest) {
     ownerSignerName = parseSignerName(ownerSig?.subject)
     ownerSignerIin = ownerSig?.userId || null
   } catch (e: any) {
-    return NextResponse.json({ error: `SIGEX: ${e.message}` }, { status: 502 })
+    return serverError('signatures/owner-sign: SIGEX', e, 502)
   }
 
   const requiresClient = REQUIRES_CLIENT_SIGNATURE[documentType] ?? true
@@ -184,7 +185,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('signatures/owner-sign', error)
 
   if (doc.clientEmail) {
     const subject = requiresClient

@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/apiError'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
@@ -146,7 +147,7 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(100)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError('ai-agent/broadcasts', error)
 
   // A send that crashed mid-way (timeout, deploy) never reached its final
   // update and used to show «Отправляется…» forever. Anything still
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
     .select('id, created_at')
     .single()
   if (insertError || !broadcast) {
-    return NextResponse.json({ error: insertError?.message || 'insert_failed' }, { status: 500 })
+    return serverError('ai-agent/broadcasts', insertError ?? 'insert_failed')
   }
 
   // Race-safe re-check: our 'sending' row now exists, so a concurrent

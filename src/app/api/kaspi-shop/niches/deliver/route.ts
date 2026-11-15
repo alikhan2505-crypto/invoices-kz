@@ -33,12 +33,13 @@ export async function POST(req: NextRequest) {
   if (summary.total === 0 && summary.products.length === 0) {
     console.error(`kaspi-shop niches deliver: parsed OK but summary is empty, raw body: ${upstreamBodyText.slice(0, 500)}`)
   }
-  const { userId, query } = await completeNicheCheck(checkId, summary)
+  const { userId, query, firstCompletion } = await completeNicheCheck(checkId, summary)
   // Charged on any real delivered result, empty or not (matches
   // checkCycle.ts's own per-check debit, which charges for a real attempt
   // regardless of whether it found a cheaper competitor) -- only a genuine
   // upstream/parse failure above skips the charge entirely.
-  if (userId) {
+  // Повторная доставка уже закрытой проверки не списывает второй раз (firstCompletion=false).
+  if (userId && firstCompletion) {
     try {
       await debitKaspiShopWallet(userId, 1, `Проверка идеи: ${query}`)
     } catch (err: any) {

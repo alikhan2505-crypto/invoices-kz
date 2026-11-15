@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
     pdfs = fetched.pdfs
     missing = fetched.missing
   } catch (err: any) {
-    return NextResponse.json({ error: `Не удалось получить накладную: ${err.message}` }, { status: 502 })
+    console.error('kaspi-shop/orders/waybills: fetch failed:', err?.message)
+    return NextResponse.json({ error: 'Не удалось получить накладную, попробуйте ещё раз' }, { status: 502 })
   }
   // Ни одной накладной: говорим про ВСЕ заказы сразу, а не про первый попавшийся.
   if (pdfs.length === 0) {
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
   try {
     merged = await buildWaybillsPdf(pdfs, format)
   } catch (err: any) {
-    return NextResponse.json({ error: `Не удалось собрать PDF накладных: ${err.message}` }, { status: 500 })
+    console.error('kaspi-shop/orders/waybills: pdf build failed:', err?.message)
+    return NextResponse.json({ error: 'Не удалось собрать PDF накладных, попробуйте ещё раз' }, { status: 500 })
   }
   return new NextResponse(new Uint8Array(merged), {
     status: 200,
