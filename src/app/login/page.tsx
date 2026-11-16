@@ -16,6 +16,7 @@ import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWid
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
 import { peekPendingBinWatch } from '@/lib/binWatch/pendingIntent'
 import { mailProviderLink, suggestEmailFix } from '@/lib/emailHelpers'
+import { hasPasskeyDevice, markPasskeyDevice } from '@/lib/passkeyDeviceFlag'
 
 // Капча входа включается, когда задан публичный ключ Turnstile (и в Supabase
 // включена Captcha protection): без ключа поведение прежнее.
@@ -74,6 +75,8 @@ export default function Login() {
   const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
+  // Face ID первой кнопкой только там, где им уже входили (D6, 16.11.2026); у остальных он внизу. Определяется после монтирования.
+  const [passkeyKnown, setPasskeyKnown] = useState(false)
   // Встроенный браузер Instagram / Facebook: Google отвечает 403 disallowed_useragent, Face ID там ненадёжен.
   // Определяем после монтирования, чтобы разметка сервера и клиента совпала.
   const [inApp, setInApp] = useState(false)
@@ -131,6 +134,7 @@ export default function Login() {
     const inAppBrowser = /Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent)
     setInApp(inAppBrowser)
     setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential && !inAppBrowser)
+    setPasskeyKnown(hasPasskeyDevice())
 
     // Runs AFTER ?next= / ?plan=&period= above were stored, exactly as for a
     // fresh sign-in, so a signed-in visitor arriving from a product landing
@@ -195,6 +199,7 @@ export default function Login() {
 
       const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.tokenHash, type: 'email' })
       if (error) { alert(t.errorPrefix(error.message)); return }
+      markPasskeyDevice()
 
       // A passkey login only ever exists for an already-registered,
       // already-onboarded account, so there is no onboarding branch to
@@ -423,7 +428,7 @@ export default function Login() {
         <AnimatePresence mode="wait" initial={false} custom={dir}>
         {!sent ? (
           <motion.div key="form" custom={dir} variants={slide} initial="enter" animate="center" exit="exit" transition={{ duration: reduceMotion ? 0.01 : 0.22, ease: EASE }}>
-            {passkeySupported && (
+            {passkeySupported && passkeyKnown && (
               <button onClick={loginWithPasskey} disabled={passkeyLoading}
                 className={`${socialButton} mb-3 disabled:opacity-60`}
                 style={{ border: '1px solid var(--nav-accent)', background: 'transparent', color: 'var(--nav-accent)' }}>
@@ -528,6 +533,15 @@ export default function Login() {
                 is no separate sign-up anywhere. Someone without an account
                 had every reason to think they were in the wrong place. */}
             <p className="text-xs mt-4 text-center leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>{t.noAccountHint}</p>
+            {/* Face ID без ключа на этом устройстве ничего не даст, поэтому для новичка он внизу и тише (D6, 16.11.2026). */}
+            {passkeySupported && !passkeyKnown && (
+              <div className="mt-3 text-center">
+                <button type="button" onClick={loginWithPasskey} disabled={passkeyLoading}
+                  className="min-h-11 px-3 text-xs font-medium underline underline-offset-2 disabled:opacity-60" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {passkeyLoading ? t.sendingButton : t.passkeyLoginButton}
+                </button>
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div key="sent" custom={dir} variants={slide} initial="enter" animate="center" exit="exit" transition={{ duration: reduceMotion ? 0.01 : 0.22, ease: EASE }} className="text-center">

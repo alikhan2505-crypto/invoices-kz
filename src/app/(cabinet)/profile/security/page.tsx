@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { startRegistration } from '@simplewebauthn/browser'
+import { markPasskeyDevice } from '@/lib/passkeyDeviceFlag'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -88,6 +89,7 @@ export default function Security() {
       })
       const verifyJson = await verifyRes.json()
       if (verifyJson.error) { alert(t.errorPrefix(verifyJson.error)); return }
+      markPasskeyDevice()
 
       await loadPasskeys()
     } catch (e: any) {
