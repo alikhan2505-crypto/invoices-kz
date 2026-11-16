@@ -5,6 +5,7 @@
 // wrong -- RETURN/CANCEL are singular, not RETURNS/CANCELS). See
 // docs/superpowers/specs/2026-08-27-kaspi-quality-metrics-design.md.
 
+import { kaspiHttpError } from '@/lib/kaspiShop/kaspiHttpError'
 const COMMON_HEADERS = {
   'x-auth-version': '3',
   'content-type': 'application/json',
@@ -107,7 +108,7 @@ export async function getQualityOverview(
     return { overview: null, sessionExpired: false, failed: true, error: qualityFailure(err) }
   }
   if (res.status === 401 || res.status === 403) return { overview: null, sessionExpired: true }
-  if (!res.ok) return { overview: null, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+  if (!res.ok) return { overview: null, sessionExpired: false, failed: true, error: kaspiHttpError(res.status) }
   const json = await res.json().catch(() => null)
   const qc = json?.data?.merchant?.qualityControl
   if (!qc || !qc.ratingWithStatistics?.details || !qc.returned?.details || !qc.lateKaspiDelivery?.details || !qc.cancelled?.details) {
@@ -208,7 +209,7 @@ export async function getQualityCategories(
     return { categories: [], total: 0, sessionExpired: false, failed: true, error: qualityFailure(err) }
   }
   if (res.status === 401 || res.status === 403) return { categories: [], total: 0, sessionExpired: true }
-  if (!res.ok) return { categories: [], total: 0, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+  if (!res.ok) return { categories: [], total: 0, sessionExpired: false, failed: true, error: kaspiHttpError(res.status) }
   const json = await res.json().catch(() => null)
   const categories = json?.data?.merchant?.qualityControl?.categories
   const items = categories?.items

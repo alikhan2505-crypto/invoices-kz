@@ -8,6 +8,7 @@
 // same string. REFUND_TABS below is the API's real vocabulary; never accept
 // a hash-style value here.
 
+import { kaspiHttpError } from '@/lib/kaspiShop/kaspiHttpError'
 const COMMON_HEADERS = {
   'x-auth-version': '3',
   'referer': 'https://kaspi.kz/',
@@ -40,7 +41,7 @@ async function refundFetch(fetchFn: typeof fetch, url: string, sessionCookies: s
     return { failed: true, sessionExpired: false, error: timedOut ? 'Kaspi не ответил вовремя' : (err instanceof Error ? err.message : 'Неизвестная ошибка') }
   }
   if (!res.ok) {
-    return { failed: true, sessionExpired: res.status === 401 || res.status === 403, error: `Kaspi ответил HTTP ${res.status}` }
+    return { failed: true, sessionExpired: res.status === 401 || res.status === 403, error: kaspiHttpError(res.status) }
   }
   return { res }
 }

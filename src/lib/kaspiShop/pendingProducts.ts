@@ -3,6 +3,7 @@
 // Only the "Без привязки" (approvalStatus: CHECK) tab's shape was observed
 // with real data; the other 3 tabs' approvalStatus keys are inferred, not
 // confirmed, so v1 only ever requests CHECK.
+import { kaspiHttpError } from '@/lib/kaspiShop/kaspiHttpError'
 import { authHeaders, isAuthFailureStatus } from './cabinetApi'
 
 export type PendingProduct = {
@@ -48,7 +49,7 @@ export async function listPendingProducts(
     return { products: [], hasMore: false, sessionExpired: false, failed: true, error: errorText(err) }
   }
   if (!res.ok) {
-    return { products: [], hasMore: false, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+    return { products: [], hasMore: false, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: kaspiHttpError(res.status) }
   }
   const json = await res.json().catch(() => null)
   const data = json?.data

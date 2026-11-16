@@ -4,6 +4,7 @@
 // the original trace. Requires session cookies from a completed
 // cabinetAuth.submitOtp() login.
 
+import { kaspiHttpError } from '@/lib/kaspiShop/kaspiHttpError'
 export function authHeaders(sessionCookies: string): Record<string, string> {
   return {
     'x-auth-version': '3',
@@ -211,7 +212,7 @@ export async function fetchOffersDetailsChecked(
         result.error = 'Сессия кабинета Kaspi истекла'
         return result
       }
-      if (!res.ok) { result.ok = false; result.error = `Kaspi ответил HTTP ${res.status}`; continue }
+      if (!res.ok) { result.ok = false; result.error = kaspiHttpError(res.status); continue }
       const json = await res.json().catch(() => null)
       const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : null)
       if (!arr) { result.ok = false; result.error = 'Kaspi вернул неожиданный ответ'; continue }
@@ -339,7 +340,7 @@ export async function listCatalogWithStatus(
     if (isAuthFailureStatus(res.status)) {
       return failedResult('Сессия кабинета Kaspi истекла', true)
     }
-    if (!res.ok) return failedResult(`Kaspi ответил HTTP ${res.status}`)
+    if (!res.ok) return failedResult(kaspiHttpError(res.status))
     const json = await res.json().catch(() => null)
     const data = json?.data
     if (!Array.isArray(data)) return failedResult('Kaspi вернул неожиданный ответ')
@@ -618,7 +619,7 @@ export async function getOrderDetail(
     if (isAuthFailureStatus(res.status)) {
       return { order: null, sessionExpired: true, failed: true, error: 'Сессия кабинета Kaspi истекла' }
     }
-    if (!res.ok) return { order: null, sessionExpired: false, failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+    if (!res.ok) return { order: null, sessionExpired: false, failed: true, error: kaspiHttpError(res.status) }
     const json = await res.json().catch(() => null)
     const merchant = json?.data?.merchant
     if (!merchant || typeof merchant !== 'object') {
@@ -688,7 +689,7 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
       console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
-      return { counts: {}, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+      return { counts: {}, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: kaspiHttpError(res.status) }
     }
     const json = await res.json().catch(() => null)
     const counts = json?.data?.merchant?.orders?.counts
@@ -758,7 +759,7 @@ export async function listOrders(
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
       console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))
-      return { orders: [], total: 0, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: `Kaspi ответил HTTP ${res.status}` }
+      return { orders: [], total: 0, sessionExpired: isAuthFailureStatus(res.status), failed: true, error: kaspiHttpError(res.status) }
     }
     const json = await res.json().catch(() => null)
     // @skip/@include on the two branches means only one of orders/advancedOrders
