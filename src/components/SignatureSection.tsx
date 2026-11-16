@@ -67,7 +67,11 @@ export default function SignatureSection(props: Props) {
   const [signing, setSigning] = useState(false)
   const [qr, setQr] = useState<SigexQrState | null>(null)
   const [error, setError] = useState('')
+  // public_token документа: без него /api/documents/[id]/* отвечает 404 (16.11.2026).
+  const [docToken, setDocToken] = useState(props.mode === 'client' ? props.publicToken : '')
   const cancelRef = useRef<(() => void) | null>(null)
+  const fileHref = (rowId: string, type: 'document' | 'card') =>
+    `/api/documents/${rowId}/${type}?t=${encodeURIComponent(docToken)}`
 
   useEffect(() => { loadRow() }, [documentId])
 
@@ -123,6 +127,13 @@ export default function SignatureSection(props: Props) {
       .eq('document_id', documentId)
       .maybeSingle()
     setRow(data)
+    // Владелец читает токен своего документа сам (RLS: только свои строки).
+    const { data: doc } = await supabase
+      .from(documentType === 'contract' ? 'contracts' : 'invoices')
+      .select('public_token')
+      .eq('id', documentId)
+      .maybeSingle()
+    setDocToken(doc?.public_token || '')
     setLoading(false)
   }
 
@@ -315,14 +326,14 @@ export default function SignatureSection(props: Props) {
               <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.signedClientDatePrefix(formatDateTime(row.client_signed_at, lang))}</div>
             )}
             <div className="flex gap-2 mt-1">
-              <a href={`/api/documents/${row.id}/document`} target="_blank" rel="noreferrer"
+              <a href={fileHref(row.id, 'document')} target="_blank" rel="noreferrer"
                 className="flex-1 text-center rounded-xl py-2.5 text-sm font-medium transition-transform duration-150 hover:-translate-y-0.5"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.downloadDocumentButton}
               </a>
             </div>
             {(row.has_card ?? !!row.ddc_pdf_url) && (
-              <a href={`/api/documents/${row.id}/card`} target="_blank" rel="noreferrer"
+              <a href={fileHref(row.id, 'card')} target="_blank" rel="noreferrer"
                 className="block text-center text-xs underline mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                 {t.downloadVerificationCardButton}
               </a>

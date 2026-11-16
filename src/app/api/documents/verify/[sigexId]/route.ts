@@ -58,7 +58,7 @@ export async function GET(
     clientSignerName: row.client_signer_name,
     clientSignerIin: maskIin(row.client_signer_iin),
     clientSignedAt: row.client_signed_at,
-    documentUrl: `/api/documents/${row.id}/document`,
-    cardUrl: `/api/documents/${row.id}/card`,
+    // Ссылок на файлы и id строки подписи здесь больше нет (16.11.2026): подписанный
+    // документ отдаётся только по public_token (см. /api/documents/[id]/[type]).
   })
 }

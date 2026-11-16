@@ -15,8 +15,6 @@ type VerifyData = {
   clientSignerName: string | null
   clientSignerIin: string | null
   clientSignedAt: string | null
-  documentUrl: string
-  cardUrl: string
 }
 
 export default function VerifyPage() {
@@ -100,17 +98,6 @@ export default function VerifyPage() {
               )}
             </div>
           )}
-        </div>
-
-        <div className="space-y-2">
-          <a href={data.documentUrl} target="_blank" rel="noreferrer"
-            className="block text-center bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-            {t.downloadDocumentButton}
-          </a>
-          <a href={data.cardUrl} target="_blank" rel="noreferrer"
-            className="block text-center border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
-            {t.downloadCardButton}
-          </a>
         </div>
       </div>
     </main>

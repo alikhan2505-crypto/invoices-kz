@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { downloadSignedDocument } from '@/lib/signedDocumentsServer'
+import { documentTokenMatches } from '@/lib/signedDocumentAccess'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,16 +12,18 @@ const supabase = createClient(
 // the raw Supabase Storage URL directly — a link opened on a phone otherwise
 // shows the bare *.supabase.co project host in the browser chrome, which
 // reads as untrustworthy/unbranded for a document meant to carry legal
-// weight. No auth: same public trust model as the invoice itself (this
-// route is only ever linked from the public-token-gated invoice pages).
+// weight. Доступ по public_token документа (?t=): тот же ключ, что у страниц /view/[token] и
+// /contract-view/[token] и у владельца в кабинете. Ссылку без токена или с чужим токеном
+// отвечает так же, как несуществующую подпись (404), чтобы по ответу нельзя было понять,
+// существует ли подпись с таким id.
 // Файл берётся только из нашего бакета signed-documents и скачивается
 // служебной ролью (бакет закрыт для браузера с 15.10.2026, см.
 // src/lib/signedDocuments.ts) — никаких fetch() по ссылке из колонки.
-// Без входа и без токена намеренно: id строки подписи публикует и страница
-// проверки /api/documents/verify/[sigexId], так что подписанный договор
-// читается любым, у кого есть номер SIGEX с бумаги. Закрыть его (сессия
-// владельца или public_token для document_type='contract') — решение
-// основателя; см. supabase/migrations/signed_documents_private.sql.
+// 16.11.2026 закрыто по решению основателя: раньше файл отдавался без входа и без токена
+// по id строки подписи, а этот id публиковала страница проверки
+// /api/documents/verify/[sigexId] (номер SIGEX напечатан на бумаге), и подписанный договор
+// читался любым, у кого был этот номер. Теперь страница проверки id не отдаёт и кнопок
+// скачивания не имеет, а здесь нужен public_token документа.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; type: string }> }
@@ -37,6 +40,12 @@ export async function GET(
     .single()
 
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const docTable = row.document_type === 'contract' ? 'contracts' : 'invoices'
+  const { data: doc } = await supabase.from(docTable).select('public_token').eq('id', row.document_id).maybeSingle()
+  if (!documentTokenMatches(req.nextUrl.searchParams.get('t'), doc?.public_token)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   const sourceUrl = type === 'card' ? row.ddc_pdf_url : (row.display_pdf_url || row.snapshot_pdf_url)
   if (!sourceUrl) return NextResponse.json({ error: 'Not available' }, { status: 404 })
