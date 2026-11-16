@@ -1,4 +1,4 @@
-// Карточка «WhatsApp» в разделе «Вход и Face ID» (src/components/WhatsAppLinkCard.tsx). kk и en ждут вычитки основателем.
+// Карточка «WhatsApp» в разделе «Вход и Face ID» (src/components/WhatsAppLinkCard.tsx). kk вычитан основателем 16.11.2026 (поправки внесены), en ждёт вычитки.
 
 export interface WhatsAppLinkContent {
   title: string
@@ -54,7 +54,7 @@ export const whatsappLinkDict: Record<'ru' | 'kk' | 'en', WhatsAppLinkContent> =
     title: 'WhatsApp арқылы кіру',
     hintUnlinked: 'WhatsApp нөміріңізді байлаңыз, содан кейін бұл аккаунтқа поштасыз, бір хабарламамен кіре аласыз.',
     hintLinked: p => `${p} нөмірі байланған. «WhatsApp арқылы кіру» батырмасы арқылы кіре аласыз.`,
-    link: 'WhatsApp байлау',
+    link: 'WhatsApp-ты байлау',
     linking: 'Дайындалуда…',
     codeIntro: 'WhatsApp-ты ашып, дайын хабарламаны жіберіңіз. Жауап ретінде код келеді: оны осында енгізіңіз.',
     openWhatsApp: 'WhatsApp-ты қайта ашу',
@@ -67,11 +67,11 @@ export const whatsappLinkDict: Record<'ru' | 'kk' | 'en', WhatsAppLinkContent> =
     linkedDone: 'Нөмір байланды.',
     errWrongCode: 'Код сәйкес емес. Сандарды тексеріңіз.',
     errExpired: 'Кодтың мерзімі өтті. Байлауды қайта бастаңыз.',
-    errTooMany: 'Қате әрекет тым көп. Байлауды қайта бастаңыз.',
+    errTooMany: 'Қате кодты енгізу әрекеттері тым көп. Байлауды қайта бастаңыз.',
     errTaken: 'Бұл нөмір басқа аккаунтқа байланған. Қолдау қызметіне жазыңыз.',
     errAlreadyLinked: 'Бұл аккаунтқа нөмір бұрыннан байланған.',
     errUnavailable: 'WhatsApp арқылы кіру қазір қолжетімсіз. Кейінірек қайталаңыз.',
-    errRateLimited: 'Әрекет тым көп. Кейінірек қайталаңыз.',
+    errRateLimited: 'Тым көп әрекет жасадыңыз. Кейінірек қайталап көріңіз.',
     errGeneric: 'Бірдеңе дұрыс болмады. Қайталап көріңіз.',
   },
   en: {

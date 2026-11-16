@@ -15,7 +15,7 @@ export interface AuthContent {
   /** Встроенный браузер (Instagram, Facebook): Google такой вход не принимает, ведём на почту. */
   inAppBrowserNotice: string
   facebookSignInButton: string
-  /** Вход через WhatsApp (whatsapp_login.sql): кнопка, подсказка после нажатия, страница /auth/wa. kk и en ждут вычитки. */
+  /** Вход через WhatsApp (whatsapp_login.sql): кнопка, подсказка после нажатия, страница /auth/wa. kk вычитан основателем 16.11.2026, en ждёт вычитки. */
   whatsappSignInButton: string
   whatsappWaitingHint: string
   whatsappOpenAgain: string
