@@ -238,11 +238,12 @@ describe('K11/K16: сохранение настроек товара', () => {
     await type(field('Шаг'), '50')
     await click(byText('button', 'Сохранить'))
     const patch = world.calls.find(c => c.method === 'PATCH')!
-    expect(patch.body.floor_price).toBe(1250.5)
+    // Цены в целых тенге (D3, 16.11.2026): «1 250,5» уходит как 1251.
+    expect(patch.body.floor_price).toBe(1251)
     expect(patch.body.undercut_step).toBe(50)
     expect(text()).not.toContain('Настройки демпинга')
     await openCard()
-    expect(field('Минимальная цена').value).toBe('1250.5')
+    expect(field('Минимальная цена').value).toBe('1251')
   })
 
   it('закрыли панель без сохранения: при повторном открытии правки не выдают себя за сохранённые', async () => {
@@ -370,10 +371,10 @@ describe('модель списаний 07.11.2026: проверки беспл�
     expect(text()).not.toContain('за проверку')
   })
 
-  it('частота нового товара по умолчанию в окне «Добавить несколько» — 60, и подпись говорит «раз в 60 мин»', async () => {
+  it('частота нового товара по умолчанию в окне «Настроить несколько товаров» — 60, и подпись говорит «раз в 60 мин»', async () => {
     world.products = [product({ enabled: false }), product({ id: 'p2', product_name: 'Кабель', enabled: false })]
     await mount()
-    await click(byText('button', 'Добавить несколько'))
+    await click(byText('button', 'Настроить несколько товаров'))
     await click(byText('button', 'Чехол для телефона'))
     await click(byText('button', 'Кабель'))
     await click(byText('button', 'Далее'))
@@ -386,13 +387,13 @@ describe('модель списаний 07.11.2026: проверки беспл�
     expect(box?.textContent).not.toContain('70')
   })
 
-  it('«Применить сейчас» не показывает стоимости и не просит подтверждения: запуск сразу', async () => {
+  it('«Проверить сейчас» не показывает стоимости и не просит подтверждения: запуск сразу', async () => {
     world.products = [product(), product({ id: 'p2', product_name: 'Кабель' })]
     world.applyNow = { status: 202, body: { ok: true, count: 2, queued: 2 } }
     await mount()
     expect(text()).not.toContain('× 5 ₸')
     expect(document.body.querySelector('[data-testid="apply-now-reason"]')).toBeNull()
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(countCalls('POST', '/api/kaspi-shop/apply-now')).toBe(1)
     expect(byText('button', 'Продолжить')).toBeNull()
     expect(text()).not.toContain('спишется с баланса')
@@ -402,7 +403,7 @@ describe('модель списаний 07.11.2026: проверки беспл�
     world.products = [product(), product({ id: 'p2', product_name: 'Кабель' })]
     world.applyNow = { status: 202, body: { ok: true, count: 2, queued: 2 } }
     await mount()
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(text()).toContain('Проверка запущена: 2 товара.')
     expect(text()).toContain('несколько минут')
     expect(text()).toContain(NOTE)
@@ -413,14 +414,14 @@ describe('модель списаний 07.11.2026: проверки беспл�
   it('ответ без count не выдумывает цифры', async () => {
     world.applyNow = { status: 202, body: { ok: true } }
     await mount()
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(text()).toContain('Проверка запущена. Цены обновятся не сразу')
   })
 
   it('отказ сервера (например, кулдаун) показывает его слова', async () => {
     world.applyNow = { status: 429, body: { error: 'Проверку можно запускать раз в 10 минут' } }
     await mount()
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(text()).toContain('Проверку можно запускать раз в 10 минут')
   })
 
@@ -436,11 +437,11 @@ describe('модель списаний 07.11.2026: проверки беспл�
     expect(text()).not.toContain('Баланс заканчивается')
   })
 
-  it('пустой баланс: та же плашка, а «Применить сейчас» недоступна и объясняет почему', async () => {
+  it('пустой баланс: та же плашка, а «Проверить сейчас» недоступна и объясняет почему', async () => {
     world.wallet = okWallet({ balance: 0 })
     await mount()
     expect(text()).toContain('Баланс меньше 5 ₸: бот не сможет менять цены')
-    expect((byText('button', 'Применить сейчас') as HTMLButtonElement).disabled).toBe(true)
+    expect((byText('button', 'Проверить сейчас') as HTMLButtonElement).disabled).toBe(true)
     expect(document.body.querySelector('[data-testid="apply-now-reason"]')?.textContent).toContain('Баланс меньше 5 ₸')
   })
 
@@ -452,7 +453,7 @@ describe('модель списаний 07.11.2026: проверки беспл�
       expect(text()).not.toContain('Баланс меньше 5 ₸')
       expect(text()).not.toContain('Баланса хватит')
       expect(text()).not.toContain('Баланс заканчивается')
-      expect((byText('button', 'Применить сейчас') as HTMLButtonElement).disabled).toBe(false)
+      expect((byText('button', 'Проверить сейчас') as HTMLButtonElement).disabled).toBe(false)
       await act(async () => { root?.unmount() })
       host?.remove()
     }
@@ -485,38 +486,38 @@ describe('ui2: снятые с продажи и пауза', () => {
     product({ id: 'p3', product_name: 'Чехол снятый', available_for_sale: false }),
   ]
 
-  it('«Активных» и шапка считают только включённые товары в продаже (2 из 3), «Применить сейчас» сообщает то же число', async () => {
+  it('«Активных» и шапка считают только включённые товары в продаже (2 из 3), «Проверить сейчас» сообщает то же число', async () => {
     world.products = mixed()
     world.applyNow = { status: 202, body: { ok: true, count: 2, queued: 2 } }
     await mount()
     const card = statCard('Активных') || ''
     expect(card).toBe('2Активных')
     expect(document.body.querySelector('[data-testid="running-cost"]')?.textContent).toContain(NOTE)
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(text()).toContain('Проверка запущена: 2 товара.')
   })
 
-  it('все включённые сняты с продажи: «Активных» 0, плашки нет, «Применить сейчас» недоступна и называет причину', async () => {
+  it('все включённые сняты с продажи: «Активных» 0, плашки нет, «Проверить сейчас» недоступна и называет причину', async () => {
     world.products = [product({ available_for_sale: false })]
     world.wallet = okWallet({ balance: 0 })
     await mount()
     expect(text()).not.toContain('Баланс меньше 5 ₸')
     expect(statCard('Активных')).toBe('0Активных')
     expect(text()).toContain('Пока не запущен')
-    expect((byText('button', 'Применить сейчас') as HTMLButtonElement).disabled).toBe(true)
+    expect((byText('button', 'Проверить сейчас') as HTMLButtonElement).disabled).toBe(true)
     expect(document.body.querySelector('[data-testid="apply-now-reason"]')?.textContent).toContain('Нет включённых товаров в продаже')
   })
 
-  it('на паузе при включённых товарах: «Применить сейчас» недоступна с причиной; строка расхода говорит «не списывается»', async () => {
+  it('на паузе при включённых товарах: «Проверить сейчас» недоступна с причиной; строка расхода говорит «не списывается»', async () => {
     world.wallet = okWallet({ paused: true })
     await mount()
     const hero = document.body.querySelector('[data-testid="running-cost"]')?.textContent || ''
     expect(hero).toContain('на паузе')
     expect(hero).toContain('деньги не списываются')
     expect(hero).not.toContain(NOTE)
-    expect((byText('button', 'Применить сейчас') as HTMLButtonElement).disabled).toBe(true)
+    expect((byText('button', 'Проверить сейчас') as HTMLButtonElement).disabled).toBe(true)
     expect(document.body.querySelector('[data-testid="apply-now-reason"]')?.textContent).toContain('Демпинг на паузе')
-    await click(byText('button', 'Применить сейчас'))
+    await click(byText('button', 'Проверить сейчас'))
     expect(countCalls('POST', '/api/kaspi-shop/apply-now')).toBe(0)
   })
 })

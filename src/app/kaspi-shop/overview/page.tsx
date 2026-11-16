@@ -191,7 +191,7 @@ export default function KaspiShopOverview() {
           <div className="nav-glass rounded-2xl flex flex-wrap overflow-hidden">
             {kpi('Заказов в работе', ordersUnavailable ? '—' : inWork === null ? null : String(inWork),
               sessionExpired ? 'сессия Kaspi истекла' : ordersFailed ? 'не удалось получить из Kaspi' : counts ? `${counts[PACKING_STATUS] ?? 0} ждут упаковки` : 'загружаем из Kaspi')}
-            {kpi('Дешевле конкурентов', productsFailed ? '—' : winning === null || products === null ? null : `${winning} из ${products.length}`, productsFailed ? 'не удалось загрузить товары' : atFloor === null ? '' : `упёрлись в минимум: ${atFloor}${sessionExpired ? ' (данные на момент обрыва)' : ''}`)}
+            {kpi('Дешевле конкурентов', productsFailed ? '—' : winning === null || products === null ? null : `${winning} из ${products.length}`, productsFailed ? 'не удалось загрузить товары' : atFloor === null ? '' : `упёрлись в минимальную цену: ${atFloor}${sessionExpired ? ' (данные на момент обрыва)' : ''}`)}
             {kpi('Прибыль за 7 дней', profit === undefined ? null : profit === null ? '—' : money(profit.net), profit ? (profit.missingCogs > 0 ? 'у части товаров не указана себестоимость' : `выручка ${money(profit.revenue)}`) : profitFailed ? 'не удалось получить заказы из Kaspi' : 'после комиссии и расходов')}
           </div>
 

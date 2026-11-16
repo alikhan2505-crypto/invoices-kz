@@ -206,15 +206,18 @@ export type ProductSettingsResult =
 // понимаются, максимум обязан быть выше минимума. Сервер проверяет то же самое
 // ещё раз, это лишь быстрый и понятный отказ.
 export function validateProductSettings(v: ProductSettingsInput): ProductSettingsResult {
+  // Цены и шаг в целых тенге (решение основателя D3, 16.11.2026): «70 000,5» не сохраняется и не показывается
+  // как «70 000,5 ₸». Сервер округляет так же (checkFloorPrice и др. в productSettings.ts), здесь то же самое до отправки.
   const floor = parseMoneyInput(v.floorPrice)
   if (!floor.ok) return { ok: false, error: moneyParseMessage('Минимальная цена', floor) }
-  if (floor.value <= 0) return { ok: false, error: 'Минимальная цена должна быть больше нуля.' }
+  const floorValue = Math.round(floor.value)
+  if (floorValue <= 0) return { ok: false, error: 'Минимальная цена должна быть больше нуля.' }
 
   let max: number | null = null
   const maxParsed = parseMoneyInput(v.maxPrice)
   if (maxParsed.ok) {
-    max = maxParsed.value
-    if (max <= floor.value) return { ok: false, error: 'Максимальная цена должна быть больше минимальной.' }
+    max = Math.round(maxParsed.value)
+    if (max <= floorValue) return { ok: false, error: 'Максимальная цена должна быть больше минимальной.' }
   } else if (!maxParsed.blank) {
     return { ok: false, error: moneyParseMessage('Максимальная цена', maxParsed) }
   }
@@ -222,7 +225,7 @@ export function validateProductSettings(v: ProductSettingsInput): ProductSetting
   const step = parseMoneyInput(v.undercutStep)
   if (!step.ok) return { ok: false, error: moneyParseMessage('Шаг', step) }
 
-  return { ok: true, floor: floor.value, max, step: step.value }
+  return { ok: true, floor: floorValue, max, step: Math.round(step.value) }
 }
 
 export type BulkSettingsInput = ProductSettingsInput & { frequency: string }

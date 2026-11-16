@@ -55,17 +55,17 @@ beforeEach(() => {
 afterEach(async () => { vi.restoreAllMocks(); await unmountPage() })
 
 describe('Обзор: сбой товаров', () => {
-  it('товары загрузились: «1 из 2», «упёрлись в минимум: 1»', async () => {
+  it('товары загрузились: «1 из 2», «упёрлись в минимальную цену: 1»', async () => {
     await mountPage(OverviewPage)
     expect(pageText()).toContain('1 из 2')
-    expect(pageText()).toContain('упёрлись в минимум: 1')
+    expect(pageText()).toContain('упёрлись в минимальную цену: 1')
   })
 
   it('товары вернули 500: «—» и причина, а не «0 из 0»', async () => {
     routes['/api/kaspi-shop/products'] = () => json(500, { error: 'db down' })
     await mountPage(OverviewPage)
     expect(pageText()).not.toContain('0 из 0')
-    expect(pageText()).not.toContain('упёрлись в минимум: 0')
+    expect(pageText()).not.toContain('упёрлись в минимальную цену: 0')
     expect(pageText()).toContain('не удалось загрузить товары')
   })
 

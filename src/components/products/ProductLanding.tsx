@@ -25,6 +25,17 @@ const LANGS: { key: Lang; label: string }[] = [
 // Метки рекламы (utm_*, ref) переезжают вместе с кликом на вход: страница входа на другом
 // хосте (invoices.kz), и без этого регистрация с рекламы терялась бы без источника.
 const CARRY_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'ref']
+// Пришёл с рекламы (метки или клик Meta): на лендинге Kaspi Bot стрелку «← Все продукты» не показываем и «Тарифы» открываем в
+// новой вкладке, чтобы человек не уходил с воронки (решение основателя D7, 16.11.2026).
+const AD_PARAMS = [...CARRY_PARAMS, 'fbclid', 'igshid']
+function isAdVisit(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    return AD_PARAMS.some(k => !!q.get(k))
+  } catch {
+    return false
+  }
+}
 function withCarriedParams(href: string): string {
   try {
     const from = new URLSearchParams(window.location.search)
@@ -50,6 +61,9 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const { lang, setLang } = useLanguage()
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  // null до первого эффекта: стрелка держит место (прозрачная), чтобы вёрстка не прыгала, когда выяснится, что это реклама.
+  const [adVisit, setAdVisit] = useState<boolean | null>(null)
+  useEffect(() => { setAdVisit(isAdVisit()) }, [])
   const l = LANDINGS[landing]
   const p = PRODUCTS.find((x) => x.key === l.product)!
   const ui = LANDING_UI[lang]
@@ -112,7 +126,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
       {l.priceNote && (
         <p className="lp-price">
           <span>{l.priceNote[lang]}</span>{' '}
-          <a href={PRICING_URL}><span>{ui.pricing}</span><span aria-hidden="true">{'\u00A0→'}</span></a>
+          <a href={PRICING_URL} {...(landing === 'kaspi' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}><span>{ui.pricing}</span><span aria-hidden="true">{'\u00A0→'}</span></a>
         </p>
       )}
     </div>
@@ -123,7 +137,9 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
       <div className="lp-top">
         {/* На узком телефоне подпись прячется (остаётся «←»), чтобы назад, язык
             и вход уместились в одну строку; aria-label держит имя ссылки. */}
-        <a className="lp-back" href="https://invoices.kz/products" aria-label={ui.allProducts}><span>←<span className="lp-back-txt"> {ui.allProducts}</span></span></a>
+        {landing === 'kaspi' && adVisit
+          ? null
+          : <a className="lp-back" href="https://invoices.kz/products" aria-label={ui.allProducts} style={landing === 'kaspi' && adVisit === null ? { visibility: 'hidden' } : undefined}><span>←<span className="lp-back-txt"> {ui.allProducts}</span></span></a>}
         <span style={{ flex: 1 }} />
         {/* Язык — слева от «Войти», не справа (правило основателя). */}
         <div className="lp-lang" role="group" aria-label="Language">

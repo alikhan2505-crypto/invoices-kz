@@ -220,11 +220,11 @@ function PriceLadder({ own, competitor, floor, maxPrice, enabled }: { own: numbe
         />
       </div>
       <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-        <span>Минимум {floor.toLocaleString('ru-KZ')} ₸</span>
+        <span>Минимальная цена {floor.toLocaleString('ru-KZ')} ₸</span>
         {atFloor && (enabled
-          ? <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Упёрлись в минимум</span>
+          ? <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Достигнута</span>
           // Товар ещё не включён: минимум просто равен цене с момента импорта. Это не тревога, а «не настроено».
-          : <span>Минимум не задан</span>)}
+          : <span>Не настроена</span>)}
         {competitor !== null && <span>Конкурент {competitor.toLocaleString('ru-KZ')} ₸</span>}
         {maxPrice !== null && <span>Потолок {maxPrice.toLocaleString('ru-KZ')} ₸</span>}
       </div>
@@ -1424,7 +1424,7 @@ export default function KaspiShop() {
             </div>
             <ol className={`text-[13px] space-y-1.5 mb-4 list-decimal pl-5 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
               <li><b>Задайте минимальную цену</b>: ниже неё бот цену не опустит. Сейчас у товаров минимум равен цене, и снижать некуда.</li>
-              <li><b>Включите товары</b>: массовое окно задаёт минимум и сразу включает выбранные.</li>
+              <li><b>Включите товары</b>: окно «Настроить несколько товаров» задаёт минимальную цену и сразу включает выбранные.</li>
               <li>
                 <b>Проверьте баланс</b>: на нём {Number.isFinite(Number(balance)) ? Number(balance).toLocaleString('ru-KZ') : balance} ₸. Проверки цен бесплатны, 5 ₸ берётся только за каждое изменение цены ботом.
               </li>
@@ -1454,7 +1454,7 @@ export default function KaspiShop() {
             <p className={`text-[13px] ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
               При подключении магазина минимум выставляется равным текущей цене — чтобы бот ничего не уронил без
               вашего ведома. Но пока минимум равен цене, <b>снижать некуда: демпинг не сможет обойти конкурента</b>.
-              Задайте минимум ниже текущей цены — по одному товару или сразу всем через массовое изменение.
+              Задайте минимум ниже текущей цены — по одному товару или сразу всем через «Настроить несколько товаров».
               Посчитать безопасный минимум можно в <a href="/kaspi-shop/margin" style={{ color: 'var(--nav-accent)' }}>калькуляторе маржи</a>.
             </p>
           </div>
@@ -1468,7 +1468,7 @@ export default function KaspiShop() {
                 </div>
                 <div>
                   <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-critical)' }}>{atFloorCount}</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>упёрлись в минимум</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>упёрлись в минимальную цену</div>
                 </div>
                 <div>
                   <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{balance.toLocaleString('ru-KZ')}</div>
@@ -1556,12 +1556,12 @@ export default function KaspiShop() {
                 </button>
                 <button onClick={openBulkAdd}
                   className="nav-glass text-xs font-semibold rounded-full px-4 py-2 min-h-[44px] transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
-                  Добавить несколько
+                  Настроить несколько товаров
                 </button>
                 <button onClick={applyNow} disabled={applyingNow || !stats || applyBlockReason !== null}
                   className="text-xs font-semibold rounded-full px-4 py-2 min-h-[44px] flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {applyingNow ? 'Проверяем...' : 'Применить сейчас'}
+                  {applyingNow ? 'Проверяем...' : 'Проверить сейчас'}
                 </button>
               </div>
             </div>
@@ -1569,7 +1569,7 @@ export default function KaspiShop() {
               <div role="status" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
             ) : stats && applyBlockReason ? (
               <div data-testid="apply-now-reason" className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
-                {`«Применить сейчас» недоступна. ${applyBlockReason}`}
+                {`«Проверить сейчас» недоступна. ${applyBlockReason}`}
               </div>
             ) : null}
 
@@ -1602,7 +1602,7 @@ export default function KaspiShop() {
                     <option value="all">{`Все (${productCounts.all})`}</option>
                     <option value="active">{`Включены (${productCounts.active})`}</option>
                     <option value="paused">{`На паузе (${productCounts.paused})`}</option>
-                    <option value="floor">{`Упёрлись в минимум (${productCounts.floor})`}</option>
+                    <option value="floor">{`Упёрлись в минимальную цену (${productCounts.floor})`}</option>
                     <option value="offsale">{`Сняты с продажи (${productCounts.offsale})`}</option>
                   </select>
                   <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--nav-text-muted)' }}>
@@ -1761,7 +1761,7 @@ export default function KaspiShop() {
                         </div>
                               <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
                                 Сейчас на Kaspi: <b className="tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</b>
-                                {p.last_competitor_price !== null && <> · у лидера: <b className="tabular-nums">{p.last_competitor_price.toLocaleString('ru-KZ')} ₸</b></>}
+                                {p.last_competitor_price !== null && <> · у самого дешёвого: <b className="tabular-nums">{p.last_competitor_price.toLocaleString('ru-KZ')} ₸</b></>}
                               </div>
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
@@ -1982,7 +1982,7 @@ export default function KaspiShop() {
 
               <div className="flex items-center justify-between gap-3 mb-1">
                 <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
-                  {bulkStep === 'select' ? 'Добавить несколько' : 'Общие настройки'}
+                  {bulkStep === 'select' ? 'Настроить несколько товаров' : 'Общие настройки'}
                 </div>
                 <button onClick={() => setBulkOpen(false)} aria-label="Закрыть" className="min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center" style={{ color: 'var(--nav-text-muted)' }}><XIcon size={16} /></button>
               </div>

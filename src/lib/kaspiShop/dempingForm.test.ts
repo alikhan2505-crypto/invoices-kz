@@ -288,9 +288,13 @@ describe('validateProductSettings', () => {
     expect(validateProductSettings({ ...base, floorPrice: '-5' }).ok).toBe(false)
   })
 
-  it('запятая и пробелы в числах', () => {
+  it('запятая и пробелы в числах; копейки округляются до целых тенге (D3)', () => {
     expect(validateProductSettings({ floorPrice: '1 250,5', maxPrice: '2 000', undercutStep: '50,5' }))
-      .toEqual({ ok: true, floor: 1250.5, max: 2000, step: 50.5 })
+      .toEqual({ ok: true, floor: 1251, max: 2000, step: 51 })
+  })
+
+  it('минимальная цена меньше тенге после округления: отказ', () => {
+    expect(validateProductSettings({ ...base, floorPrice: '0,4' })).toEqual({ ok: false, error: 'Минимальная цена должна быть больше нуля.' })
   })
 
   it('максимум должен быть выше минимума', () => {

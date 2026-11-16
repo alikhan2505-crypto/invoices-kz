@@ -5,6 +5,7 @@ import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listCatalogWithStatus, fetchOffersDetailsChecked, extractOfferPointInfo, totalStock, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 import { DEFAULT_CHECK_FREQUENCY } from '@/lib/kaspiShop/productSettings'
+import { defaultUndercutStep } from '@/lib/kaspiShop/defaultStep'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -287,7 +288,7 @@ export async function POST(req: NextRequest) {
             stock_count: 0,
             own_current_price: offer.minPrice,
             floor_price: offer.minPrice,
-            undercut_step: 100,
+            undercut_step: defaultUndercutStep(offer.minPrice),
             check_frequency_minutes: DEFAULT_CHECK_FREQUENCY,
             enabled: false,
             available_for_sale: true,

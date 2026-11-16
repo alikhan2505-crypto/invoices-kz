@@ -157,6 +157,13 @@ describe('importCatalogProducts: частота проверки новых то
     expect(inserts[0].enabled).toBe(false)
   })
 
+  it('a NEW product gets the default step: 0,1% of the price, not less than 1 tenge (D3, 16.11.2026)', async () => {
+    listCatalogWithStatus.mockResolvedValue(okList([{ ...offer('a'), minPrice: 78990 }, { ...offer('b'), minPrice: 190 }]))
+    fetchOffersDetailsChecked.mockResolvedValue({ items: [], okSkus: new Set(), ok: false, sessionExpired: false })
+    await importCatalogProducts('conn', 'user', 'cookie', 'm')
+    expect(inserts.map(i => i.undercut_step).sort((x, y) => Number(x) - Number(y))).toEqual([1, 79])
+  })
+
   it('an EXISTING product keeps its own frequency: the import does not touch it', async () => {
     tables.tracked.push({ id: 'old', kaspi_master_sku: 'Ma', check_frequency_minutes: 15 })
     listCatalogWithStatus.mockResolvedValue(okList([offer('a')]))
