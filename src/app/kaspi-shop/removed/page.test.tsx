@@ -102,8 +102,10 @@ function byText(selector: string, needle: string): HTMLElement | null {
 }
 // Поле цены/остатка точки: блок точки находим по подписи «город · код».
 function pointInputs(label: string): { price: HTMLInputElement; stock: HTMLInputElement } {
+  // В окне код точки показан как «Точка N» (M15): PP1 -> «Точка 1».
+  const shown = label.replace(/^PP/, 'Точка ')
   const block = (Array.from(document.body.querySelectorAll('div.rounded-xl')) as HTMLElement[])
-    .find(d => (d.querySelector('.text-xs.font-semibold')?.textContent || '').includes(label))
+    .find(d => (d.querySelector('.text-xs.font-semibold')?.textContent || '').includes(shown))
   if (!block) throw new Error(`point ${label} not found`)
   const inputs = block.querySelectorAll('input')
   return { price: inputs[0] as HTMLInputElement, stock: inputs[1] as HTMLInputElement }
@@ -287,5 +289,26 @@ describe('K24: «Цена и остатки» сохраняет по город
     await type(pointInputs('PP3').price, '1400')
     await click(byText('button', 'Сохранить изменения'))
     expect(pointInputs('PP2').price.value).toBe('1500')
+  })
+})
+
+describe('M15: первый экран и окно «Цена и остатки» без технических деталей', () => {
+  it('вводный текст и фото товаров свёрнуты в строки, поиск и список доступны сразу', async () => {
+    await mount()
+    for (const id of ['removed-intro', 'removed-photos']) {
+      const d = document.body.querySelector(`details[data-testid="${id}"]`) as HTMLDetailsElement | null
+      expect(d, id).not.toBeNull()
+      expect(d!.open).toBe(false)
+    }
+    expect(document.body.querySelector('input[placeholder^="Поиск"]')).not.toBeNull()
+  })
+
+  it('точка показана как «Город · Точка N», а не кодом; есть предупреждение про демпинг', async () => {
+    await mount()
+    await openModal()
+    expect(text()).toContain('Алматы · Точка 1')
+    expect(text()).toContain('Астана · Точка 3')
+    expect(text()).not.toContain('PP1')
+    expect(document.body.querySelector('[data-testid="stock-modal-dumping-note"]')?.textContent).toContain('демпинг')
   })
 })

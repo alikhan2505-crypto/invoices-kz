@@ -152,6 +152,13 @@ type AddModalState = {
   saved: boolean
 }
 
+// Код точки Kaspi («1_PP1», «PP3») в окне «Цена и остатки» продавцу ничего не говорит (M15).
+// Названия склада в данных Kaspi нет, поэтому показываем «Точка N», а нераспознанный код как есть.
+function pointLabel(storeCode: string): string {
+  const m = /(?:^|_)PP(\d+)$/i.exec(storeCode)
+  return m ? `Точка ${m[1]}` : storeCode
+}
+
 export default function KaspiShopProductAvailability() {
   // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
   usePageDocumentTitle('Управление товарами')
@@ -717,21 +724,35 @@ export default function KaspiShopProductAvailability() {
 
       <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
         <PageHeader title="Управление товарами" />
+        {/* M15 (прогон воронки 07.11): на телефоне вводный текст и блок «Фото товаров» занимали
+            больше половины первого экрана, список товаров начинался ниже. Оба свёрнуты в строки. */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <p className={`text-sm ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
-            Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
-            обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
-            выключается, чтобы репрайсер случайно не вернул его в продажу.
-          </p>
+          className="mb-3">
+          <details className="group nav-glass rounded-2xl" data-testid="removed-intro">
+            <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden"
+              style={{ color: 'var(--nav-text-primary)' }}>
+              Как работает снятие с продажи
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l5 5 5-5" /></svg>
+            </summary>
+            <p className={`px-4 pb-4 text-sm ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-secondary)' }}>
+              Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
+              обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
+              выключается, чтобы репрайсер случайно не вернул его в продажу.
+            </p>
+          </details>
         </motion.div>
 
         {/* Product photos. The agent can attach one to a reply, but image_url
             is otherwise only filled off order items -- so a product gets a
             picture after it sells and not before. This takes them from Kaspi's
             catalogue instead. */}
-        <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
-          <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Фото товаров</div>
+        <details className="group nav-glass rounded-2xl mb-4" data-testid="removed-photos">
+          <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden"
+            style={{ color: 'var(--nav-text-primary)' }}>
+            Фото товаров для ИИ-агента
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l5 5 5-5" /></svg>
+          </summary>
+          <div className="px-4 pb-4 lg:px-5">
           <p className={`text-[13px] mb-3 ${PROSE_WIDE_CLS}`} style={{ color: 'var(--nav-text-muted)' }}>
             Загружает фотографии из карточек Kaspi для товаров, у которых их ещё нет. Нужны, чтобы ИИ-агент
             мог прислать клиенту фото товара. За один раз обрабатывается 20 товаров — нажимайте, пока не
@@ -752,7 +773,8 @@ export default function KaspiShopProductAvailability() {
             )}
           </div>
           {photoError && <div className="text-[13px] mt-2" style={{ color: 'var(--nav-critical)' }}>{photoError}</div>}
-        </div>
+          </div>
+        </details>
 
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-1.5">
@@ -918,6 +940,9 @@ export default function KaspiShopProductAvailability() {
               <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
                 Как в кабинете Kaspi: цена и остаток по каждой точке. Остаток можно оставить пустым — товар останется в продаже без учёта остатков.
               </p>
+              <p className="text-[11px] mb-4" data-testid="stock-modal-dumping-note" style={{ color: 'var(--nav-text-muted)' }}>
+                Если у товара включён демпинг, бот может позже сменить цену, которую вы укажете здесь.
+              </p>
 
               {stockModal.loading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем точки…</div>}
 
@@ -930,7 +955,7 @@ export default function KaspiShopProductAvailability() {
               {stockModal.entries.map(e => (
                 <div key={e.storeCode} className="rounded-xl p-3 mb-2" style={{ background: 'var(--nav-bg)' }}>
                   <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
-                    {e.cityName ? `${e.cityName} · ` : ''}{e.storeCode}
+                    {e.cityName ? `${e.cityName} · ` : ''}{pointLabel(e.storeCode)}
                     {!e.cityId && <span className="font-normal" style={{ color: 'var(--nav-text-muted)' }}> — город не распознан, сохранение недоступно</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
