@@ -18,13 +18,14 @@ import { useWalletRefresh } from '@/lib/walletSignal'
 import { useKaspiMenuCounts } from '@/lib/kaspiShop/useMenuCounts'
 import { menuCountKeyForHref } from '@/lib/kaspiShop/menuCounts'
 import MenuCountBadge from '@/components/MenuCountBadge'
+import { splitMenuLinks } from '@/lib/kaspiShop/menuGroups'
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 
-const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string; soon: string }> = {
-  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт', soon: 'скоро' },
-  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Балансты толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған', notifications: 'Хабарландырулар', help: 'Көмек', account: 'Аккаунт', soon: 'жақында' },
-  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up balance', connected: 'Store connected', notConnected: 'Store not connected', notifications: 'Notifications', help: 'Help', account: 'Account', soon: 'soon' },
+const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string; soon: string; more: string }> = {
+  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт', soon: 'скоро', more: 'Ещё' },
+  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Балансты толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған', notifications: 'Хабарландырулар', help: 'Көмек', account: 'Аккаунт', soon: 'жақында', more: 'Тағы' },
+  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up balance', connected: 'Store connected', notConnected: 'Store not connected', notifications: 'Notifications', help: 'Help', account: 'Account', soon: 'soon', more: 'More' },
 }
 
 function openUtility(panel: 'notifications' | 'help' | 'account') {
@@ -97,6 +98,12 @@ export default function ProductShell({ product, children }: { product: ProductKe
   // магазина (иначе ни одного запроса). Открытие шторки тоже проверяет свежесть.
   const menuCounts = useKaspiMenuCounts(product === 'kaspiShop' && storeLive, path, open)
 
+  // Что видно сразу, а что в «Ещё» (D1, 16.11.2026). Страница из «Ещё» раскрывает группу сама; ручное
+  // раскрытие/сворачивание перекрывает авто, пока человек остаётся в этом разделе.
+  const split = splitMenuLinks(links, { counts: menuCounts, isAdmin, activeHref: bestMatch })
+  const [moreToggle, setMoreToggle] = useState<boolean | null>(null)
+  const moreOpen = moreToggle ?? split.moreOpenByDefault
+
   const switchable = PRODUCTS.filter((p) => !p.locked && p.key !== 'salon' && (p.adminOnly ? isAdmin : (mine === null ? SELECTABLE_KEYS.includes(p.key) : mine.includes(p.key) || p.key === product)))
 
   // The top pill drops its own balance button while a shell is on screen (CSS keys off this class).
@@ -160,6 +167,34 @@ export default function ProductShell({ product, children }: { product: ProductKe
       ? <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-border)' }} aria-hidden="true" />
       : <span className="shell-dot" data-state={dotState} title={dotTitle} role="img" aria-label={dotTitle} />
 
+  const renderLink = (l: (typeof links)[number]) => {
+    const active = l.href === bestMatch
+    // Link, а не <a>: переход между разделами без перезагрузки страницы: меню и шапка остаются, меняется только правая часть.
+    const countKey = product === 'kaspiShop' ? menuCountKeyForHref(l.href) : null
+    return (
+      <Link
+        key={l.href}
+        href={l.href}
+        prefetch={linkPrefetch(l.href, hostname, BASE_DOMAIN)}
+        data-tour={l.href.slice(1).replace(/\//g, '-')}
+        onClick={() => setOpen(false)}
+        aria-current={active ? 'page' : undefined}
+        className="flex items-center gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors"
+        style={{
+          background: active ? 'var(--nav-accent-soft, var(--nav-surface-glass))' : 'transparent',
+          color: active ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
+        }}
+      >
+        {countKey ? (
+          <>
+            <span className="flex-1 min-w-0 truncate">{l.label[lang]}</span>
+            <MenuCountBadge count={menuCounts[countKey]} active={active} />
+          </>
+        ) : (product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
+      </Link>
+    )
+  }
+
   const panel = (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 pt-4 pb-3 flex-shrink-0 space-y-3">
@@ -202,47 +237,23 @@ export default function ProductShell({ product, children }: { product: ProductKe
       </div>
 
       <nav aria-label={def.name} className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-2 pb-3">
-        {links.map((l) => {
-          const active = l.href === bestMatch
-          if ('soon' in l && l.soon) {
-            return (
-              <span
-                key={l.href}
-                aria-disabled="true"
-                className="flex items-center justify-between gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 cursor-not-allowed select-none"
-                style={{ color: 'var(--nav-text-secondary)', opacity: 0.55 }}
-              >
-                {l.label[lang]}
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)' }}>{t.soon}</span>
-              </span>
-            )
-          }
-          // Link, а не <a>: переход между разделами без перезагрузки
-          // страницы -- меню и шапка остаются, меняется только правая часть.
-          const countKey = product === 'kaspiShop' ? menuCountKeyForHref(l.href) : null
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              prefetch={linkPrefetch(l.href, hostname, BASE_DOMAIN)}
-              data-tour={l.href.slice(1).replace(/\//g, '-')}
-              onClick={() => setOpen(false)}
-              aria-current={active ? 'page' : undefined}
-              className="flex items-center gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors"
-              style={{
-                background: active ? 'var(--nav-accent-soft, var(--nav-surface-glass))' : 'transparent',
-                color: active ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
-              }}
+        {split.primary.map(renderLink)}
+        {split.more.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setMoreToggle(!moreOpen)}
+              aria-expanded={moreOpen}
+              aria-controls="shell-more-links"
+              className="flex w-full items-center justify-between gap-2 min-h-[44px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ color: 'var(--nav-text-secondary)' }}
             >
-              {countKey ? (
-                <>
-                  <span className="flex-1 min-w-0 truncate">{l.label[lang]}</span>
-                  <MenuCountBadge count={menuCounts[countKey]} active={active} />
-                </>
-              ) : (product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
-            </Link>
-          )
-        })}
+              <span>{t.more}</span>
+              <span aria-hidden="true" style={{ display: 'inline-flex', transform: moreOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}><Chevron /></span>
+            </button>
+            {moreOpen && <div id="shell-more-links">{split.more.map(renderLink)}</div>}
+          </>
+        )}
       </nav>
 
       <div className="px-3 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--nav-border)' }}>

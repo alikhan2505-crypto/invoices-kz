@@ -47,6 +47,8 @@ const KASPI_TEXT = {
     goToKaspi: 'Подключить магазин Kaspi',
     basicNoKaspi: 'Kaspi Bot в этот тариф не входит',
     proForKaspi: 'Для Kaspi Bot',
+    havePromo: 'Есть промокод?',
+    showAllFeatures: 'Показать всё',
     payHere: 'Оплата в Kaspi',
     payHint: 'Нажмите «Открыть Kaspi», оплатите и вернитесь на эту страницу: она сама увидит оплату.',
   },
@@ -54,6 +56,8 @@ const KASPI_TEXT = {
     goToKaspi: 'Kaspi дүкенін қосу',
     basicNoKaspi: 'Kaspi Bot бұл тарифке кірмейді',
     proForKaspi: 'Kaspi Bot үшін',
+    havePromo: 'Промокод бар ма?',
+    showAllFeatures: 'Барлығын көрсету',
     payHere: 'Kaspi-де төлеу',
     payHint: '«Kaspi ашу» батырмасын басып, төлеңіз де осы бетке оралыңыз: бет төлемді өзі көреді.',
   },
@@ -61,6 +65,8 @@ const KASPI_TEXT = {
     goToKaspi: 'Connect your Kaspi store',
     basicNoKaspi: 'Kaspi Bot is not included in this plan',
     proForKaspi: 'For Kaspi Bot',
+    havePromo: 'Have a promo code?',
+    showAllFeatures: 'Show all',
     payHere: 'Pay in Kaspi',
     payHint: 'Tap “Open Kaspi”, pay and come back to this page: it will see the payment by itself.',
   },
@@ -365,6 +371,9 @@ export default function Upgrade() {
   const baselineExpiresRef = useRef<number>(0)
 
   const [kaspiBack, setKaspiBack] = useState<string | null>(null)
+  // D9 (16.11.2026): у пришедшего из Kaspi Bot промокод свёрнут в ссылку, а список Про короче, чтобы кнопка оплаты была на первом экране.
+  const [promoOpen, setPromoOpen] = useState(false)
+  const [proFeaturesOpen, setProFeaturesOpen] = useState(false)
   // Встроенный браузер Instagram / Facebook: автопереход на pay.kaspi.kz там легко оставляет человека
   // в тупике, поэтому вместо него явная кнопка «Открыть Kaspi».
   const [inApp, setInApp] = useState(false)
@@ -1004,6 +1013,13 @@ export default function Upgrade() {
     setShowModal(false)
   }
 
+  // Для пришедшего из Kaspi Bot строка про Kaspi Bot идёт первой, и список короче (D9, 16.11.2026).
+  const kaspiFeatureIdx = t.proFeatures.findIndex(f => f.includes('Kaspi Bot'))
+  const proFeaturesOrdered = kaspiBack && kaspiFeatureIdx > 0
+    ? [t.proFeatures[kaspiFeatureIdx], ...t.proFeatures.filter((_, i) => i !== kaspiFeatureIdx)]
+    : t.proFeatures
+  const proFeaturesShown = kaspiBack && !proFeaturesOpen ? proFeaturesOrdered.slice(0, 5) : proFeaturesOrdered
+
   const suffixFor = (p: BillingPeriod | undefined) => p === 'annual' ? t.perYearSuffix : t.perMonthSuffix
   const priceSuffix = suffixFor(period)
 
@@ -1044,6 +1060,16 @@ export default function Upgrade() {
               <p className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.heroSubtitle}</p>
             </div>
 
+            {kaspiBack && !promoOpen && !promoError && !promoSuccess ? (
+              <p className="text-center mb-4">
+                <button type="button" onClick={() => setPromoOpen(true)}
+                  className="min-h-[44px] px-3 text-sm font-medium underline underline-offset-2"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  {KASPI_TEXT[lang].havePromo}
+                </button>
+              </p>
+            ) : (
+              <>
             {/* Promo */}
             {/* One line on a computer (label · field · button) to keep the
                 plan row above the fold; label on top on a phone. */}
@@ -1074,6 +1100,8 @@ export default function Upgrade() {
               {promoError && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }} role="alert">{promoError}</p>}
               {promoSuccess && <p className="text-xs mt-2 font-medium" style={{ color: 'var(--nav-success)' }} role="status">{promoSuccess}</p>}
             </div>
+              </>
+            )}
 
             {walletBalance > 0 && (
               <div className="nav-glass flex items-center justify-between gap-3 rounded-2xl px-4 py-3 mb-4 text-sm">
@@ -1161,7 +1189,14 @@ export default function Upgrade() {
               <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>
                 {PLAN_PRICES.pro[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal" style={{ color: 'var(--nav-text-muted)' }}>{priceSuffix}</span>
               </div>
-              <FeatureList items={t.proFeatures} />
+              <FeatureList items={proFeaturesShown} />
+              {kaspiBack && !proFeaturesOpen && t.proFeatures.length > 5 && (
+                <button type="button" onClick={() => setProFeaturesOpen(true)}
+                  className="mt-2 min-h-[44px] text-sm font-medium underline underline-offset-2"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  {KASPI_TEXT[lang].showAllFeatures}
+                </button>
+              )}
               <div className="mt-6">
                 {basicCredit > 0 && (
                   <p className="text-center text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.basicCreditNote(basicCredit)}</p>

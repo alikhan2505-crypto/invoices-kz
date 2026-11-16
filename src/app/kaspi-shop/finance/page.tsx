@@ -247,7 +247,7 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
 
 export default function KaspiShopFinance() {
   // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
-  usePageDocumentTitle('Финансы')
+  usePageDocumentTitle('Аналитика продаж')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>({ kind: 'days', days: 30 })
@@ -319,7 +319,7 @@ export default function KaspiShopFinance() {
       <SiteNav />
 
       <PageContainer variant="full" className="flex-1 min-w-0 pb-6">
-        <PageHeader title="Финансы" subtitle="Выручка" />
+        <PageHeader title="Аналитика продаж" subtitle="Выручка" />
         {summary?.sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (

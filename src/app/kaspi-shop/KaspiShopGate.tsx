@@ -12,6 +12,7 @@ import { kaspiShopGateState, type ProGateState } from '@/lib/proGate'
 import { PLAN_PRICES } from '@/lib/plans/pricing'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { useEffectivePath } from '@/lib/useEffectivePath'
+import { SECTIONS } from '@/components/SiteNav'
 
 // Единая Про-стена Kaspi Bot (17.10.2026). Раньше каждая из 18 страниц раздела
 // после загрузки меню и заставки молча делала router.push('/upgrade'). Теперь
@@ -55,14 +56,19 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
   const lapsed = state === 'lapsed'
   // Путь назад -- только раздел Kaspi Bot (isSafeBack в crossProduct).
   const back = path === '/kaspi-shop' || path.startsWith('/kaspi-shop/') ? path : '/kaspi-shop'
+  // D8 (16.11.2026): стена одна на все страницы раздела, но заголовок называет раздел, куда человек шёл («Заказы»,
+  // «Возвраты»), чтобы это не выглядело как одна и та же заглушка на каждый пункт меню.
+  const sectionLabel = SECTIONS.find(s => s.key === 'kaspiShop')?.links
+    .filter(l => path === l.href || path.startsWith(l.href + '/'))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.label[lang]
   return (
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <PageContainer variant="narrow">
-          <PageHeader title="Kaspi Bot" />
+          <PageHeader title={sectionLabel ?? 'Kaspi Bot'} />
           {/* ProGateCard (общий компонент) в режиме start сам прижат влево; на десктопе
               центрируем его оберткой, на телефоне ничего не меняется. */}
-          <div className="lg:flex lg:justify-center">
+          <div className="lg:flex lg:flex-col lg:items-center">
           <ProGateCard
             align="start"
             title={lapsed ? t.lapsedTitle : t.title}
@@ -77,6 +83,11 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
               </ul>
             )}
           />
+          {!lapsed && (
+            <p className="mt-3 text-sm text-center">
+              <a href="https://kaspi.invoices.kz/" className="inline-flex items-center min-h-[44px] underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>{t.whatIncluded}</a>
+            </p>
+          )}
           </div>
         </PageContainer>
       </main>

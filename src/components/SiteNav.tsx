@@ -47,20 +47,22 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
 
 // soon: пункт виден, но неактивен (серый, «скоро») -- 15.10.2026 так
 // выключена Витрина до доработки, по решению основателя.
-const kaspiShopLinks: { href: string; label: LocalizedLabel; soon?: boolean }[] = [
+// more: пункт живёт в свёрнутой группе «Ещё» (решение основателя D1, 16.11.2026): на старте виден минимум, а пункт
+// с числом «ждёт действия» (Возвраты, Нераспознанные) выходит наверх сам. Разбор в src/lib/kaspiShop/menuGroups.ts.
+const kaspiShopLinks: { href: string; label: LocalizedLabel; soon?: boolean; more?: boolean }[] = [
   { href: '/kaspi-shop/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
   { href: '/kaspi-shop/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
-  { href: '/kaspi-shop/refunds', label: { ru: 'Возвраты', kk: 'Қайтарулар', en: 'Refunds' } },
-  { href: '/kaspi-shop/finance', label: { ru: 'Финансы', kk: 'Қаржы', en: 'Finance' } },
-  { href: '/kaspi-shop/pending-products', label: { ru: 'Нераспознанные товары', kk: 'Танылмаған тауарлар', en: 'Unmatched products' } },
-  { href: '/kaspi-shop/removed', label: { ru: 'Управление товарами', kk: 'Тауарларды басқару', en: 'Product management' } },
-  { href: '/kaspi-shop/niches', label: { ru: 'Ниши', kk: 'Нишалар', en: 'Niches' } },
-  { href: '/kaspi-shop/profit', label: { ru: 'Прибыль', kk: 'Пайда', en: 'Profit' } },
+  { href: '/kaspi-shop/refunds', label: { ru: 'Возвраты', kk: 'Қайтарулар', en: 'Refunds' }, more: true },
+  { href: '/kaspi-shop/finance', label: { ru: 'Аналитика продаж', kk: 'Сатылым аналитикасы', en: 'Sales analytics' }, more: true },
+  { href: '/kaspi-shop/pending-products', label: { ru: 'Нераспознанные товары', kk: 'Танылмаған тауарлар', en: 'Unmatched products' }, more: true },
+  { href: '/kaspi-shop/removed', label: { ru: 'Управление товарами', kk: 'Тауарларды басқару', en: 'Product management' }, more: true },
+  { href: '/kaspi-shop/niches', label: { ru: 'Ниши', kk: 'Нишалар', en: 'Niches' }, more: true },
+  { href: '/kaspi-shop/profit', label: { ru: 'Прибыль', kk: 'Пайда', en: 'Profit' }, more: true },
   { href: '/kaspi-shop/margin', label: { ru: 'Калькулятор маржи', kk: 'Маржа калькуляторы', en: 'Margin calculator' } },
-  { href: '/kaspi-shop/reviews', label: { ru: 'Отзывы', kk: 'Пікірлер', en: 'Reviews' } },
-  { href: '/kaspi-shop/quality', label: { ru: 'Качество', kk: 'Сапа', en: 'Quality' } },
-  { href: '/kaspi-shop/nkt', label: { ru: 'Нац. каталог (НКТ)', kk: 'ҰТК каталогы', en: 'National catalog (NKT)' } },
+  { href: '/kaspi-shop/reviews', label: { ru: 'Отзывы', kk: 'Пікірлер', en: 'Reviews' }, more: true },
+  { href: '/kaspi-shop/quality', label: { ru: 'Качество', kk: 'Сапа', en: 'Quality' }, more: true },
+  { href: '/kaspi-shop/nkt', label: { ru: 'Нац. каталог (НКТ)', kk: 'ҰТК каталогы', en: 'National catalog (NKT)' }, more: true },
   { href: '/kaspi-shop/storefront', label: { ru: 'Витрина', kk: 'Витрина', en: 'Storefront' }, soon: true },
   { href: '/kaspi-shop/storefront-orders', label: { ru: 'Заказы витрины', kk: 'Витрина тапсырыстары', en: 'Storefront orders' }, soon: true },
 ]
@@ -119,7 +121,7 @@ const cfoLinks: { href: string; label: LocalizedLabel; family?: LocalizedLabel }
 // to the section.
 export type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'cfo'
-  links: { href: string; label: LocalizedLabel; family?: LocalizedLabel; soon?: boolean }[]
+  links: { href: string; label: LocalizedLabel; family?: LocalizedLabel; soon?: boolean; more?: boolean }[]
   adminOnly: boolean
   // Unlocked for an active Pro plan too, not just admins (2026-09-02
   // AI-агент, 2026-09-03 Kaspi Bot) -- only meaningful when adminOnly is

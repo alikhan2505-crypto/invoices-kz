@@ -9,6 +9,8 @@ export type ProGateDict = {
   lapsedTitle: string
   lapsedText: string
   lapsedCta: string
+  // Ссылка под карточкой на лендинг Kaspi Bot (D8, 16.11.2026): что именно входит в Про.
+  whatIncluded: string
   // Что человек получает и что будет дальше (07.11.2026, прогон воронки Kaspi: на стене не было ни цены,
   // ни слова про кошелёк и следующий шаг). Цену подставляет вызывающий из PLAN_PRICES.
   facts: (price: string) => string[]
@@ -22,6 +24,7 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Продлите Про, чтобы Kaspi Bot снова работал',
     lapsedText: 'Пока тариф не продлён, Kaspi Bot не меняет цены в вашем магазине, а разделы закрыты. После продления доступ вернётся.',
     lapsedCta: 'Продлить Про',
+    whatIncluded: 'Что входит в Про',
     facts: (price) => [
       `Тариф Про: ${price} в месяц. В него входит весь кабинет магазина Kaspi.`,
       'Проверки цен бесплатны. 5 ₸ из кошелька берётся только за каждое изменение цены ботом.',
@@ -35,6 +38,7 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Kaspi Bot қайта жұмыс істеуі үшін Про тарифін ұзартыңыз',
     lapsedText: 'Тариф ұзартылмайынша, Kaspi Bot дүкеніңіздегі бағаларды өзгертпейді, ал бөлімдер жабық болады. Ұзартқаннан кейін қолжетімділік қайтады.',
     lapsedCta: 'Проны ұзарту',
+    whatIncluded: 'Про тарифіне не кіреді',
     facts: (price) => [
       `Про тарифі: айына ${price}. Kaspi дүкенінің бүкіл кабинеті кіреді.`,
       'Баға тексеру тегін. Әмияннан 5 ₸ тек бот бағаны әр өзгерткенде алынады.',
@@ -48,6 +52,7 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
     lapsedTitle: 'Renew Pro to get Kaspi Bot working again',
     lapsedText: 'Until the plan is renewed, Kaspi Bot does not change the prices in your store and the sections are closed. Access returns once you renew.',
     lapsedCta: 'Renew Pro',
+    whatIncluded: 'What the Pro plan includes',
     facts: (price) => [
       `Pro plan: ${price} per month. It includes the whole Kaspi store cabinet.`,
       'Price checks are free. 5 ₸ is taken from the wallet only for each price change made by the bot.',
