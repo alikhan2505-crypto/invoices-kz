@@ -15,6 +15,7 @@ import PageContainer, { TWO_COL_CLS } from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
 import { qualityLevelLabel, qualityMetricLabel, qualityStatusLabel, qualityTone, qualityToneStyle } from '@/lib/kaspiShop/qualityText'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -105,7 +106,7 @@ export default function KaspiShopQualityPage() {
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(kaspiLoginUrl()); return }
     const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
     if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
     // Демпинг is the only page with the actual connect terminal (phone/OTP)

@@ -13,6 +13,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 import { planCityStockSaves, sameCityPriceMismatches } from '@/lib/kaspiShop/pointStockPlan'
 import { apiErrorMessage } from '@/lib/kaspiShop/dempingForm'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -213,7 +214,7 @@ export default function KaspiShopProductAvailability() {
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(kaspiLoginUrl()); return }
     const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
     if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
     // Демпинг is the only page with the actual connect terminal (phone/OTP)

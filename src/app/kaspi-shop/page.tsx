@@ -26,6 +26,7 @@ import { FLOOR_LOW_SHARE } from '@/lib/kaspiShop/productSettings'
 import { PRODUCTS_PAGE_SIZE, filterCounts, filterProducts, type ProductFilterKey } from '@/lib/kaspiShop/productFilter'
 import { freshnessLine } from '@/lib/kaspiShop/productFreshness'
 import { marginHref } from '@/lib/kaspiShop/source1688'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 type Product = {
   id: string
@@ -461,7 +462,7 @@ export default function KaspiShop() {
 
   async function load(opts: { refreshEdit?: string } = {}) {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(kaspiLoginUrl()); return }
     const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
     if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
 
@@ -1278,7 +1279,7 @@ export default function KaspiShop() {
               )}
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
               <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>
-                {needsReconnect ? 'Сессия истекла — переподключитесь' : connected ? 'Добавьте ещё один магазин' : 'Подключите Kaspi Магазин'}
+                {merchantChoices ? 'Выберите магазин' : needsReconnect ? 'Сессия истекла — переподключитесь' : connected ? 'Добавьте ещё один магазин' : 'Подключите Kaspi Магазин'}
               </h1>
               {needsReconnect && (
                 <p className="text-sm mb-4 -mt-3" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -1303,7 +1304,7 @@ export default function KaspiShop() {
 
               {merchantChoices ? (
                 <div className="flex flex-col gap-2">
-                  <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
+                  <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>На этом номере найдено магазинов: {merchantChoices.length}. Выберите один сейчас, остальные можно подключить позже.</div>
                   {merchantChoices.map(m => (
                     <button key={m.id} onClick={() => selectMerchant(m.id)} disabled={connecting}
                       className="w-full text-left nav-glass rounded-xl px-4 py-3 text-sm transition-colors hover:border-[color:var(--nav-accent)] disabled:opacity-50"

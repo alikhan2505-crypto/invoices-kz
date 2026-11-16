@@ -14,6 +14,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 
 type Settings = {
@@ -155,7 +156,7 @@ export default function KaspiShopStorefrontSettings() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { router.push(kaspiLoginUrl()); return }
       // Same admin-only gate as every other kaspi-shop/* page (audit finding,
       // 2026-09-02) -- this page and storefront-orders were the only two
       // missing it, so any authenticated invoices.kz user could reach a

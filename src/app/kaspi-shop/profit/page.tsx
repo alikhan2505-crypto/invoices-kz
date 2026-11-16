@@ -15,6 +15,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer, { PROSE_WIDE_CLS } from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const PERIODS = [7, 30, 90]
@@ -112,6 +113,8 @@ export default function KaspiShopProfit() {
   const [commissionInput, setCommissionInput] = useState('')
   const [commissionError, setCommissionError] = useState('')
   const [savingCogsFor, setSavingCogsFor] = useState<string | null>(null)
+  // «Сохранено» на 2,5 с рядом с полем товара: раньше после сохранения не было никакого подтверждения (M17).
+  const [savedCogsFor, setSavedCogsFor] = useState<string | null>(null)
   const [cogsInputs, setCogsInputs] = useState<Record<string, string>>({})
   // Ошибка ввода себестоимости под полем конкретного товара (аудит K34).
   const [cogsErrors, setCogsErrors] = useState<Record<string, string>>({})
@@ -134,7 +137,7 @@ export default function KaspiShopProfit() {
 
   async function checkAccess() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(kaspiLoginUrl()); return }
     const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
     if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
     // Демпинг is the only page with the actual connect terminal (phone/OTP)
@@ -255,6 +258,8 @@ export default function KaspiShopProfit() {
         return
       }
       await loadSummary(days)
+      setSavedCogsFor(kaspiMasterSku)
+      setTimeout(() => setSavedCogsFor(cur => (cur === kaspiMasterSku ? null : cur)), 2500)
     } catch {
       setLoadError('Не удалось сохранить себестоимость. Проверьте соединение и попробуйте ещё раз.')
     } finally {
@@ -493,13 +498,17 @@ export default function KaspiShopProfit() {
                           setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))
                           setCogsErrors(prev => without(prev, p.kaspiMasterSku))
                         }}
-                        placeholder="₸" inputMode="decimal" autoComplete="off"
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveCogs(p.kaspiMasterSku) } }}
+                        placeholder="₸" inputMode="decimal" autoComplete="off" enterKeyHint="done"
                         className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                      <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
-                        className="flex-shrink-0 text-xs font-medium rounded-lg px-2 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
+                      <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku} aria-label="Сохранить себестоимость"
+                        className="flex-shrink-0 text-xs font-medium rounded-lg px-2 py-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                     </div>
                     {cogsErrors[p.kaspiMasterSku] && (
                       <span className="text-[10px] mt-1 block" style={{ color: 'var(--nav-critical)' }}>{cogsErrors[p.kaspiMasterSku]}</span>
+                    )}
+                    {savedCogsFor === p.kaspiMasterSku && !cogsErrors[p.kaspiMasterSku] && (
+                      <span role="status" className="text-[10px] mt-1 block" style={{ color: 'var(--nav-success)' }}>Сохранено ✓</span>
                     )}
                   </label>
 

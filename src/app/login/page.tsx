@@ -91,6 +91,8 @@ export default function Login() {
   // cancelled-and-repeated (the second run would find the intent gone).
   const sessionCheckStarted = useRef(false)
   const [linkExpired, setLinkExpired] = useState(false)
+  // Страница Kaspi Bot выбросила на /login (kaspiLoginUrl): говорим человеку, что вход устарел, и что вернём его назад.
+  const [sessionExpired, setSessionExpired] = useState(false)
   const reduceMotion = !!useReducedMotion()
   // Направление шага: 1 вперёд (форма -> «проверьте почту»), -1 назад («Изменить адрес»).
   const [dir, setDir] = useState<1 | -1>(1)
@@ -121,6 +123,7 @@ export default function Login() {
     if (ref) localStorage.setItem('referral_code', ref)
     // Пришли с /auth/callback после просроченной или использованной ссылки из письма.
     if (params.get('link') === 'expired') setLinkExpired(true)
+    if (params.get('session') === 'expired') setSessionExpired(true)
     const next = postLoginRedirectFromSearch(window.location.search)
     if (next) setPostLoginRedirect(next)
     const pending = pendingUpgradeFromSearch(window.location.search)
@@ -469,6 +472,11 @@ export default function Login() {
               <div className="flex-1 h-px" style={{ background: 'var(--nav-border)' }} />
             </div>
 
+            {sessionExpired && !linkExpired && (
+              <p role="status" className="text-xs rounded-lg px-3 py-2 mb-3 leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }}>
+                {t.sessionExpiredNotice}
+              </p>
+            )}
             {linkExpired && (
               <p role="alert" className="text-xs rounded-lg px-3 py-2 mb-3 leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }}>
                 {t.linkExpiredNotice}

@@ -13,6 +13,7 @@ import PageHeader from '@/components/PageHeader'
 import PageContainer from '@/components/PageContainer'
 import KaspiAccessRetry from '@/components/kaspiShop/KaspiAccessRetry'
 import { checkKaspiConnection } from '@/lib/kaspiShop/connectionGuard'
+import { kaspiLoginUrl } from '@/lib/kaspiShop/loginRedirect'
 
 // "Обзор" of Kaspi Bot (founder's mock, 21.09.2026): three numbers, the orders in
 // work, and the hand-offs to the neighbouring products. Everything here reads
@@ -67,7 +68,7 @@ export default function KaspiShopOverview() {
     let alive = true
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { router.push(kaspiLoginUrl()); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       // Not silently back to /dashboard -- that left a Pro-only wall with zero
       // explanation (founder's own Instagram ads send people here directly).

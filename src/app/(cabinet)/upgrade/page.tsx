@@ -274,6 +274,15 @@ function FeatureList({ items }: { items: string[] }) {
   )
 }
 
+// Тексты ошибок оплаты, которые приходят с сервера, бывают техническими («Platform Kaspi connection not set up»,
+// «tracking_failed», «Server error»): человеку они ни о чём не говорят (M27, прогон воронки 07.11.2026). Строки из
+// латиницы, цифр и знаков подчёркивания считаем кодами и заменяем общей фразой «Попробуйте снова»; обычный текст
+// (русский или казахский) показываем как есть.
+function humanPayError(raw: unknown, fallback: string): string {
+  if (typeof raw !== 'string' || !raw.trim()) return fallback
+  return /^[A-Za-z0-9_ .:\-]+$/.test(raw.trim()) ? fallback : raw
+}
+
 export default function Upgrade() {
   const router = useRouter()
   const { lang } = useLanguage()
@@ -511,7 +520,7 @@ export default function Upgrade() {
         : data.error === 'wallet_unavailable' ? tw.walletErrors.unavailable
         : typeof data.error === 'string' && data.error.startsWith('wallet_') ? tw.walletErrors.generic
         : null
-      alert(walletError ?? (data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault)))
+      alert(walletError ?? (data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(humanPayError(data.error, t.tryAgainDefault))))
       return { link: '', settled: false, error: typeof data.error === 'string' ? data.error : 'error' }
     }
 
@@ -704,7 +713,7 @@ export default function Upgrade() {
       statusInterval.current = setInterval(() => checkPaymentStatus(planKey), 5000)
 
     } catch (e: any) {
-      alert(t.errorPrefix(e.message || t.tryAgainDefault))
+      alert(t.errorPrefix(humanPayError(e.message, t.tryAgainDefault)))
       setShowModal(false)
     }
     setSubmitting(false)
@@ -774,7 +783,7 @@ export default function Upgrade() {
           setPhoneSubmitting(false)
           return
         }
-        alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
+        alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(humanPayError(data.error, t.tryAgainDefault)))
         setPhoneSubmitting(false)
         return
       }
@@ -788,7 +797,7 @@ export default function Upgrade() {
       // xpayment's near-instant webhook.
       setExtTranId(data.payment_id)
     } catch (e: any) {
-      alert(t.errorPrefix(e.message))
+      alert(t.errorPrefix(humanPayError(e.message, t.tryAgainDefault)))
     }
     setPhoneSubmitting(false)
   }
