@@ -46,6 +46,27 @@ export async function claimLoginCode(db: SupabaseClient, code: string, waId: str
   return data ? { token } : null
 }
 
+/**
+ * Ответ со ссылкой не ушёл человеку: код возвращается из sent в pending (пока не истёк), и то же сообщение
+ * «Вход <код>» можно отправить ещё раз. Условие по wa_id и статусу: уже открытую ссылку (consumed) не трогаем.
+ * Возвращает true, если код вернули.
+ */
+export async function releaseClaim(db: SupabaseClient, code: string, waId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('whatsapp_login_codes')
+    .update({ status: 'pending', wa_id: null, token_hash: null, token_expires_at: null, confirm_hash: null })
+    .eq('code_hash', hashSecret(code))
+    .eq('status', 'sent')
+    .eq('wa_id', waId)
+    .select('id')
+    .maybeSingle()
+  if (error) {
+    console.error('whatsapp login: release claim failed:', error.message)
+    return false
+  }
+  return !!data
+}
+
 interface AdminApi {
   createUser(attrs: Record<string, unknown>): Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>
   getUserById(id: string): Promise<{ data: { user: { email?: string | null } | null }; error: { message: string } | null }>

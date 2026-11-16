@@ -8,7 +8,7 @@ import {
   EXPIRED_CODE_REPLY, linkReplyText, loginConfig, loginReplyText, normalizeWaId, parseLinkMessage, parseLoginMessage,
   type WhatsAppLoginConfig,
 } from './helpers'
-import { claimLoginCode } from './service'
+import { claimLoginCode, releaseClaim } from './service'
 import { claimLinkCode } from './link'
 
 /** Ссылок входа на один номер WhatsApp в час: больше ни одному человеку не нужно. */
@@ -27,7 +27,11 @@ export interface LoginMessageParams {
   send: (text: string) => Promise<void>
   cfg?: WhatsAppLoginConfig | null
   now?: number
+  /** Ответ человеку не ушёл (код при этом возвращён): сообщить основателю. Не должна бросать. */
+  onSendFailure?: (info: { waId: string; kind: 'login' | 'link'; reason: string; released: boolean }) => Promise<void> | void
 }
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300)
 
 /**
  * true: сообщение наше (вход), агенту его отдавать нельзя. false: это обычное сообщение клиента.
@@ -47,9 +51,22 @@ export async function handleLoginMessage(p: LoginMessageParams): Promise<boolean
     const slot = await claimWindowSlot(p.db, windowKey('walogin-wa', waId, hourBucket(p.now)), LOGINS_PER_NUMBER_PER_HOUR)
     if (!slot.ok && slot.reason === 'limit') return true // слишком часто: молчим
 
+    // Код уже переведён в sent, а ответ человеку мог не уйти (сбой Graph API): без отката ссылка потеряна,
+    // и человек остаётся ни с чем. Откатываем код в pending, чтобы то же сообщение можно было отправить ещё раз.
+    const sendOrRelease = async (kind: 'login' | 'link', code: string, text: string) => {
+      try {
+        await p.send(text)
+      } catch (e) {
+        const released = await releaseClaim(p.db, code, waId).catch(() => false)
+        console.error('whatsapp login: reply not sent:', errText(e), released ? '(код возвращён)' : '(код не возвращён)')
+        try { await p.onSendFailure?.({ waId, kind, reason: errText(e), released }) } catch { /* оповещение не критично */ }
+      }
+    }
+
     if (linkCode) {
       const linkClaim = await claimLinkCode(p.db, linkCode, waId, p.now)
-      await p.send(linkClaim ? linkReplyText(linkClaim.confirm) : EXPIRED_CODE_REPLY)
+      if (!linkClaim) await p.send(EXPIRED_CODE_REPLY)
+      else await sendOrRelease('link', linkCode, linkReplyText(linkClaim.confirm))
       return true
     }
     const claim = await claimLoginCode(p.db, loginCode!, waId, p.now)
@@ -57,7 +74,7 @@ export async function handleLoginMessage(p: LoginMessageParams): Promise<boolean
       await p.send(EXPIRED_CODE_REPLY)
       return true
     }
-    await p.send(loginReplyText(`${LOGIN_LINK_BASE}${claim.token}`))
+    await sendOrRelease('login', loginCode!, loginReplyText(`${LOGIN_LINK_BASE}${claim.token}`))
   } catch (e) {
     // Сбой базы или отправки: человек увидит, что ответа нет, и нажмёт кнопку ещё раз. Агенту не отдаём.
     console.error('whatsapp login: message handling failed:', e instanceof Error ? e.message : e)

@@ -10,6 +10,7 @@ import { entryMatchesWabaId } from '@/lib/aiAgent/whatsappWabaMatch'
 import { secretEquals } from '@/lib/secretEquals'
 import { createClient } from '@supabase/supabase-js'
 import { handleLoginMessage } from '@/lib/whatsappLogin/webhook'
+import { alertSendFailure } from '@/lib/whatsappLogin/alerts'
 import { LINK_REPLY_MARKER, LOGIN_LINK_MARKER } from '@/lib/whatsappLogin/helpers'
 
 // Вход через WhatsApp (whatsapp_login.sql): сообщения «Вход <код>» забираются до агента.
@@ -175,6 +176,7 @@ export async function POST(req: NextRequest) {
             from,
             text,
             send: (reply) => sendWhatsAppMessage(conn.phoneNumberId, from, reply, { accessToken: conn.accessToken }),
+            onSendFailure: (info) => alertSendFailure(loginDb, info),
           })
           if (handled) continue
         }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { hookSecretOk } from '@/lib/hooksGuard'
+import { signupLabel } from '@/lib/whatsappLogin/signupLabel'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
   if (!claimed || claimed.length === 0) return NextResponse.json({ ok: true, already: true })
 
   const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
+  // Вошедший по WhatsApp без почты: подписываем «через WhatsApp +7•••0406», а не «без email».
+  const who = await signupLabel(supabase, userId, profile.email).catch(() => 'без email')
 
   const { data: admins } = await supabase
     .from('profiles')
@@ -59,7 +62,7 @@ export async function POST(req: NextRequest) {
     try {
       await sendTelegramNotification(
         String(a.telegram_chat_id),
-        `🆕 Новая регистрация: ${escapeHtml(profile.email) || 'без email'}${count ? ` (№${count})` : ''}`,
+        `🆕 Новая регистрация: ${escapeHtml(who)}${count ? ` (№${count})` : ''}`,
       )
     } catch (e) {
       console.error('hooks/new-signup: telegram failed:', e instanceof Error ? e.message : e)

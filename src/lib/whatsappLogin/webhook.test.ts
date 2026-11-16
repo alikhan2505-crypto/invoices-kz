@@ -73,4 +73,31 @@ describe('handleLoginMessage', () => {
     const code = await createLoginCode(db, {}, NOW)
     expect(await call(`Вход ${code}`, { send: async () => { throw new Error('graph 500') } })).toBe(true)
   })
+
+  it('ссылка не ушла: код возвращается в pending, основателю тревога, повтор того же сообщения выдаёт ссылку', async () => {
+    const { db, call, sent, tables } = setup()
+    const code = await createLoginCode(db, {}, NOW)
+    const failures: unknown[] = []
+    expect(await call(`Вход ${code}`, {
+      send: async () => { throw new Error('graph 500') },
+      onSendFailure: (i) => { failures.push(i) },
+    })).toBe(true)
+    expect(tables.whatsapp_login_codes[0].status).toBe('pending')
+    expect(tables.whatsapp_login_codes[0].token_hash).toBeNull()
+    expect(failures).toEqual([{ waId: '77776970406', kind: 'login', reason: 'graph 500', released: true }])
+
+    expect(await call(`Вход ${code}`)).toBe(true)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toContain(LOGIN_LINK_BASE)
+    expect(tables.whatsapp_login_codes[0].status).toBe('sent')
+  })
+
+  it('сбой самой тревоги не ломает вебхук', async () => {
+    const { db, call } = setup()
+    const code = await createLoginCode(db, {}, NOW)
+    expect(await call(`Вход ${code}`, {
+      send: async () => { throw new Error('graph 500') },
+      onSendFailure: () => { throw new Error('telegram down') },
+    })).toBe(true)
+  })
 })
